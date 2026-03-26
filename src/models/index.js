@@ -3,6 +3,36 @@
 // Every log, student lookup, and health check goes through here
 // ══════════════════════════════════════════════════════════════
 
+// ── Pseudonym palette — 12 named colors for identity generation ──────────
+export const PSEUDONYM_PALETTE = [
+  { hex: "#ef4444", name: "Red" },
+  { hex: "#f97316", name: "Orange" },
+  { hex: "#eab308", name: "Yellow" },
+  { hex: "#22c55e", name: "Green" },
+  { hex: "#06b6d4", name: "Cyan" },
+  { hex: "#3b82f6", name: "Blue" },
+  { hex: "#8b5cf6", name: "Violet" },
+  { hex: "#ec4899", name: "Pink" },
+  { hex: "#f43f5e", name: "Rose" },
+  { hex: "#14b8a6", name: "Teal" },
+  { hex: "#a855f7", name: "Purple" },
+  { hex: "#84cc16", name: "Lime" },
+];
+
+// Input: string[] of unique real names in desired assignment order
+// Output: Map<realName, { pseudonym: string, color: string }>
+// Cycles through palette; increments counter per color on wrap-around.
+export function generatePseudonymSet(uniqueNames) {
+  const colorCounts = {};
+  const result = new Map();
+  uniqueNames.forEach((realName, i) => {
+    const { hex, name } = PSEUDONYM_PALETTE[i % PSEUDONYM_PALETTE.length];
+    colorCounts[name] = (colorCounts[name] || 0) + 1;
+    result.set(realName, { pseudonym: `${name} Student ${colorCounts[name]}`, color: hex });
+  });
+  return result;
+}
+
 // ── Enriched Log Factory ─────────────────────────────────────
 // Every log entry gets full context — ready for analytics, AI, MCP
 let _logCounter = 0;
