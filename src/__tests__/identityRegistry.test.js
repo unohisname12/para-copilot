@@ -25,7 +25,15 @@ describe('generatePseudonymSet', () => {
     expect(generatePseudonymSet([]).size).toBe(0);
   });
 
-  test('PSEUDONYM_PALETTE has exactly 12 entries', () => {
+  test('silently overwrites duplicate input names (Map behavior)', () => {
+    const result = generatePseudonymSet(['Alice', 'Alice']);
+    expect(result.size).toBe(1);
+    expect(result.get('Alice').pseudonym).toBe('Orange Student 1');
+  });
+});
+
+describe('PSEUDONYM_PALETTE', () => {
+  test('has exactly 12 entries', () => {
     expect(PSEUDONYM_PALETTE).toHaveLength(12);
   });
 });

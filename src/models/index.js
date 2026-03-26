@@ -23,6 +23,9 @@ export const PSEUDONYM_PALETTE = [
 // Output: Map<realName, { pseudonym: string, color: string }>
 // Cycles through palette; increments counter per color on wrap-around.
 export function generatePseudonymSet(uniqueNames) {
+  if (!Array.isArray(uniqueNames)) {
+    throw new TypeError('generatePseudonymSet: uniqueNames must be an Array');
+  }
   const colorCounts = {};
   const result = new Map();
   uniqueNames.forEach((realName, i) => {
