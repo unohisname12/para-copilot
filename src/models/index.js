@@ -36,6 +36,101 @@ export function generatePseudonymSet(uniqueNames) {
   return result;
 }
 
+// ── Identity Registry Builder ─────────────────────────────────────────────
+// Reads a combined bundle JSON, groups all privateRosterMap entries by realName,
+// assigns one pseudonym+color per unique person, merges IEP data across periods.
+//
+// Returns:
+//   registry:       [{ realName, pseudonym, color, periodIds[], classLabels{} }]
+//   importStudents: { [id]: student }  — no realName field, safe for app state
+//   periodMap:      { [periodId]: id[] }
+export function buildIdentityRegistry(bundleData) {
+  const prEntries    = bundleData?.privateRosterMap?.privateRosterMap || [];
+  const rawStudents  = bundleData?.normalizedStudents?.students        || [];
+  const registry     = [];
+  const importStudents = {};
+  const periodMap    = {};
+
+  if (!prEntries.length) return { registry, importStudents, periodMap };
+
+  // Build studentId → raw student lookup for IEP fields
+  const rawById = {};
+  rawStudents.forEach(s => { if (s.id) rawById[s.id] = s; });
+
+  // Group privateRosterMap entries by realName to find unique people
+  const byRealName = new Map();
+  prEntries.forEach(entry => {
+    const name = (entry.realName || "").trim();
+    if (!name) return;
+    if (!byRealName.has(name)) byRealName.set(name, []);
+    byRealName.get(name).push(entry);
+  });
+
+  // One pseudonym+color per unique person
+  const pseudonymMap = generatePseudonymSet([...byRealName.keys()]);
+
+  let idCounter = 1;
+  const coveredRawIds = new Set();
+
+  byRealName.forEach((appearances, realName) => {
+    const { pseudonym, color } = pseudonymMap.get(realName);
+    const periodIds  = [...new Set(appearances.map(a => a.periodId).filter(Boolean))];
+    const classLabels = {};
+    appearances.forEach(a => { if (a.periodId) classLabels[a.periodId] = a.classLabel || ""; });
+
+    const raws = appearances.map(a => rawById[a.studentId]).filter(Boolean);
+    raws.forEach(r => coveredRawIds.add(r.id));
+
+    // Merge goals — deduplicate by text
+    const seenGoalTexts = new Set();
+    const mergedGoals = [];
+    raws.forEach(r => {
+      (r.goals || []).forEach(g => {
+        const text = typeof g === "string" ? g : (g.text || "");
+        if (text && !seenGoalTexts.has(text)) { seenGoalTexts.add(text); mergedGoals.push(g); }
+      });
+    });
+
+    // Merge accs — union
+    const mergedAccs = [...new Set(raws.flatMap(r => r.accs || r.accommodations || []))];
+
+    const primaryRaw    = raws[0] || {};
+    const primaryEntry  = appearances[0];
+    const studentId     = `stu_gen_${String(idCounter++).padStart(3, "0")}`;
+
+    const profile = normalizeImportedStudent({
+      ...primaryRaw,
+      id:         studentId,
+      pseudonym,
+      color,
+      goals:      mergedGoals.length ? mergedGoals : (primaryRaw.goals || []),
+      accs:       mergedAccs.length  ? mergedAccs  : (primaryRaw.accs  || []),
+      periodId:   primaryEntry?.periodId   || "",
+      classLabel: primaryEntry?.classLabel || "",
+    });
+
+    importStudents[studentId] = profile;
+    periodIds.forEach(pid => {
+      if (!periodMap[pid]) periodMap[pid] = [];
+      periodMap[pid].push(studentId);
+    });
+    registry.push({ realName, pseudonym, color, periodIds, classLabels });
+  });
+
+  // Include any normalizedStudents not in privateRosterMap (safe fallback)
+  rawStudents.forEach(s => {
+    if (coveredRawIds.has(s.id) || !s.id) return;
+    const profile = normalizeImportedStudent(s);
+    importStudents[profile.id] = profile;
+    if (s.periodId) {
+      if (!periodMap[s.periodId]) periodMap[s.periodId] = [];
+      periodMap[s.periodId].push(profile.id);
+    }
+  });
+
+  return { registry, importStudents, periodMap };
+}
+
 // ── Enriched Log Factory ─────────────────────────────────────
 // Every log entry gets full context — ready for analytics, AI, MCP
 let _logCounter = 0;
