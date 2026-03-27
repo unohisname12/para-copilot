@@ -235,4 +235,21 @@ describe('buildIdentityRegistryFromMasterRoster', () => {
     const { importStudents } = buildIdentityRegistryFromMasterRoster(roster);
     expect(Object.keys(importStudents)).toHaveLength(2); // both records exist, no clobber
   });
+
+  test('uses periods[].studentIds as fallback when student.periodIds is absent or empty', () => {
+    const roster = {
+      students: [
+        { id: "f001", fullName: "Fallback Student" }  // no periodIds field
+      ],
+      periods: [
+        { id: "p1", label: "Period 1 — ELA", studentIds: ["f001"] },
+        { id: "p2", label: "Period 2 — Math", studentIds: [] }
+      ]
+    };
+    const { registry, periodMap } = buildIdentityRegistryFromMasterRoster(roster);
+    expect(registry).toHaveLength(1);
+    expect(registry[0].periodIds).toEqual(["p1"]);
+    expect(periodMap.p1).toBeDefined();
+    expect(periodMap.p1[0]).toMatch(/^stu_mr_/);
+  });
 });
