@@ -6,7 +6,7 @@
 import React, { useState, useRef } from "react";
 import { DB } from '../data';
 import { ollamaParseIEP } from '../engine/ollama';
-import { normalizeImportedStudent, buildIdentityRegistry } from '../models';
+import { normalizeImportedStudent, buildIdentityRegistry, buildIdentityRegistryFromMasterRoster } from '../models';
 
 // ── System 1: App Bundle validation ──────────────────────────
 // Accepts schemaVersion 2.0 / 2.1 app bundles only.
@@ -23,6 +23,23 @@ function validateBundle(json) {
     return `Unsupported schemaVersion "${json.schemaVersion}". Supported: ${SUPPORTED_SCHEMA.join(", ")}.`;
   if (!json.normalizedStudents || !Array.isArray(json.normalizedStudents.students))
     return "Missing normalizedStudents.students array.";
+  return null; // null = valid
+}
+
+function validateMasterRoster(json) {
+  if (!json || typeof json !== "object" || Array.isArray(json))
+    return "Not a valid JSON object.";
+  if (!Array.isArray(json.students) || json.students.length === 0)
+    return "Missing or empty students array.";
+  if (!Array.isArray(json.periods) || json.periods.length === 0)
+    return "Missing or empty periods array.";
+  for (let i = 0; i < json.students.length; i++) {
+    const s = json.students[i];
+    if (!s.id || typeof s.id !== "string")
+      return `Student at index ${i} is missing a valid id field.`;
+    if (!s.fullName || typeof s.fullName !== "string" || !s.fullName.trim())
+      return `Student at index ${i} (id: "${s.id}") is missing a valid fullName field.`;
+  }
   return null; // null = valid
 }
 
@@ -75,6 +92,12 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
   const [pendingRosterData,     setPendingRosterData]     = useState([]);
   const bundleFileRef = useRef();
 
+  // ── Master Roster state ─────────────────────────────────────────
+  const [masterRosterData,     setMasterRosterData]     = useState(null);
+  const [masterRosterError,    setMasterRosterError]     = useState("");
+  const [masterRosterImported, setMasterRosterImported] = useState(false);
+  const masterRosterFileRef = useRef();
+
   const handleBundleFile = async (e) => {
     const file = e.target.files[0]; if (!file) return;
     setBundleError(""); setBundleData(null); setBundleImported(false);
@@ -120,6 +143,31 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
     }
   };
 
+  const handleMasterRosterFile = async (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    setMasterRosterError(""); setMasterRosterData(null); setMasterRosterImported(false);
+    try {
+      const json = JSON.parse(await file.text());
+      const err = validateMasterRoster(json);
+      if (err) { setMasterRosterError(err); e.target.value = ""; return; }
+      setMasterRosterData(json);
+    } catch (err) { setMasterRosterError("Could not parse JSON: " + err.message); }
+    e.target.value = "";
+  };
+
+  const doMasterRosterImport = () => {
+    if (!masterRosterData || !onBulkImport) return;
+    const { registry, importStudents, periodMap } = buildIdentityRegistryFromMasterRoster(masterRosterData);
+    onBulkImport(Object.values(importStudents), periodMap);
+    if (registry.length > 0) onIdentityLoad?.(registry);
+    setMasterRosterImported(true);
+    setTimeout(() => { setMasterRosterImported(false); setMasterRosterData(null); }, 3500);
+    if (registry.length > 0) {
+      setPendingRosterData(registry);
+      setShowRosterSaveModal(true);
+    }
+  };
+
   // ── Bundle summary helpers ───────────────────────────────────
   const bundleStudents = bundleData?.normalizedStudents?.students || [];
   const bundleSummary = {
@@ -129,6 +177,11 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
     crossPeriod:    bundleStudents.filter(s => s.flags?.crossPeriod).length,
     withAlerts:     bundleStudents.filter(s => s.flags?.alert || s.alertText).length,
   };
+
+  // ── Master Roster summary helpers ────────────────────────────
+  const mrStudents = masterRosterData?.students || [];
+  const mrPeriods  = masterRosterData?.periods  || [];
+  const mrCrossPeriodCount = mrStudents.filter(s => Array.isArray(s.periodIds) && s.periodIds.length > 1).length;
 
   // ── Private Roster accumulator ────────────────────────────────
   const [exportedPrivateRoster, setExportedPrivateRoster] = useState([]);
@@ -347,9 +400,28 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
 
       {/* Mode tabs */}
       <div style={{ display: "flex", gap: "4px", marginBottom: "20px", flexWrap: "wrap" }}>
-        {[["paste", "📋 Paste Text"], ["upload", "📎 Upload File"], ["manual", "✏️ Manual Entry"], ["bundle", "📦 App Bundle JSON"]].map(([id, label]) => (
-          <button key={id} onClick={() => { setInputMode(id); setParsed(null); setParseError(""); setBundleError(""); }}
-            style={{ padding: "8px 16px", borderRadius: "8px", border: id === "bundle" ? "1px solid #6d28d9" : "none", cursor: "pointer", fontSize: "13px", fontWeight: "600", background: inputMode === id ? (id === "bundle" ? "#1e1b4b" : "#1d4ed8") : "var(--panel-bg)", color: inputMode === id ? (id === "bundle" ? "#a78bfa" : "#fff") : "var(--text-muted)" }}>
+        {[["paste", "📋 Paste Text"], ["upload", "📎 Upload File"], ["manual", "✏️ Manual Entry"], ["bundle", "📦 App Bundle JSON"], ["masterRoster", "🗂️ Master Roster JSON"]].map(([id, label]) => (
+          <button key={id} onClick={() => { setInputMode(id); setParsed(null); setParseError(""); setBundleError(""); setMasterRosterData(null); setMasterRosterError(""); }}
+            style={{
+              padding: "8px 16px",
+              borderRadius: "8px",
+              border: id === "bundle"      ? "1px solid #6d28d9"
+                    : id === "masterRoster" ? "1px solid #166534"
+                    : "none",
+              cursor: "pointer",
+              fontSize: "13px",
+              fontWeight: "600",
+              background: inputMode === id ? (
+                  id === "bundle"       ? "#1e1b4b"
+                : id === "masterRoster" ? "#0d2010"
+                : "#1d4ed8"
+              ) : "var(--panel-bg)",
+              color: inputMode === id ? (
+                  id === "bundle"       ? "#a78bfa"
+                : id === "masterRoster" ? "#4ade80"
+                : "#fff"
+              ) : "var(--text-muted)",
+            }}>
             {label}
           </button>
         ))}
@@ -469,8 +541,73 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
         </div>
       )}
 
+      {/* ── MASTER ROSTER IMPORT UI ─────────────────────────── */}
+      {inputMode === "masterRoster" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+
+          {/* Privacy notice */}
+          <div style={{ padding: "10px 14px", background: "#071a0e", border: "1px solid #166534", borderRadius: "10px", fontSize: "11px", color: "#4ade80", lineHeight: "1.6" }}>
+            🔒 <strong>FERPA-safe:</strong> Real names are read from this file and placed into the Private Roster only — never stored in app state, AI context, logs, analytics, or exports. The app works with pseudonyms only.
+          </div>
+
+          {/* Duplicate-import warning */}
+          {importedCount > 0 && (
+            <div style={{ padding: "10px 14px", background: "#1a1505", border: "1px solid #854d0e", borderRadius: "10px", fontSize: "11px", color: "#fbbf24", lineHeight: "1.6" }}>
+              ⚠ <strong>You already have {importedCount} imported student{importedCount !== 1 ? "s" : ""}.</strong> Importing a Master Roster adds new records with different IDs. To avoid duplicates, clear imported students first.
+            </div>
+          )}
+
+          {/* File input */}
+          <input type="file" ref={masterRosterFileRef} style={{ display: "none" }} accept=".json" onChange={handleMasterRosterFile} />
+
+          {/* Upload button */}
+          <button onClick={() => masterRosterFileRef.current?.click()}
+            style={{ width: "100%", padding: "14px 20px", borderRadius: "10px", border: `2px solid ${masterRosterData ? "#166534" : "var(--border-light)"}`, background: masterRosterData ? "#071a0e" : "var(--bg-surface)", color: masterRosterData ? "#4ade80" : "var(--text-primary)", fontSize: "14px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", gap: "12px", textAlign: "left" }}>
+            <span style={{ fontSize: "22px" }}>🗂️</span>
+            <span>{masterRosterData ? `✓ Roster loaded — ${mrStudents.length} student${mrStudents.length !== 1 ? "s" : ""} in ${mrPeriods.length} period${mrPeriods.length !== 1 ? "s" : ""}` : "Upload Master Roster JSON"}</span>
+          </button>
+
+          {/* Validation error */}
+          {masterRosterError && (
+            <div style={{ padding: "10px 14px", background: "#1a0505", border: "1px solid #7f1d1d", borderRadius: "8px", fontSize: "12px", color: "#f87171" }}>
+              ✗ {masterRosterError}
+            </div>
+          )}
+
+          {/* Preview */}
+          {masterRosterData && !masterRosterImported && (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
+                {[
+                  { label: "Students",      val: mrStudents.length,      color: "#e2e8f0" },
+                  { label: "Periods",       val: mrPeriods.length,       color: "#60a5fa" },
+                  { label: "Multi-Period",  val: mrCrossPeriodCount,     color: "#4ade80" },
+                ].map(({ label, val, color }) => (
+                  <div key={label} style={{ background: "var(--bg-surface)", borderRadius: "8px", padding: "10px 12px", textAlign: "center" }}>
+                    <div style={{ fontSize: "22px", fontWeight: "700", color }}>{val}</div>
+                    <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "2px" }}>{label}</div>
+                  </div>
+                ))}
+              </div>
+
+              <button onClick={doMasterRosterImport}
+                style={{ width: "100%", padding: "14px", borderRadius: "12px", border: "1px solid #166534", background: "#0d2010", color: "#4ade80", fontSize: "15px", fontWeight: "800", cursor: "pointer" }}>
+                🗂️ Import {mrStudents.length} Student{mrStudents.length !== 1 ? "s" : ""} into App
+              </button>
+            </>
+          )}
+
+          {/* Success banner */}
+          {masterRosterImported && (
+            <div style={{ padding: "20px", borderRadius: "12px", background: "#0d2010", border: "2px solid #166534", color: "#4ade80", textAlign: "center", fontSize: "16px", fontWeight: "700" }}>
+              ✓ {mrStudents.length} student{mrStudents.length !== 1 ? "s" : ""} imported from Master Roster!
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── ORIGINAL IEP/AI IMPORT (paste / upload / manual) ──── */}
-      {inputMode !== "bundle" && <div style={{ display: "grid", gridTemplateColumns: parsed || inputMode === "manual" ? "1fr 1fr" : "1fr", gap: "20px" }}>
+      {inputMode !== "bundle" && inputMode !== "masterRoster" && <div style={{ display: "grid", gridTemplateColumns: parsed || inputMode === "manual" ? "1fr 1fr" : "1fr", gap: "20px" }}>
 
         {/* Left: Input */}
         <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
