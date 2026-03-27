@@ -98,26 +98,24 @@ export default function App() {
     setImportedPeriodMap(prev => ({ ...prev, [periodId]: [...(prev[periodId] || []), studentObj.id] }));
   };
 
-  // ── Private roster — local only, FERPA-sensitive, never persisted ──
-  const [privateRoster, setPrivateRoster] = useState({}); // { [studentId]: realName }
+  // identityRegistry — local only, FERPA-sensitive, never persisted
+  // Shape: [{ realName, pseudonym, color, periodIds: string[], classLabels: {} }]
+  const [identityRegistry, setIdentityRegistry] = useState([]);
 
-  // System 2: Private Roster load — keyed by displayLabel (= student pseudonym)
-  // entries: [{ displayLabel, realName, color }] from the strict JSON format
-  const handlePrivateRosterLoad = (entries) => {
-    const update = {};
-    (entries || []).forEach(entry => {
-      if (!entry.realName) return;
-      if (entry.displayLabel) {
-        update[entry.displayLabel] = entry.realName;
-      } else if (entry.color) {
-        // Color fallback: find a student with matching color
-        const match = Object.values(allStudents).find(s => s.color === entry.color);
-        if (match?.pseudonym) update[match.pseudonym] = entry.realName;
-      }
-    });
-    if (Object.keys(update).length > 0) {
-      setPrivateRoster(prev => ({ ...prev, ...update }));
-    }
+  // handleIdentityLoad — accepts v2.0 registry entries or v1.0 backward-compat shape.
+  // v2.0: [{ realName, pseudonym, color, periodIds, classLabels }]
+  // v1.0: [{ displayLabel, realName, color }] — promoted to minimal v2.0 shape
+  const handleIdentityLoad = (entries) => {
+    const normalized = (entries || [])
+      .filter(e => e.realName && (e.pseudonym || e.displayLabel))
+      .map(e => ({
+        realName:    e.realName,
+        pseudonym:   e.pseudonym   || e.displayLabel,
+        color:       e.color       || "",
+        periodIds:   e.periodIds   || [],
+        classLabels: e.classLabels || {},
+      }));
+    if (normalized.length > 0) setIdentityRegistry(normalized);
   };
 
   // Bulk bundle import — deduplicates by id, never touches privateRosterMap
@@ -534,10 +532,10 @@ export default function App() {
         <RosterPanel
           onClose={() => setRosterPanelOpen(false)}
           allStudents={allStudents}
-          privateRoster={privateRoster}
-          onNameChange={(id, val) => setPrivateRoster(prev => ({ ...prev, [id]: val }))}
-          onRosterLoad={handlePrivateRosterLoad}
-          onClearRoster={() => setPrivateRoster({})}
+          identityRegistry={identityRegistry}
+          activePeriod={activePeriod}
+          onIdentityLoad={handleIdentityLoad}
+          onClearRoster={() => setIdentityRegistry([])}
         />
       )}
 
@@ -605,7 +603,7 @@ export default function App() {
                 />
               )}
               {view === "vault" && renderVault()}
-              {view === "import" && <IEPImport onImport={handleImport} onBulkImport={handleBundleImport} importedCount={Object.keys(importedStudents).length} />}
+              {view === "import" && <IEPImport onImport={handleImport} onBulkImport={handleBundleImport} onIdentityLoad={handleIdentityLoad} importedCount={Object.keys(importedStudents).length} />}
               {view === "analytics" && <AnalyticsDashboard logs={logs} groups={groups} setGroups={setGroups} onOpenProfile={setProfileStu} ollamaOnline={ollamaOnline} ollamaLoading={ollamaLoading} onOllamaPatternSummary={handleOllamaPatternSummary} />}
             </>
         }
