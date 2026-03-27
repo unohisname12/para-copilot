@@ -73,7 +73,9 @@ export function buildIdentityRegistry(bundleData) {
   const coveredRawIds = new Set();
 
   byRealName.forEach((appearances, realName) => {
-    const { pseudonym, color } = pseudonymMap.get(realName);
+    const entry = pseudonymMap.get(realName);
+    if (!entry) { console.error(`buildIdentityRegistry: no pseudonym generated for "${realName}" — skipping`); return; }
+    const { pseudonym, color } = entry;
     const periodIds  = [...new Set(appearances.map(a => a.periodId).filter(Boolean))];
     const classLabels = {};
     appearances.forEach(a => { if (a.periodId) classLabels[a.periodId] = a.classLabel || ""; });
@@ -92,6 +94,7 @@ export function buildIdentityRegistry(bundleData) {
     });
 
     // Merge accs — union
+    // r.accommodations: legacy field name used in older bundle schemas (pre-2.0)
     const mergedAccs = [...new Set(raws.flatMap(r => r.accs || r.accommodations || []))];
 
     const primaryRaw    = raws[0] || {};
