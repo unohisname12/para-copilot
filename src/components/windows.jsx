@@ -1,67 +1,79 @@
 // ══════════════════════════════════════════════════════════════
 // WINDOW COMPONENTS — Tip, Floating, Fullscreen, Stealth, RosterPanel
 // ══════════════════════════════════════════════════════════════
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import ReactDOM from 'react-dom';
 import { DB } from '../data';
 
-// ── System 2: Private Roster validator ───────────────────────
-// Accepts two formats:
-//   A) Official:  { type: "privateRoster", schemaVersion: "1.0", students: [...] }
-//   B) Combined:  { privateRosterMap: { schemaVersion, privateRosterMap: [...] }, normalizedStudents: ... }
-// Returns null if valid, error string otherwise.
 function validatePrivateRoster(json) {
   if (!json || typeof json !== "object" || Array.isArray(json))
     return "Not a valid JSON object.";
 
-  // Format B: combined export — check this BEFORE normalizedStudents guard
+  // Combined export format (has privateRosterMap key)
   if (json.privateRosterMap) {
     const inner = json.privateRosterMap;
     if (!inner || typeof inner !== "object" || Array.isArray(inner))
       return 'Malformed file: "privateRosterMap" must be an object.';
     if (!Array.isArray(inner.privateRosterMap))
       return 'Malformed file: expected "privateRosterMap.privateRosterMap" to be an array.';
-    const hasNames = inner.privateRosterMap.some(e => e && e.realName && String(e.realName).trim());
-    if (!hasNames)
-      return "No real student names found in this file. Fill in the realName fields and try again.";
+    if (!inner.privateRosterMap.some(e => e && e.realName && String(e.realName).trim()))
+      return "No real student names found in this file.";
     return null;
   }
 
-  // Pure app bundle (no privateRosterMap, has normalizedStudents)
+  // Pure app bundle (no private roster data)
   if (json.normalizedStudents)
     return "This looks like an App Bundle file — upload it in IEP Import → App Bundle JSON tab, not here.";
 
-  // Format A: official privateRoster
+  // Official privateRoster artifact (schemaVersion 1.0 or 2.0)
   if (json.type !== "privateRoster")
     return json.type
       ? `Wrong file type: "${json.type}". Expected a Private Roster file.`
       : 'Missing type field. Expected { "type": "privateRoster", ... }';
   if (!Array.isArray(json.students))
     return 'Missing "students" array in file.';
-  const hasNames = json.students.some(e => e && e.realName && String(e.realName).trim());
-  if (!hasNames)
-    return "No real student names found in this file. Fill in the realName fields and try again.";
+  if (!json.students.some(e => e && e.realName && String(e.realName).trim()))
+    return "No real student names found in this file.";
   return null;
 }
 
-// ── Private Roster entry normalizer ──────────────────────────
-// Converts either format into [{ displayLabel, realName, color }]
-// so handlePrivateRosterLoad in App.jsx always receives the same shape.
-function extractRosterEntries(json, allStudents = {}) {
+// Normalizes any supported format into [{ realName, pseudonym, color, periodIds, classLabels }]
+// so handleIdentityLoad in App.jsx always receives the same v2.0 shape.
+function extractIdentityEntries(json, allStudents = {}) {
+  // Combined export — group by realName to build v2.0 entries
   if (json.privateRosterMap) {
-    // Build a pseudonym→color map from available imported students
     const colorByPseudonym = {};
     Object.values(allStudents).forEach(s => {
       if (s.pseudonym) colorByPseudonym[s.pseudonym] = s.color || "";
     });
-    return json.privateRosterMap.privateRosterMap.map(e => ({
-      displayLabel: e.pseudonym || "",
-      realName:     e.realName  || "",
-      color:        colorByPseudonym[e.pseudonym] || "",
-    }));
+    const byRealName = new Map();
+    json.privateRosterMap.privateRosterMap.forEach(e => {
+      if (!e.realName) return;
+      const key = e.realName.trim();
+      if (!byRealName.has(key)) {
+        byRealName.set(key, {
+          realName: key, pseudonym: e.pseudonym || "",
+          color: colorByPseudonym[e.pseudonym] || "",
+          periodIds: [], classLabels: {},
+        });
+      }
+      const rec = byRealName.get(key);
+      if (e.periodId && !rec.periodIds.includes(e.periodId)) {
+        rec.periodIds.push(e.periodId);
+        rec.classLabels[e.periodId] = e.classLabel || "";
+      }
+    });
+    return [...byRealName.values()];
   }
-  // Official format already matches the expected shape
-  return json.students;
+
+  // v2.0 official artifact — already the right shape
+  if (json.students?.[0]?.periodIds !== undefined)
+    return json.students.filter(e => e && e.realName);
+
+  // v1.0 official artifact [{ displayLabel, realName, color }] — promote to v2.0 shape
+  return (json.students || [])
+    .filter(e => e && e.realName)
+    .map(e => ({ realName: e.realName, pseudonym: e.displayLabel || "", color: e.color || "", periodIds: [], classLabels: {} }));
 }
 
 // ── Click-to-learn Info Button (portal-rendered, always on top) ──
@@ -192,20 +204,63 @@ export function FloatingToolWindow({ tool, onClose, onFullscreen, onDock }) {
 
 // ── Private Roster Panel ─────────────────────────────────────
 // Local-only real name reference. Never stored, logged, exported, or sent to AI.
-export function RosterPanel({ onClose, allStudents = {}, privateRoster = {}, onNameChange, onRosterLoad, onClearRoster }) {
-  const initPeriods = () => Object.entries(DB.periods).map(([id, p]) => ({ id, pseudonym: p.label, realClass: "" }));
-  const [periods,    setPeriods]   = useState(initPeriods);
-  const [importText, setImportText] = useState("");
-  const [showImport, setShowImport] = useState(false);
+export function RosterPanel({ onClose, allStudents = {}, identityRegistry = [], activePeriod, onIdentityLoad, onClearRoster }) {
+  const [rosterMode,  setRosterMode]  = useState("current"); // "current" | "whole"
+  const [showImport,  setShowImport]  = useState(false);
+  const [importText,  setImportText]  = useState("");
   const [rosterError, setRosterError] = useState("");
   const fileInputRef = useRef();
 
-  // All students (DB + imported), in a stable order
-  const students = Object.values(allStudents).map(s => ({ id: s.id, pseudonym: s.pseudonym, color: s.color }));
+  const hasNames = identityRegistry.length > 0;
 
-  const updatePeriodClass = (id, val) => setPeriods(prev => prev.map(m => m.id === id ? { ...m, realClass: val } : m));
+  // pseudonym → realName lookup for rendering
+  const nameByPseudonym = {};
+  identityRegistry.forEach(e => { nameByPseudonym[e.pseudonym] = e.realName; });
 
-  // Upload a Private Roster JSON file — strict validation, match by displayLabel
+  // pseudonym → all periodIds (for cross-period badge)
+  const periodIdsByPseudonym = {};
+  identityRegistry.forEach(e => { periodIdsByPseudonym[e.pseudonym] = e.periodIds; });
+
+  // Period groups: { [periodId]: { classLabel, studentIds: string[] } }
+  const periodGroups = useMemo(() => {
+    const groups = {};
+
+    // DB students — placed via DB.periods
+    Object.entries(DB.periods).forEach(([pid, p]) => {
+      groups[pid] = { classLabel: p.label, studentIds: [] };
+      p.students.forEach(stuId => {
+        if (allStudents[stuId]) groups[pid].studentIds.push(stuId);
+      });
+    });
+
+    // Build pseudonym → student map for imported students
+    const stuByPseudonym = {};
+    Object.values(allStudents).forEach(s => {
+      if (s.imported && s.pseudonym) stuByPseudonym[s.pseudonym] = s;
+    });
+
+    // Place identity-registry students into all their period groups
+    const placedByRegistry = new Set();
+    identityRegistry.forEach(entry => {
+      const stu = stuByPseudonym[entry.pseudonym];
+      if (!stu) return;
+      placedByRegistry.add(stu.id);
+      entry.periodIds.forEach(pid => {
+        if (!groups[pid]) groups[pid] = { classLabel: entry.classLabels[pid] || pid, studentIds: [] };
+        if (!groups[pid].studentIds.includes(stu.id)) groups[pid].studentIds.push(stu.id);
+      });
+    });
+
+    // Place any imported students not in identityRegistry by their primary periodId
+    Object.values(allStudents).forEach(s => {
+      if (!s.imported || placedByRegistry.has(s.id) || !s.periodId) return;
+      if (!groups[s.periodId]) groups[s.periodId] = { classLabel: s.classLabel || s.periodId, studentIds: [] };
+      if (!groups[s.periodId].studentIds.includes(s.id)) groups[s.periodId].studentIds.push(s.id);
+    });
+
+    return groups;
+  }, [allStudents, identityRegistry]);
+
   const handleFileUpload = async (e) => {
     const file = e.target.files[0]; if (!file) return;
     setRosterError("");
@@ -213,142 +268,162 @@ export function RosterPanel({ onClose, allStudents = {}, privateRoster = {}, onN
       const json = JSON.parse(await file.text());
       const err = validatePrivateRoster(json);
       if (err) { setRosterError(err); return; }
-      onRosterLoad?.(extractRosterEntries(json, allStudents)); // [{displayLabel, realName, color}]
+      onIdentityLoad?.(extractIdentityEntries(json, allStudents));
     } catch { setRosterError("Could not read file. Make sure it is a valid Private Roster JSON."); }
     e.target.value = "";
   };
 
-  const hasNames = Object.values(privateRoster).some(v => v);
-
-  // Generate a Private Roster JSON template pre-filled with current student slots
-  const buildRosterTemplate = () => ({
-    schemaVersion: "1.0",
-    type: "privateRoster",
-    students: students.map(m => ({
-      color: m.color,
-      displayLabel: m.pseudonym,
-      realName: privateRoster[m.pseudonym] || "",
-    })),
-  });
-
-  const handleDownloadTemplate = () => {
-    const json = JSON.stringify(buildRosterTemplate(), null, 2);
+  const handleSaveRoster = () => {
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const json = { type: "privateRoster", schemaVersion: "2.0", createdAt: new Date().toISOString(), students: identityRegistry };
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([json], { type: "application/json" }));
-    a.download = "private_roster.json";
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(json, null, 2)], { type: "application/json" }));
+    a.download = `private-roster-${dateStr}.json`;
     a.click();
   };
 
-  const handleCopyTemplate = () => {
-    const json = JSON.stringify(buildRosterTemplate(), null, 2);
-    navigator.clipboard?.writeText(json)
-      .then(() => alert("Template copied! Fill in realName fields, then upload it here."))
-      .catch(() => alert(json));
-  };
-
-  // Paste JSON import — accepts new privateRoster format
-  const handleImport = () => {
+  const handlePasteImport = () => {
     try {
       const data = JSON.parse(importText);
       const err = validatePrivateRoster(data);
       if (err) { alert("Invalid format: " + err); return; }
-      onRosterLoad?.(extractRosterEntries(data, allStudents));
+      onIdentityLoad?.(extractIdentityEntries(data, allStudents));
       setImportText(""); setShowImport(false);
-    } catch { alert("Invalid JSON. Use the downloaded template format."); }
+    } catch { alert("Invalid JSON. Paste the contents of your saved Private Roster file."); }
+  };
+
+  const renderStudentRow = (stuId) => {
+    const stu = allStudents[stuId];
+    if (!stu) return null;
+    const realName   = nameByPseudonym[stu.pseudonym];
+    const crossPids  = periodIdsByPseudonym[stu.pseudonym] || [];
+    return (
+      <div key={stuId} style={{ display: "flex", alignItems: "center", gap: "7px", padding: "5px 8px", background: "#0a1628", border: "1px solid #1e3a5f", borderRadius: "6px" }}>
+        <div style={{ width: "9px", height: "9px", borderRadius: "50%", background: stu.color, flexShrink: 0 }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: "10px", color: stu.color, fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{stu.pseudonym}</div>
+          {realName
+            ? <div style={{ fontSize: "9px", color: "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{realName}</div>
+            : <div style={{ fontSize: "9px", color: "#334155", fontStyle: "italic" }}>name not loaded</div>
+          }
+        </div>
+        {crossPids.length > 1 && (
+          <div style={{ fontSize: "7px", background: "#1e3a5f", color: "#60a5fa", padding: "2px 5px", borderRadius: "10px", whiteSpace: "nowrap", flexShrink: 0 }}>
+            {crossPids.join("·")}
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
     <div style={{ width: "220px", flexShrink: 0, background: "#060c18", borderRight: "2px solid #1e3a5f", display: "flex", flexDirection: "column", overflow: "hidden", height: "100vh" }}>
+
       {/* Header */}
-      <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexShrink: 0, background: "#0a1628" }}>
-        <div>
-          <div style={{ fontSize: "12px", fontWeight: "700", color: "var(--text-primary)", marginBottom: "2px" }}>Private Roster</div>
-          <div style={{ fontSize: "10px", color: "#f59e0b", lineHeight: "1.4" }}>⚠ Local only — never saved, logged, or sent to AI</div>
+      <div style={{ padding: "10px 12px", background: "#0a1628", borderBottom: "1px solid #1e3a5f", flexShrink: 0 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "3px" }}>
+          <span style={{ fontSize: "12px", fontWeight: "700", color: "#e2e8f0" }}>Private Roster</span>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#475569", fontSize: "20px", cursor: "pointer", lineHeight: 1 }}>×</button>
         </div>
-        <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-muted)", fontSize: "20px", cursor: "pointer", lineHeight: 1, flexShrink: 0, marginLeft: "8px" }}>×</button>
+        <div style={{ fontSize: "9px", color: "#f59e0b" }}>⚠ Local only — never saved or sent to AI</div>
       </div>
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "10px" }}>
-        {/* Privacy notice */}
-        <div style={{ padding: "8px 10px", background: "#1a1505", border: "1px solid #854d0e", borderRadius: "8px", marginBottom: "10px", fontSize: "10px", color: "#fbbf24", lineHeight: "1.5" }}>
-          This panel is a temporary visual reference only. Nothing you type here is stored, exported, or used anywhere in the app.
-        </div>
+      {/* Mode toggle */}
+      <div style={{ display: "flex", margin: "8px 10px 0", background: "#0a1628", border: "1px solid #1e3a5f", borderRadius: "8px", overflow: "hidden", flexShrink: 0 }}>
+        {(["current", "whole"]).map(mode => (
+          <button key={mode} onClick={() => setRosterMode(mode)}
+            style={{ flex: 1, padding: "6px", background: rosterMode === mode ? "#1e3a5f" : "transparent", color: rosterMode === mode ? "#93c5fd" : "#475569", fontSize: "10px", fontWeight: rosterMode === mode ? "700" : "400", border: "none", cursor: "pointer" }}>
+            {mode === "current" ? "Current Class" : "Whole Roster"}
+          </button>
+        ))}
+      </div>
 
-        {/* Upload button */}
+      {/* Upload / status */}
+      <div style={{ padding: "8px 10px 0", flexShrink: 0 }}>
         <input type="file" ref={fileInputRef} style={{ display: "none" }} accept=".json" onChange={handleFileUpload} />
         <button onClick={() => { setRosterError(""); fileInputRef.current?.click(); }}
-          style={{ width: "100%", padding: "9px 10px", borderRadius: "8px", border: `2px solid ${hasNames ? "#166534" : "var(--border-light)"}`, background: hasNames ? "#0d2010" : "var(--bg-surface)", color: hasNames ? "#4ade80" : "var(--text-secondary)", fontSize: "12px", fontWeight: "700", cursor: "pointer", marginBottom: "6px", display: "flex", alignItems: "center", gap: "8px", justifyContent: "center" }}>
+          style={{ width: "100%", padding: "8px 10px", borderRadius: "8px", border: `2px solid ${hasNames ? "#166534" : "#1e3a5f"}`, background: hasNames ? "#0d2010" : "#0a1628", color: hasNames ? "#4ade80" : "#475569", fontSize: "11px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", gap: "7px", justifyContent: "center" }}>
           <span>{hasNames ? "✓" : "📂"}</span>
-          <span>{hasNames ? "Private Roster Loaded" : "Upload Private Roster JSON"}</span>
+          <span>{hasNames ? "Private Roster Loaded" : "Load Private Roster JSON"}</span>
         </button>
         {rosterError && (
-          <div style={{ fontSize: "11px", color: "#f87171", background: "#1a0505", border: "1px solid #7f1d1d", borderRadius: "6px", padding: "8px 10px", marginBottom: "6px", lineHeight: "1.5" }}>
+          <div style={{ fontSize: "10px", color: "#f87171", background: "#1a0505", border: "1px solid #7f1d1d", borderRadius: "6px", padding: "7px 9px", marginTop: "6px", lineHeight: "1.5" }}>
             ✗ {rosterError}
           </div>
         )}
+      </div>
+
+      {/* Student list — scrollable */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "8px 10px" }}>
+
+        {rosterMode === "current" ? (
+          (() => {
+            const group = periodGroups[activePeriod];
+            if (!group) return (
+              <div style={{ fontSize: "11px", color: "#334155", fontStyle: "italic", textAlign: "center", marginTop: "20px" }}>
+                No students found for this period.
+              </div>
+            );
+            return (
+              <>
+                <div style={{ padding: "4px 8px", background: "#0f2040", borderLeft: "3px solid #3b82f6", fontSize: "10px", fontWeight: "700", color: "#60a5fa", marginBottom: "8px", borderRadius: "0 4px 4px 0" }}>
+                  {group.classLabel}&nbsp;·&nbsp;<span style={{ fontWeight: "400" }}>{group.studentIds.length}</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+                  {group.studentIds.map(renderStudentRow)}
+                </div>
+              </>
+            );
+          })()
+        ) : (
+          Object.entries(periodGroups)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([pid, group]) => (
+              <div key={pid} style={{ marginBottom: "12px" }}>
+                <div style={{ padding: "4px 8px", background: pid === activePeriod ? "#1e3a5f" : "#0f2040", borderLeft: `3px solid ${pid === activePeriod ? "#93c5fd" : "#3b82f6"}`, fontSize: "10px", fontWeight: "700", color: pid === activePeriod ? "#93c5fd" : "#60a5fa", marginBottom: "5px", borderRadius: "0 4px 4px 0", display: "flex", justifyContent: "space-between" }}>
+                  <span>{pid === activePeriod ? "★ " : ""}{group.classLabel}</span>
+                  <span style={{ fontWeight: "400", opacity: 0.7 }}>{group.studentIds.length}</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                  {group.studentIds.map(renderStudentRow)}
+                </div>
+              </div>
+            ))
+        )}
+
+      </div>
+
+      {/* Footer */}
+      <div style={{ padding: "8px 10px", borderTop: "1px solid #1e3a5f", flexShrink: 0, display: "flex", flexDirection: "column", gap: "5px" }}>
+        {hasNames && (
+          <button onClick={handleSaveRoster}
+            style={{ width: "100%", padding: "7px", borderRadius: "6px", border: "1px solid #166534", background: "#0d2010", color: "#4ade80", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>
+            ↓ Save Private Roster
+          </button>
+        )}
+        <button onClick={() => setShowImport(!showImport)}
+          style={{ width: "100%", padding: "6px", borderRadius: "6px", border: "1px solid #1e3a5f", background: "transparent", color: "#475569", fontSize: "10px", cursor: "pointer" }}>
+          {showImport ? "Cancel" : "Import JSON"}
+        </button>
+        {showImport && (
+          <>
+            <textarea value={importText} onChange={e => setImportText(e.target.value)}
+              placeholder="Paste saved Private Roster JSON here..."
+              style={{ width: "100%", minHeight: "70px", padding: "7px", background: "#0a1628", border: "1px solid #1e3a5f", borderRadius: "6px", color: "#e2e8f0", fontSize: "10px", resize: "none", fontFamily: "monospace", boxSizing: "border-box" }} />
+            <button onClick={handlePasteImport}
+              style={{ width: "100%", padding: "6px", borderRadius: "6px", border: "1px solid #166534", background: "#14532d", color: "#4ade80", fontSize: "10px", fontWeight: "700", cursor: "pointer" }}>
+              Apply
+            </button>
+          </>
+        )}
         {hasNames && (
           <button onClick={() => { if (window.confirm("Clear all real names?")) { onClearRoster?.(); setRosterError(""); } }}
-            style={{ width: "100%", padding: "6px", borderRadius: "6px", border: "1px solid #7f1d1d", background: "#1a0505", color: "#f87171", fontSize: "10px", cursor: "pointer", marginBottom: "12px" }}>
+            style={{ width: "100%", padding: "5px", borderRadius: "6px", border: "1px solid #7f1d1d", background: "#1a0505", color: "#f87171", fontSize: "9px", cursor: "pointer" }}>
             Clear Private Roster
           </button>
         )}
-
-        {/* Students */}
-        <div style={{ fontSize: "10px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: "8px", fontWeight: "600" }}>Students</div>
-        {students.map(m => {
-          const realName = privateRoster[m.pseudonym] || "";
-          return (
-            <div key={m.id} style={{ marginBottom: "9px" }}>
-              <div style={{ fontSize: "10px", color: m.color, fontWeight: "600", marginBottom: "3px" }}>{m.pseudonym}</div>
-              <input value={realName} onChange={e => onNameChange?.(m.pseudonym, e.target.value)}
-                placeholder="Real name..."
-                style={{ width: "100%", padding: "6px 8px", background: "var(--bg-surface)", border: `1px solid ${realName ? m.color + "60" : "var(--border)"}`, borderRadius: "6px", color: realName ? "var(--text-primary)" : "var(--text-muted)", fontSize: "12px" }} />
-            </div>
-          );
-        })}
-
-        {/* Classes */}
-        <div style={{ fontSize: "10px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: "8px", marginTop: "16px", fontWeight: "600" }}>Classes</div>
-        {periods.map(m => (
-          <div key={m.id} style={{ marginBottom: "9px" }}>
-            <div style={{ fontSize: "10px", color: "#60a5fa", fontWeight: "600", marginBottom: "3px" }}>{m.pseudonym.split("—")[0].trim()}</div>
-            <input value={m.realClass} onChange={e => updatePeriodClass(m.id, e.target.value)}
-              placeholder="Real class..."
-              style={{ width: "100%", padding: "6px 8px", background: "var(--bg-surface)", border: `1px solid ${m.realClass ? "#3b82f680" : "var(--border)"}`, borderRadius: "6px", color: m.realClass ? "var(--text-primary)" : "var(--text-muted)", fontSize: "12px" }} />
-          </div>
-        ))}
-
-        {/* Template / import */}
-        <div style={{ marginTop: "16px", paddingTop: "12px", borderTop: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: "6px" }}>
-          <button onClick={handleDownloadTemplate}
-            style={{ width: "100%", padding: "7px", borderRadius: "6px", border: "1px solid #166534", background: "#0d2010", color: "#4ade80", fontSize: "11px", cursor: "pointer", fontWeight: "600" }}>
-            ↓ Download Roster Template
-          </button>
-          <button onClick={handleCopyTemplate}
-            style={{ width: "100%", padding: "7px", borderRadius: "6px", border: "1px solid var(--border-light)", background: "var(--bg-surface)", color: "#60a5fa", fontSize: "11px", cursor: "pointer", fontWeight: "500" }}>
-            📋 Copy Fill-in Template
-          </button>
-          <button onClick={() => setShowImport(!showImport)}
-            style={{ width: "100%", padding: "7px", borderRadius: "6px", border: "1px solid var(--border)", background: "var(--bg-surface)", color: "var(--text-muted)", fontSize: "11px", cursor: "pointer" }}>
-            {showImport ? "Cancel" : "Import JSON"}
-          </button>
-          {showImport && (
-            <>
-              <textarea value={importText} onChange={e => setImportText(e.target.value)}
-                placeholder="Paste filled-in template JSON here..."
-                style={{ width: "100%", minHeight: "80px", padding: "8px", background: "var(--bg-surface)", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--text-primary)", fontSize: "11px", resize: "none", fontFamily: "monospace" }} />
-              <button onClick={handleImport}
-                style={{ width: "100%", padding: "7px", borderRadius: "6px", border: "1px solid #166534", background: "#14532d", color: "#4ade80", fontSize: "11px", cursor: "pointer", fontWeight: "600" }}>
-                Apply Names
-              </button>
-            </>
-          )}
-          <button onClick={() => { if (window.confirm("Clear all real names from the roster panel?")) onClearRoster?.(); }}
-            style={{ width: "100%", padding: "6px", borderRadius: "6px", border: "1px solid #7f1d1d", background: "#1a0505", color: "#f87171", fontSize: "10px", cursor: "pointer", marginTop: "4px" }}>
-            Clear All Names
-          </button>
-        </div>
       </div>
+
     </div>
   );
 }
