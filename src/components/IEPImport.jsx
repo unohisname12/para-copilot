@@ -96,6 +96,7 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
   const [masterRosterData,     setMasterRosterData]     = useState(null);
   const [masterRosterError,    setMasterRosterError]     = useState("");
   const [masterRosterImported, setMasterRosterImported] = useState(false);
+  const [mrImportedStudentCount, setMrImportedStudentCount] = useState(0);
   const masterRosterFileRef = useRef();
 
   const handleBundleFile = async (e) => {
@@ -151,7 +152,7 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
       const err = validateMasterRoster(json);
       if (err) { setMasterRosterError(err); e.target.value = ""; return; }
       setMasterRosterData(json);
-    } catch (err) { setMasterRosterError("Could not parse JSON: " + err.message); e.target.value = ""; }
+    } catch (err) { setMasterRosterError("Could not parse JSON: " + err.message); }
     e.target.value = "";
   };
 
@@ -160,6 +161,7 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
     const { registry, importStudents, periodMap } = buildIdentityRegistryFromMasterRoster(masterRosterData);
     onBulkImport(Object.values(importStudents), periodMap);
     if (registry.length > 0) onIdentityLoad?.(registry);
+    setMrImportedStudentCount(Object.keys(importStudents).length);
     setMasterRosterImported(true);
     setTimeout(() => { setMasterRosterImported(false); setMasterRosterData(null); }, 3500);
     if (registry.length > 0) {
@@ -600,7 +602,7 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
           {/* Success banner */}
           {masterRosterImported && (
             <div style={{ padding: "20px", borderRadius: "12px", background: "#0d2010", border: "2px solid #166534", color: "#4ade80", textAlign: "center", fontSize: "16px", fontWeight: "700" }}>
-              ✓ {mrStudents.length} student{mrStudents.length !== 1 ? "s" : ""} imported from Master Roster!
+              ✓ {mrImportedStudentCount} student{mrImportedStudentCount !== 1 ? "s" : ""} imported from Master Roster!
             </div>
           )}
         </div>
