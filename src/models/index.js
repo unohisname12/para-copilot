@@ -381,7 +381,10 @@ export function buildIdentityRegistryFromMasterRoster(masterRosterData) {
   const periodMap      = {};
 
   sortedStudents.forEach(student => {
-    const dedupedName = dedupedNameMap.get(student.id) || student.fullName || "";
+    const fullName = (student.fullName || "").trim();
+    if (!fullName) return; // skip students with no real name — matches buildIdentityRegistry behavior
+
+    const dedupedName = dedupedNameMap.get(student.id) || fullName;
     const entry = pseudonymMap.get(dedupedName);
     if (!entry) {
       console.error(`buildIdentityRegistryFromMasterRoster: no pseudonym generated for id "${student.id}" — skipping`);
@@ -390,10 +393,9 @@ export function buildIdentityRegistryFromMasterRoster(masterRosterData) {
     const { pseudonym, color } = entry;
 
     // Resolve periodIds: prefer student.periodIds, fallback to scanning periods[]
-    let periodIds = Array.isArray(student.periodIds) && student.periodIds.length > 0
+    const periodIds = Array.isArray(student.periodIds) && student.periodIds.length > 0
       ? student.periodIds
       : periods.filter(p => Array.isArray(p.studentIds) && p.studentIds.includes(student.id)).map(p => p.id);
-    if (!Array.isArray(periodIds)) periodIds = [];
 
     const classLabels = Object.fromEntries(
       periodIds.map(pid => [pid, periodLabelMap[pid] || pid])
@@ -401,7 +403,13 @@ export function buildIdentityRegistryFromMasterRoster(masterRosterData) {
 
     const primaryPeriod = periodIds[0] || "";
 
-    const studentId = `stu_mr_${String(student.id).replace(/[^a-z0-9]/gi, "_").toLowerCase().slice(0, 20)}`;
+    let studentId = `stu_mr_${String(student.id).replace(/[^a-z0-9]/gi, "_").toLowerCase().slice(0, 20)}`;
+    // Guard against truncation collisions
+    if (importStudents[studentId]) {
+      let suffix = 2;
+      while (importStudents[`${studentId}_${suffix}`]) suffix++;
+      studentId = `${studentId}_${suffix}`;
+    }
 
     const normalized = normalizeImportedStudent({
       id:         studentId,
@@ -421,7 +429,7 @@ export function buildIdentityRegistryFromMasterRoster(masterRosterData) {
     });
 
     registry.push({
-      realName: student.fullName,
+      realName: fullName,
       ...(student.displayName ? { displayName: student.displayName } : {}),
       pseudonym,
       color,

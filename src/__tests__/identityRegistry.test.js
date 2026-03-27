@@ -140,7 +140,7 @@ describe('buildIdentityRegistryFromMasterRoster', () => {
     const { registry, importStudents, periodMap } = buildIdentityRegistryFromMasterRoster(sampleRoster);
     const alice = registry.find(r => r.realName === "Alice Tan");
     expect(alice).toBeDefined();
-    expect(alice.pseudonym).toBeTruthy();
+    expect(alice.pseudonym).toBe("Red Student 1");
     expect(alice.color).toMatch(/^#[0-9a-f]{6}$/i);
     expect(alice.periodIds).toEqual(["p1"]);
     expect(alice.classLabels).toEqual({ p1: "Period 1 — ELA 7" });
@@ -208,5 +208,31 @@ describe('buildIdentityRegistryFromMasterRoster', () => {
     // realName is preserved as the original name for both
     expect(registry[0].realName).toBe("Alex Smith");
     expect(registry[1].realName).toBe("Alex Smith");
+  });
+
+  test('skips students with empty or missing fullName', () => {
+    const roster = {
+      students: [
+        { id: "a001", fullName: "Valid Name", periodIds: ["p1"] },
+        { id: "a002", fullName: "", periodIds: ["p1"] },
+        { id: "a003", periodIds: ["p1"] } // no fullName field
+      ],
+      periods: [{ id: "p1", label: "Period 1", studentIds: ["a001", "a002", "a003"] }]
+    };
+    const { registry } = buildIdentityRegistryFromMasterRoster(roster);
+    expect(registry).toHaveLength(1);
+    expect(registry[0].realName).toBe("Valid Name");
+  });
+
+  test('avoids studentId collision when source IDs normalize to same slug', () => {
+    const roster = {
+      students: [
+        { id: "student-period-001-section-A-extra", fullName: "Person One", periodIds: ["p1"] },
+        { id: "student-period-001-section-B-extra", fullName: "Person Two", periodIds: ["p1"] }
+      ],
+      periods: [{ id: "p1", label: "Period 1", studentIds: ["student-period-001-section-A-extra", "student-period-001-section-B-extra"] }]
+    };
+    const { importStudents } = buildIdentityRegistryFromMasterRoster(roster);
+    expect(Object.keys(importStudents)).toHaveLength(2); // both records exist, no clobber
   });
 });
