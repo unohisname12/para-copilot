@@ -329,6 +329,113 @@ export function normalizeImportedStudent(raw) {
   };
 }
 
+// ── Master Roster Identity Registry Builder ──────────────────────────────────
+// Reads a Master Roster JSON (students + periods), assigns pseudonyms, and
+// returns the same shape as buildIdentityRegistry:
+//   registry:       [{ realName, pseudonym, color, periodIds[], classLabels{} }]
+//   importStudents: { [id]: student }  — no realName/fullName, FERPA-safe
+//   periodMap:      { [periodId]: id[] }
+export function buildIdentityRegistryFromMasterRoster(masterRosterData) {
+  const students = masterRosterData?.students;
+  const periods  = masterRosterData?.periods;
+
+  const emptyResult = { registry: [], importStudents: {}, periodMap: {} };
+  if (!Array.isArray(students) || !Array.isArray(periods)) return emptyResult;
+
+  // Build periodLabelMap: { [id]: label }
+  const periodLabelMap = {};
+  periods.forEach(p => { if (p.id) periodLabelMap[p.id] = p.label || p.id; });
+
+  // Duplicate fullName guard — build deduped name map
+  const nameCounts = {};
+  students.forEach(s => {
+    const name = s.fullName || "";
+    nameCounts[name] = (nameCounts[name] || 0) + 1;
+  });
+
+  // Track per-name occurrence index for disambiguation
+  const nameOccurrence = {};
+  const dedupedNameMap = new Map(); // student.id -> dedupedName
+
+  students.forEach(s => {
+    const name = s.fullName || "";
+    if (nameCounts[name] > 1) {
+      nameOccurrence[name] = (nameOccurrence[name] || 0) + 1;
+      // Append last 4 chars of id, padded to 4 with leading underscores
+      const rawSuffix = String(s.id || "");
+      const suffix = rawSuffix.slice(-4).padStart(4, "_");
+      dedupedNameMap.set(s.id, `${name}_${suffix}`);
+    } else {
+      dedupedNameMap.set(s.id, name);
+    }
+  });
+
+  // Sort students by id alphabetically (locale-independent)
+  const sortedStudents = [...students].sort((a, b) =>
+    a.id < b.id ? -1 : a.id > b.id ? 1 : 0
+  );
+
+  // Generate pseudonym set using deduped names in sorted order
+  const dedupedNames = sortedStudents.map(s => dedupedNameMap.get(s.id) || s.fullName || "");
+  const pseudonymMap = generatePseudonymSet(dedupedNames);
+
+  const registry       = [];
+  const importStudents = {};
+  const periodMap      = {};
+
+  sortedStudents.forEach(student => {
+    const dedupedName = dedupedNameMap.get(student.id) || student.fullName || "";
+    const entry = pseudonymMap.get(dedupedName);
+    if (!entry) {
+      console.error(`buildIdentityRegistryFromMasterRoster: no pseudonym generated for id "${student.id}" — skipping`);
+      return;
+    }
+    const { pseudonym, color } = entry;
+
+    // Resolve periodIds: prefer student.periodIds, fallback to scanning periods[]
+    let periodIds = Array.isArray(student.periodIds) && student.periodIds.length > 0
+      ? student.periodIds
+      : periods.filter(p => Array.isArray(p.studentIds) && p.studentIds.includes(student.id)).map(p => p.id);
+    if (!Array.isArray(periodIds)) periodIds = [];
+
+    const classLabels = Object.fromEntries(
+      periodIds.map(pid => [pid, periodLabelMap[pid] || pid])
+    );
+
+    const primaryPeriod = periodIds[0] || "";
+
+    const studentId = `stu_mr_${String(student.id).replace(/[^a-z0-9]/gi, "_").toLowerCase().slice(0, 20)}`;
+
+    const normalized = normalizeImportedStudent({
+      id:         studentId,
+      pseudonym,
+      color,
+      periodId:   primaryPeriod,
+      classLabel: periodLabelMap[primaryPeriod] || "",
+      flags:      { profileMissing: true },
+      sourceMeta: { importType: "master_roster", schemaVersion: "1.0" },
+    });
+
+    importStudents[studentId] = normalized;
+
+    periodIds.forEach(pid => {
+      if (!periodMap[pid]) periodMap[pid] = [];
+      periodMap[pid].push(studentId);
+    });
+
+    registry.push({
+      realName: student.fullName,
+      ...(student.displayName ? { displayName: student.displayName } : {}),
+      pseudonym,
+      color,
+      periodIds,
+      classLabels,
+    });
+  });
+
+  return { registry, importStudents, periodMap };
+}
+
 // ── Log query helpers (MCP-ready) ────────────────────────────
 export function getRecentStudentLogs(logs, studentId, limit = 10) {
   return logs.filter(l => l.studentId === studentId).slice(0, limit);

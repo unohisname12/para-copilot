@@ -1,4 +1,4 @@
-import { generatePseudonymSet, PSEUDONYM_PALETTE, buildIdentityRegistry } from '../models';
+import { generatePseudonymSet, PSEUDONYM_PALETTE, buildIdentityRegistry, buildIdentityRegistryFromMasterRoster } from '../models';
 
 describe('generatePseudonymSet', () => {
   test('assigns Red Student 1 to the first name', () => {
@@ -110,5 +110,98 @@ describe('buildIdentityRegistry', () => {
   test('returns empty registry when privateRosterMap is absent', () => {
     const { registry } = buildIdentityRegistry({ normalizedStudents: { students: [] } });
     expect(registry).toHaveLength(0);
+  });
+});
+
+describe('buildIdentityRegistryFromMasterRoster', () => {
+  // Sample data reused across tests
+  const sampleRoster = {
+    students: [
+      { id: "s001", fullName: "Alice Tan", periodIds: ["p1"] },
+      { id: "s002", fullName: "Bob Patel", periodIds: ["p1", "p3"], displayName: "B. Patel" }
+    ],
+    periods: [
+      { id: "p1", label: "Period 1 — ELA 7", studentIds: ["s001", "s002"] },
+      { id: "p3", label: "Period 3 — Math 2", studentIds: ["s002"] }
+    ]
+  };
+
+  test('returns empty result for empty students array', () => {
+    const result = buildIdentityRegistryFromMasterRoster({ students: [], periods: [] });
+    expect(result).toEqual({ registry: [], importStudents: {}, periodMap: {} });
+  });
+
+  test('single-period student gets correct pseudonym and periodMap entry', () => {
+    const { registry, importStudents, periodMap } = buildIdentityRegistryFromMasterRoster(sampleRoster);
+    const alice = registry.find(r => r.realName === "Alice Tan");
+    expect(alice).toBeDefined();
+    expect(alice.pseudonym).toBeTruthy();
+    expect(alice.color).toMatch(/^#[0-9a-f]{6}$/i);
+    expect(alice.periodIds).toEqual(["p1"]);
+    expect(alice.classLabels).toEqual({ p1: "Period 1 — ELA 7" });
+    // periodMap
+    expect(periodMap.p1).toContainEqual(expect.stringMatching(/^stu_mr_/));
+  });
+
+  test('cross-period student appears in both period arrays with same student ID', () => {
+    const { registry, importStudents, periodMap } = buildIdentityRegistryFromMasterRoster(sampleRoster);
+    const bob = registry.find(r => r.realName === "Bob Patel");
+    expect(bob.periodIds).toEqual(["p1", "p3"]);
+    // Find Bob's student ID
+    const bobEntry = Object.values(importStudents).find(s => s.pseudonym === bob.pseudonym);
+    expect(bobEntry).toBeDefined();
+    const bobId = bobEntry.id;
+    expect(periodMap.p1).toContain(bobId);
+    expect(periodMap.p3).toContain(bobId);
+  });
+
+  test('importStudents records have no realName or fullName field', () => {
+    const { importStudents } = buildIdentityRegistryFromMasterRoster(sampleRoster);
+    Object.values(importStudents).forEach(s => {
+      expect(s).not.toHaveProperty('realName');
+      expect(s).not.toHaveProperty('fullName');
+    });
+  });
+
+  test('student IDs are deterministic — same input produces same IDs', () => {
+    const r1 = buildIdentityRegistryFromMasterRoster(sampleRoster);
+    const r2 = buildIdentityRegistryFromMasterRoster(sampleRoster);
+    expect(Object.keys(r1.importStudents).sort()).toEqual(Object.keys(r2.importStudents).sort());
+  });
+
+  test('period label is looked up from periods array', () => {
+    const { registry } = buildIdentityRegistryFromMasterRoster(sampleRoster);
+    const bob = registry.find(r => r.realName === "Bob Patel");
+    expect(bob.classLabels.p1).toBe("Period 1 — ELA 7");
+    expect(bob.classLabels.p3).toBe("Period 3 — Math 2");
+  });
+
+  test('displayName is included in registry when present', () => {
+    const { registry } = buildIdentityRegistryFromMasterRoster(sampleRoster);
+    const bob = registry.find(r => r.realName === "Bob Patel");
+    expect(bob.displayName).toBe("B. Patel");
+    const alice = registry.find(r => r.realName === "Alice Tan");
+    expect(alice).not.toHaveProperty('displayName');
+  });
+
+  test('duplicate fullName students get disambiguated pseudonyms', () => {
+    const dupRoster = {
+      students: [
+        { id: "x001", fullName: "Alex Smith", periodIds: ["p1"] },
+        { id: "x002", fullName: "Alex Smith", periodIds: ["p2"] }
+      ],
+      periods: [
+        { id: "p1", label: "Period 1", studentIds: ["x001"] },
+        { id: "p2", label: "Period 2", studentIds: ["x002"] }
+      ]
+    };
+    const { registry } = buildIdentityRegistryFromMasterRoster(dupRoster);
+    // Both should get valid pseudonyms (not skip)
+    expect(registry).toHaveLength(2);
+    // They should have different pseudonyms
+    expect(registry[0].pseudonym).not.toBe(registry[1].pseudonym);
+    // realName is preserved as the original name for both
+    expect(registry[0].realName).toBe("Alex Smith");
+    expect(registry[1].realName).toBe("Alex Smith");
   });
 });
