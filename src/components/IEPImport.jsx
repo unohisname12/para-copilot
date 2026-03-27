@@ -35,7 +35,7 @@ function validateMasterRoster(json) {
     return "Missing or empty periods array.";
   for (let i = 0; i < json.students.length; i++) {
     const s = json.students[i];
-    if (!s.id || typeof s.id !== "string")
+    if (!s.id || typeof s.id !== "string" || !s.id.trim())
       return `Student at index ${i} is missing a valid id field.`;
     if (!s.fullName || typeof s.fullName !== "string" || !s.fullName.trim())
       return `Student at index ${i} (id: "${s.id}") is missing a valid fullName field.`;
@@ -151,7 +151,7 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
       const err = validateMasterRoster(json);
       if (err) { setMasterRosterError(err); e.target.value = ""; return; }
       setMasterRosterData(json);
-    } catch (err) { setMasterRosterError("Could not parse JSON: " + err.message); }
+    } catch (err) { setMasterRosterError("Could not parse JSON: " + err.message); e.target.value = ""; }
     e.target.value = "";
   };
 
@@ -401,7 +401,7 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
       {/* Mode tabs */}
       <div style={{ display: "flex", gap: "4px", marginBottom: "20px", flexWrap: "wrap" }}>
         {[["paste", "📋 Paste Text"], ["upload", "📎 Upload File"], ["manual", "✏️ Manual Entry"], ["bundle", "📦 App Bundle JSON"], ["masterRoster", "🗂️ Master Roster JSON"]].map(([id, label]) => (
-          <button key={id} onClick={() => { setInputMode(id); setParsed(null); setParseError(""); setBundleError(""); setMasterRosterData(null); setMasterRosterError(""); }}
+          <button key={id} onClick={() => { setInputMode(id); setParsed(null); setParseError(""); setBundleError(""); setMasterRosterData(null); setMasterRosterError(""); setMasterRosterImported(false); }}
             style={{
               padding: "8px 16px",
               borderRadius: "8px",
