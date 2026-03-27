@@ -346,21 +346,23 @@ export function buildIdentityRegistryFromMasterRoster(masterRosterData) {
   const periodLabelMap = {};
   periods.forEach(p => { if (p.id) periodLabelMap[p.id] = p.label || p.id; });
 
-  // Duplicate fullName guard — build deduped name map
+  // Sort students by id alphabetically (locale-independent)
+  const sortedStudents = [...students].sort((a, b) =>
+    a.id < b.id ? -1 : a.id > b.id ? 1 : 0
+  );
+
+  // Duplicate fullName guard — build deduped name map iterating sorted order
   const nameCounts = {};
-  students.forEach(s => {
+  sortedStudents.forEach(s => {
     const name = s.fullName || "";
     nameCounts[name] = (nameCounts[name] || 0) + 1;
   });
 
-  // Track per-name occurrence index for disambiguation
-  const nameOccurrence = {};
   const dedupedNameMap = new Map(); // student.id -> dedupedName
 
-  students.forEach(s => {
+  sortedStudents.forEach(s => {
     const name = s.fullName || "";
     if (nameCounts[name] > 1) {
-      nameOccurrence[name] = (nameOccurrence[name] || 0) + 1;
       // Append last 4 chars of id, padded to 4 with leading underscores
       const rawSuffix = String(s.id || "");
       const suffix = rawSuffix.slice(-4).padStart(4, "_");
@@ -369,11 +371,6 @@ export function buildIdentityRegistryFromMasterRoster(masterRosterData) {
       dedupedNameMap.set(s.id, name);
     }
   });
-
-  // Sort students by id alphabetically (locale-independent)
-  const sortedStudents = [...students].sort((a, b) =>
-    a.id < b.id ? -1 : a.id > b.id ? 1 : 0
-  );
 
   // Generate pseudonym set using deduped names in sorted order
   const dedupedNames = sortedStudents.map(s => dedupedNameMap.get(s.id) || s.fullName || "");

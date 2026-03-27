@@ -131,6 +131,11 @@ describe('buildIdentityRegistryFromMasterRoster', () => {
     expect(result).toEqual({ registry: [], importStudents: {}, periodMap: {} });
   });
 
+  test('returns empty result when students or periods is missing', () => {
+    expect(buildIdentityRegistryFromMasterRoster({})).toEqual({ registry: [], importStudents: {}, periodMap: {} });
+    expect(buildIdentityRegistryFromMasterRoster({ students: null, periods: [] })).toEqual({ registry: [], importStudents: {}, periodMap: {} });
+  });
+
   test('single-period student gets correct pseudonym and periodMap entry', () => {
     const { registry, importStudents, periodMap } = buildIdentityRegistryFromMasterRoster(sampleRoster);
     const alice = registry.find(r => r.realName === "Alice Tan");
