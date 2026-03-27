@@ -25,6 +25,9 @@ function validatePrivateRoster(json) {
   if (json.normalizedStudents)
     return "This looks like an App Bundle file — upload it in IEP Import → App Bundle JSON tab, not here.";
 
+  if (json.students && json.periods && !json.type)
+    return "This looks like a Master Roster file — upload it in IEP Import → Master Roster JSON tab.";
+
   // Official privateRoster artifact (schemaVersion 1.0 or 2.0)
   if (json.type !== "privateRoster")
     return json.type
