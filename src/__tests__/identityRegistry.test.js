@@ -3,7 +3,7 @@ import { generatePseudonymSet, PSEUDONYM_PALETTE, buildIdentityRegistry, buildId
 describe('generatePseudonymSet', () => {
   test('assigns Red Student 1 to the first name', () => {
     const result = generatePseudonymSet(['Alice']);
-    expect(result.get('Alice')).toEqual({ pseudonym: 'Red Student 1', color: '#ef4444' });
+    expect(result.get('Alice')).toEqual(expect.objectContaining({ pseudonym: 'Red Student 1', color: '#ef4444' }));
   });
 
   test('assigns different colors to sequential names', () => {
@@ -29,6 +29,16 @@ describe('generatePseudonymSet', () => {
     const result = generatePseudonymSet(['Alice', 'Alice']);
     expect(result.size).toBe(1);
     expect(result.get('Alice').pseudonym).toBe('Orange Student 1');
+  });
+
+  test('entries include identity field with emoji and codename', () => {
+    const result = generatePseudonymSet(['Alice']);
+    const alice = result.get('Alice');
+    expect(alice.identity).toBeDefined();
+    expect(alice.identity.colorName).toBe('Red');
+    expect(alice.identity.emoji).toBe('🔥');
+    expect(alice.identity.codename).toBe('Ember');
+    expect(alice.identity.sequenceNumber).toBe(1);
   });
 });
 
@@ -110,6 +120,26 @@ describe('buildIdentityRegistry', () => {
   test('returns empty registry when privateRosterMap is absent', () => {
     const { registry } = buildIdentityRegistry({ normalizedStudents: { students: [] } });
     expect(registry).toHaveLength(0);
+  });
+
+  test('registry entries include identity field', () => {
+    const { registry } = buildIdentityRegistry(mockBundle);
+    registry.forEach(entry => {
+      expect(entry.identity).toBeDefined();
+      expect(entry.identity.colorName).toBeTruthy();
+      expect(entry.identity.emoji).toBeTruthy();
+      expect(entry.identity.codename).toBeTruthy();
+      expect(typeof entry.identity.sequenceNumber).toBe('number');
+    });
+  });
+
+  test('importStudents entries include identity field', () => {
+    const { importStudents } = buildIdentityRegistry(mockBundle);
+    Object.values(importStudents).forEach(s => {
+      expect(s.identity).toBeDefined();
+      expect(s.identity.colorName).toBeTruthy();
+      expect(typeof s.identity.sequenceNumber).toBe('number');
+    });
   });
 });
 
@@ -251,5 +281,25 @@ describe('buildIdentityRegistryFromMasterRoster', () => {
     expect(registry[0].periodIds).toEqual(["p1"]);
     expect(periodMap.p1).toBeDefined();
     expect(periodMap.p1[0]).toMatch(/^stu_mr_/);
+  });
+
+  test('registry entries include identity field with emoji and codename', () => {
+    const { registry } = buildIdentityRegistryFromMasterRoster(sampleRoster);
+    registry.forEach(entry => {
+      expect(entry.identity).toBeDefined();
+      expect(entry.identity.colorName).toBeTruthy();
+      expect(entry.identity.emoji).toBeTruthy();
+      expect(entry.identity.codename).toBeTruthy();
+      expect(typeof entry.identity.sequenceNumber).toBe('number');
+    });
+  });
+
+  test('importStudents entries include identity field', () => {
+    const { importStudents } = buildIdentityRegistryFromMasterRoster(sampleRoster);
+    Object.values(importStudents).forEach(s => {
+      expect(s.identity).toBeDefined();
+      expect(s.identity.colorName).toBeTruthy();
+      expect(typeof s.identity.sequenceNumber).toBe('number');
+    });
   });
 });

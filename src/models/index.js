@@ -3,37 +3,19 @@
 // Every log, student lookup, and health check goes through here
 // ══════════════════════════════════════════════════════════════
 
-// ── Pseudonym palette — 12 named colors for identity generation ──────────
-export const PSEUDONYM_PALETTE = [
-  { hex: "#ef4444", name: "Red" },
-  { hex: "#f97316", name: "Orange" },
-  { hex: "#eab308", name: "Yellow" },
-  { hex: "#22c55e", name: "Green" },
-  { hex: "#06b6d4", name: "Cyan" },
-  { hex: "#3b82f6", name: "Blue" },
-  { hex: "#8b5cf6", name: "Violet" },
-  { hex: "#ec4899", name: "Pink" },
-  { hex: "#f43f5e", name: "Rose" },
-  { hex: "#14b8a6", name: "Teal" },
-  { hex: "#a855f7", name: "Purple" },
-  { hex: "#84cc16", name: "Lime" },
-];
+import { generateIdentitySet, migrateIdentity, IDENTITY_PALETTE } from '../identity';
+
+// ── Pseudonym palette — backward-compatible alias of IDENTITY_PALETTE ──────
+export const PSEUDONYM_PALETTE = IDENTITY_PALETTE.map(({ hex, name }) => ({ hex, name }));
 
 // Input: string[] of unique real names in desired assignment order
-// Output: Map<realName, { pseudonym: string, color: string }>
-// Cycles through palette; increments counter per color on wrap-around.
+// Output: Map<realName, { pseudonym: string, color: string, identity?: object }>
+// Backward-compatible: existing callers destructure { pseudonym, color } and ignore identity.
 export function generatePseudonymSet(uniqueNames) {
   if (!Array.isArray(uniqueNames)) {
     throw new TypeError('generatePseudonymSet: uniqueNames must be an Array');
   }
-  const colorCounts = {};
-  const result = new Map();
-  uniqueNames.forEach((realName, i) => {
-    const { hex, name } = PSEUDONYM_PALETTE[i % PSEUDONYM_PALETTE.length];
-    colorCounts[name] = (colorCounts[name] || 0) + 1;
-    result.set(realName, { pseudonym: `${name} Student ${colorCounts[name]}`, color: hex });
-  });
-  return result;
+  return generateIdentitySet(uniqueNames);
 }
 
 // ── Identity Registry Builder ─────────────────────────────────────────────
@@ -101,7 +83,7 @@ export function buildIdentityRegistry(bundleData) {
     const primaryEntry  = appearances[0];
     const studentId     = `stu_gen_${String(idCounter++).padStart(3, "0")}`;
 
-    const profile = normalizeImportedStudent({
+    const profile = migrateIdentity(normalizeImportedStudent({
       ...primaryRaw,
       id:         studentId,
       pseudonym,
@@ -110,20 +92,20 @@ export function buildIdentityRegistry(bundleData) {
       accs:       mergedAccs.length  ? mergedAccs  : (primaryRaw.accs  || []),
       periodId:   primaryEntry?.periodId   || "",
       classLabel: primaryEntry?.classLabel || "",
-    });
+    }));
 
     importStudents[studentId] = profile;
     periodIds.forEach(pid => {
       if (!periodMap[pid]) periodMap[pid] = [];
       periodMap[pid].push(studentId);
     });
-    registry.push({ realName, pseudonym, color, periodIds, classLabels });
+    registry.push({ realName, pseudonym, color, periodIds, classLabels, identity: entry.identity });
   });
 
   // Include any normalizedStudents not in privateRosterMap (safe fallback)
   rawStudents.forEach(s => {
     if (coveredRawIds.has(s.id) || !s.id) return;
-    const profile = normalizeImportedStudent(s);
+    const profile = migrateIdentity(normalizeImportedStudent(s));
     importStudents[profile.id] = profile;
     if (s.periodId) {
       if (!periodMap[s.periodId]) periodMap[s.periodId] = [];
@@ -411,7 +393,7 @@ export function buildIdentityRegistryFromMasterRoster(masterRosterData) {
       studentId = `${studentId}_${suffix}`;
     }
 
-    const normalized = normalizeImportedStudent({
+    const normalized = migrateIdentity(normalizeImportedStudent({
       id:         studentId,
       pseudonym,
       color,
@@ -419,7 +401,7 @@ export function buildIdentityRegistryFromMasterRoster(masterRosterData) {
       classLabel: periodLabelMap[primaryPeriod] || "",
       flags:      { profileMissing: true },
       sourceMeta: { importType: "master_roster", schemaVersion: "1.0" },
-    });
+    }));
 
     importStudents[studentId] = normalized;
 
@@ -435,6 +417,7 @@ export function buildIdentityRegistryFromMasterRoster(masterRosterData) {
       color,
       periodIds,
       classLabels,
+      identity: entry.identity,
     });
   });
 
