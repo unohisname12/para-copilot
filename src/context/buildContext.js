@@ -5,6 +5,7 @@
 
 import { DB } from '../data';
 import { parseDocForPeriod } from '../engine';
+import { resolveLabel } from '../privacy/nameResolver';
 
 // ── Build a context pack from App state ──────────────────────
 export function buildContextPack({
@@ -42,7 +43,7 @@ export function buildContextPack({
       note: (l.note || l.text || "").slice(0, 200),
       tags: l.tags || [],
       flagged: l.flagged || false,
-      studentPseudonym: (allStudents[l.studentId] || {}).pseudonym || l.studentId,
+      studentPseudonym: resolveLabel(allStudents[l.studentId]) || l.studentId,
     }));
 
   const docSnippet = docContent
@@ -92,7 +93,7 @@ function serializeStudent(s) {
 
   return [
     s.alertText        ? `⚠ ALERT: ${s.alertText}` : null,
-    `STUDENT: ${s.pseudonym}`,
+    `STUDENT: ${resolveLabel(s)}`,
     `Eligibility: ${s.eligibility || "Not specified"}`,
     `Accommodations: ${(s.accs || []).join(", ") || "None listed"}`,
     goals.length       ? `Goals:\n${goalLines.join("\n")}` : "Goals: None listed",
@@ -199,7 +200,7 @@ export function serializeForEmailPrompt(student, logs) {
     : "No recent observations logged.";
   return [
     `TO: ${student.caseManager || "Case Manager"}`,
-    `RE: ${student.pseudonym}`,
+    `RE: ${resolveLabel(student)}`,
     `Eligibility: ${student.eligibility}`,
     `Goals: ${goals || "None listed"}`,
     `Accommodations: ${(student.accs || []).join(", ")}`,

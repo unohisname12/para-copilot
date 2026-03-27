@@ -3,6 +3,7 @@
 // ══════════════════════════════════════════════════════════════
 import React, { useState } from "react";
 import { DB } from '../data';
+import { resolveLabel } from '../privacy/nameResolver';
 
 export function AnalyticsDashboard({ logs, groups, setGroups, onOpenProfile, ollamaOnline, ollamaLoading, onOllamaPatternSummary }) {
   const [range, setRange] = useState("week"), [customStart, setCustomStart] = useState(""), [customEnd, setCustomEnd] = useState("");
@@ -72,7 +73,7 @@ export function AnalyticsDashboard({ logs, groups, setGroups, onOpenProfile, oll
       <div className="panel" style={{ padding: "14px", borderLeft: `3px solid ${s.color}` }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
           <div>
-            <div style={{ fontWeight: "700", fontSize: "14px", color: s.color, cursor: "pointer" }} onClick={() => onOpenProfile(id)}>{s.pseudonym}</div>
+            <div style={{ fontWeight: "700", fontSize: "14px", color: s.color, cursor: "pointer" }} onClick={() => onOpenProfile(id)}>{resolveLabel(s, "compact")}</div>
             <div style={{ fontSize: "11px", color: "#4a6284" }}>{s.eligibility} · {sl.length} logs in range</div>
           </div>
           <div style={{ display: "flex", gap: "4px" }}>
@@ -100,7 +101,7 @@ export function AnalyticsDashboard({ logs, groups, setGroups, onOpenProfile, oll
           <div>
             <div style={{ fontWeight: "700", fontSize: "14px", color: "#a78bfa" }}>{group.name}</div>
             <div style={{ fontSize: "11px", color: "#4a6284" }}>{group.students.length} students · {gl.length} logs</div>
-            <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginTop: "4px" }}>{group.students.map(id => <span key={id} style={{ fontSize: "10px", color: DB.students[id]?.color, background: DB.students[id]?.color + "15", padding: "1px 7px", borderRadius: "20px" }}>{DB.students[id]?.pseudonym}</span>)}</div>
+            <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginTop: "4px" }}>{group.students.map(id => <span key={id} style={{ fontSize: "10px", color: DB.students[id]?.color, background: DB.students[id]?.color + "15", padding: "1px 7px", borderRadius: "20px" }}>{resolveLabel(DB.students[id], "compact")}</span>)}</div>
           </div>
           <div style={{ display: "flex", gap: "4px" }}>
             <button onClick={() => setFocusGroup(focusGroup === group.id ? null : group.id)} style={{ fontSize: "10px", padding: "3px 10px", borderRadius: "6px", border: "1px solid #1e293b", background: focusGroup === group.id ? "#1d4ed8" : "#0f172a", color: focusGroup === group.id ? "#fff" : "#8fa3c4", cursor: "pointer" }}>{focusGroup === group.id ? "Collapse" : "Expand"}</button>
@@ -139,7 +140,7 @@ export function AnalyticsDashboard({ logs, groups, setGroups, onOpenProfile, oll
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
           <div className="panel" style={{ padding: "16px" }}><div style={{ fontSize: "13px", fontWeight: "600", color: "#e2e8f0", marginBottom: "10px" }}>Log Types</div><TypeBars counts={allTC} /></div>
           <div className="panel" style={{ padding: "16px" }}><div style={{ fontSize: "13px", fontWeight: "600", color: "#e2e8f0", marginBottom: "10px" }}>Per Student</div>
-            {Object.keys(DB.students).map(id => { const sl = logsFor([id]); return sl.length > 0 ? (<div key={id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", borderBottom: "1px solid #0f172a" }}><span style={{ fontSize: "12px", color: DB.students[id].color, cursor: "pointer" }} onClick={() => onOpenProfile(id)}>{DB.students[id].pseudonym}</span><span style={{ fontSize: "12px", fontWeight: "600", color: "#8fa3c4" }}>{sl.length}</span></div>) : null; })}
+            {Object.keys(DB.students).map(id => { const sl = logsFor([id]); return sl.length > 0 ? (<div key={id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", borderBottom: "1px solid #0f172a" }}><span style={{ fontSize: "12px", color: DB.students[id].color, cursor: "pointer" }} onClick={() => onOpenProfile(id)}>{resolveLabel(DB.students[id], "compact")}</span><span style={{ fontSize: "12px", fontWeight: "600", color: "#8fa3c4" }}>{sl.length}</span></div>) : null; })}
           </div>
         </div>
       </div>)}
@@ -156,7 +157,7 @@ export function AnalyticsDashboard({ logs, groups, setGroups, onOpenProfile, oll
           <input value={newGroupName} onChange={e => setNewGroupName(e.target.value)} className="chat-input" placeholder="Group name (e.g. 'Period 3 Focus', 'BIP Students')" style={{ marginBottom: "10px" }} />
           <div style={{ fontSize: "11px", color: "#4a6284", marginBottom: "6px" }}>Select students:</div>
           <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "10px" }}>
-            {Object.entries(DB.students).map(([id, s]) => (<button key={id} onClick={() => toggleGroupStu(id)} style={{ fontSize: "11px", padding: "4px 10px", borderRadius: "6px", border: `1px solid ${newGroupStudents.includes(id) ? s.color : s.color + "40"}`, cursor: "pointer", background: newGroupStudents.includes(id) ? s.color + "25" : "transparent", color: s.color, fontWeight: newGroupStudents.includes(id) ? "600" : "400" }}>{s.pseudonym}</button>))}
+            {Object.entries(DB.students).map(([id, s]) => (<button key={id} onClick={() => toggleGroupStu(id)} style={{ fontSize: "11px", padding: "4px 10px", borderRadius: "6px", border: `1px solid ${newGroupStudents.includes(id) ? s.color : s.color + "40"}`, cursor: "pointer", background: newGroupStudents.includes(id) ? s.color + "25" : "transparent", color: s.color, fontWeight: newGroupStudents.includes(id) ? "600" : "400" }}>{resolveLabel(s, "compact")}</button>))}
           </div>
           <div style={{ display: "flex", gap: "8px" }}><button onClick={addGroup} className="btn btn-primary" style={{ fontSize: "12px" }}>Save Group</button><button onClick={() => setShowGroupForm(false)} className="btn btn-secondary" style={{ fontSize: "12px" }}>Cancel</button></div>
         </div>)}

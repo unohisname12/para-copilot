@@ -7,6 +7,7 @@ import React, { useState, useRef } from "react";
 import { DB } from '../data';
 import { ollamaParseIEP } from '../engine/ollama';
 import { normalizeImportedStudent, buildIdentityRegistry, buildIdentityRegistryFromMasterRoster } from '../models';
+import { assignIdentity, IDENTITY_PALETTE } from '../identity';
 
 // ── System 1: App Bundle validation ──────────────────────────
 // Accepts schemaVersion 2.0 / 2.1 app bundles only.
@@ -43,19 +44,19 @@ function validateMasterRoster(json) {
   return null; // null = valid
 }
 
-// Color palette for imported students
-const IMPORT_COLORS = [
-  { color: "#06b6d4", name: "Cyan" },
-  { color: "#84cc16", name: "Lime" },
-  { color: "#f43f5e", name: "Rose" },
-  { color: "#0ea5e9", name: "Sky" },
-  { color: "#e879f9", name: "Fuchsia" },
-  { color: "#fb923c", name: "Coral" },
-  { color: "#2dd4bf", name: "Turquoise" },
-  { color: "#c084fc", name: "Lavender" },
-  { color: "#fde047", name: "Yellow" },
-  { color: "#4ade80", name: "Mint" },
-];
+// ── resolveStudentSlot ────────────────────────────────────────
+// Maps importedCount → { pseudonym, color, identity } using IDENTITY_PALETTE.
+// Replaces the old IMPORT_COLORS 10-color palette with the unified 12-entry palette.
+export function resolveStudentSlot(importedCount) {
+  const size = IDENTITY_PALETTE.length;
+  const colorNum = Math.floor(importedCount / size) + 1;
+  const identity = assignIdentity(importedCount, colorNum);
+  return {
+    pseudonym: `${identity.colorName} Student ${colorNum}`,
+    color: identity.color,
+    identity,
+  };
+}
 
 // ── PDF text extractor (pdfjs-dist) ──────────────────────────
 async function extractPDFText(file) {
@@ -242,9 +243,7 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
   });
   const fileRef = useRef();
 
-  const colorEntry = IMPORT_COLORS[importedCount % IMPORT_COLORS.length];
-  const colorNum = Math.floor(importedCount / IMPORT_COLORS.length) + 1;
-  const pseudonym = `${colorEntry.name} Student ${colorNum}`;
+  const { pseudonym, color: slotColor, identity: slotIdentity } = resolveStudentSlot(importedCount);
 
   // ── File upload handler ───────────────────────────────────
   const handleFileUpload = async e => {
@@ -320,7 +319,7 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
       subject: g.subject || data.subject || "All",
     }));
     const studentObj = {
-      id, pseudonym, color: colorEntry.color,
+      id, pseudonym, color: slotColor, identity: slotIdentity,
       eligibility: data.eligibility || "Imported",
       accs: data.accommodations || [],
       caseManager: data.caseManager || "",
@@ -342,7 +341,7 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
     setExportedPrivateRoster(prev => {
       const alreadyExists = prev.some(e => e.displayLabel === pseudonym);
       if (alreadyExists) return prev;
-      return [...prev, { color: colorEntry.color, displayLabel: pseudonym, realName: capturedName }];
+      return [...prev, { color: slotColor, displayLabel: pseudonym, realName: capturedName }];
     });
     setLastImportedPseudonym(pseudonym); // freeze the name before importedCount re-renders
     setImported(true);
@@ -698,20 +697,20 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
           <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
 
             {/* Privacy conversion preview */}
-            <div style={{ padding: "14px", background: "#070e1c", border: `2px solid ${colorEntry.color}40`, borderRadius: "12px" }}>
+            <div style={{ padding: "14px", background: "#070e1c", border: `2px solid ${slotColor}40`, borderRadius: "12px" }}>
               <div style={{ fontSize: "11px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: "10px", fontWeight: "600" }}>Privacy Conversion</div>
               <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "8px" }}>
                 <div style={{ flex: 1, padding: "8px 12px", background: "#1a0505", borderRadius: "8px", fontSize: "12px", color: "#f87171", textDecoration: "line-through", opacity: .6 }}>
                   {data.studentName || "Student Name"} (stays local only)
                 </div>
                 <div style={{ fontSize: "16px", color: "var(--text-muted)" }}>→</div>
-                <div style={{ flex: 1, padding: "8px 12px", background: colorEntry.color + "18", border: `1px solid ${colorEntry.color}50`, borderRadius: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
-                  <div style={{ width: "12px", height: "12px", borderRadius: "50%", background: colorEntry.color, flexShrink: 0 }} />
-                  <span style={{ fontSize: "13px", fontWeight: "700", color: colorEntry.color }}>{pseudonym}</span>
+                <div style={{ flex: 1, padding: "8px 12px", background: slotColor + "18", border: `1px solid ${slotColor}50`, borderRadius: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <div style={{ width: "12px", height: "12px", borderRadius: "50%", background: slotColor, flexShrink: 0 }} />
+                  <span style={{ fontSize: "13px", fontWeight: "700", color: slotColor }}>{pseudonym}</span>
                 </div>
               </div>
               <div style={{ fontSize: "10px", color: "var(--text-muted)", lineHeight: "1.5" }}>
-                The app uses <strong style={{ color: colorEntry.color }}>{pseudonym}</strong> everywhere. Real name never stored in app data.
+                The app uses <strong style={{ color: slotColor }}>{pseudonym}</strong> everywhere. Real name never stored in app data.
               </div>
             </div>
 
@@ -735,14 +734,14 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
                 {data.goals?.length > 0 && (
                   <div>
                     <div style={{ color: "var(--text-muted)", marginBottom: "4px" }}>Goals ({data.goals.length}):</div>
-                    {data.goals.map((g, i) => <div key={i} style={{ fontSize: "11px", color: "var(--text-secondary)", padding: "4px 8px", background: "rgba(0,0,0,.2)", borderRadius: "6px", borderLeft: `2px solid ${colorEntry.color}` }}>{(g.text || g).slice(0, 100)}{(g.text || g).length > 100 ? "..." : ""}</div>)}
+                    {data.goals.map((g, i) => <div key={i} style={{ fontSize: "11px", color: "var(--text-secondary)", padding: "4px 8px", background: "rgba(0,0,0,.2)", borderRadius: "6px", borderLeft: `2px solid ${slotColor}` }}>{(g.text || g).slice(0, 100)}{(g.text || g).length > 100 ? "..." : ""}</div>)}
                   </div>
                 )}
                 {data.strengths && <Row label="Strengths" value={data.strengths.slice(0, 100)} color="#4ade80" />}
                 {data.triggers && <Row label="Triggers" value={data.triggers.slice(0, 100)} color="#f87171" />}
                 {data.tags?.length > 0 && (
                   <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
-                    {data.tags.map((t, i) => <span key={i} style={{ fontSize: "10px", background: colorEntry.color + "20", color: colorEntry.color, padding: "2px 8px", borderRadius: "20px" }}>{t}</span>)}
+                    {data.tags.map((t, i) => <span key={i} style={{ fontSize: "10px", background: slotColor + "20", color: slotColor, padding: "2px 8px", borderRadius: "20px" }}>{t}</span>)}
                   </div>
                 )}
               </div>
@@ -762,20 +761,20 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
               </div>
             ) : (
               <button onClick={handleImport}
-                style={{ width: "100%", padding: "14px", borderRadius: "12px", border: "none", background: colorEntry.color, color: "#000", fontSize: "15px", fontWeight: "700", cursor: "pointer" }}>
+                style={{ width: "100%", padding: "14px", borderRadius: "12px", border: "none", background: slotColor, color: "#000", fontSize: "15px", fontWeight: "700", cursor: "pointer" }}>
                 Add {pseudonym} to App
               </button>
             )}
 
             <div style={{ display: "flex", gap: "8px" }}>
               <button onClick={() => {
-                const safeJSON = { id: `stu_preview_${Date.now()}`, pseudonym, color: colorEntry.color, eligibility: data.eligibility, accs: data.accommodations, goals: data.goals, strengths: data.strengths, triggers: data.triggers, strategies: data.strategies, tags: data.tags, behaviorNotes: data.behaviorNotes, caseManager: data.caseManager };
+                const safeJSON = { id: `stu_preview_${Date.now()}`, pseudonym, color: slotColor, eligibility: data.eligibility, accs: data.accommodations, goals: data.goals, strengths: data.strengths, triggers: data.triggers, strategies: data.strategies, tags: data.tags, behaviorNotes: data.behaviorNotes, caseManager: data.caseManager };
                 downloadJSON(safeJSON, `${pseudonym.replace(" ", "_")}_safe.json`);
               }} style={{ flex: 1, padding: "8px", borderRadius: "8px", border: "1px solid var(--border-light)", background: "var(--bg-surface)", color: "var(--text-secondary)", fontSize: "11px", cursor: "pointer" }}>
                 ↓ Safe JSON
               </button>
               <button onClick={() => {
-                const privateMap = { _warning: "PRIVATE — never share or store in app", pseudonym, color: colorEntry.color, realName: data.studentName, realClass: data.classLabel, teacherName: data.teacherName, caseManager: data.caseManager, gradeLevel: data.gradeLevel };
+                const privateMap = { _warning: "PRIVATE — never share or store in app", pseudonym, color: slotColor, realName: data.studentName, realClass: data.classLabel, teacherName: data.teacherName, caseManager: data.caseManager, gradeLevel: data.gradeLevel };
                 downloadJSON(privateMap, `${pseudonym.replace(" ", "_")}_private_mapping.json`);
               }} style={{ flex: 1, padding: "8px", borderRadius: "8px", border: "1px solid #854d0e", background: "#1a1505", color: "#fbbf24", fontSize: "11px", cursor: "pointer" }}>
                 ↓ Private Mapping

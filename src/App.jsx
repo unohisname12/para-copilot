@@ -18,7 +18,9 @@ import { buildContextPack, serializeForAI, serializeForPatternPrompt,
          serializeForEmailPrompt } from './context/buildContext';
 
 // Model layer
-import { createLog, getHealth, hdot } from './models';
+import { createLog, getHealth, hdot, normalizeIdentityEntries } from './models';
+import { patchIdentity } from './identity';
+import { resolveLabel, resolveExportName, buildRealNameMap, EXPORT_MODE } from './privacy/nameResolver';
 
 // Components
 import { VisualTimer, CalculatorTool, MultChart, CEROrganizer, BreathingExercise, GroundingExercise } from './components/tools';
@@ -31,6 +33,7 @@ import { IEPImport } from './components/IEPImport';
 import { OllamaStatusBadge } from './components/OllamaStatusBadge';
 import { Dashboard } from './components/Dashboard';
 import { BrandHeader } from './components/BrandHeader';
+import { getSidebarVisibility } from './utils/sidebarVisibility';
 
 export default function App() {
   // ── Core state ─────────────────────────────────────────────
@@ -48,6 +51,11 @@ export default function App() {
   const [rosterPanelOpen, setRosterPanelOpen] = useState(false);
   const [importedStudents, setImportedStudents] = useState({});
   const [importedPeriodMap, setImportedPeriodMap] = useState({});
+  // identityOverrides: { [studentId]: { emoji, codename } } — only the customized fields.
+  // Persisted to localStorage so edits survive reload.
+  const [identityOverrides, setIdentityOverrides] = useState(() => {
+    try { const s = localStorage.getItem("paraIdentityOverridesV1"); return s ? JSON.parse(s) : {}; } catch { return {}; }
+  });
 
   // ── UI state ───────────────────────────────────────────────
   const [profileStu, setProfileStu] = useState(null);
@@ -88,8 +96,12 @@ export default function App() {
   // ── Derived ────────────────────────────────────────────────
   const chatEndRef = useRef();
   const period = DB.periods[activePeriod];
-  // Merge static DB students with any imported students
-  const allStudents = { ...DB.students, ...importedStudents };
+  // Merge static DB students with any imported students, then apply identity overrides.
+  const allStudentsBase = { ...DB.students, ...importedStudents };
+  const allStudents = Object.keys(identityOverrides).length === 0 ? allStudentsBase :
+    Object.fromEntries(Object.entries(allStudentsBase).map(([id, s]) =>
+      identityOverrides[id] ? [id, patchIdentity(s, identityOverrides[id])] : [id, s]
+    ));
   const effectivePeriodStudents = [...new Set([...period.students, ...(importedPeriodMap[activePeriod] || [])])];
 
   // Single-student import (existing IEP/Ollama/manual flow)
@@ -102,20 +114,16 @@ export default function App() {
   // Shape: [{ realName, pseudonym, color, periodIds: string[], classLabels: {} }]
   const [identityRegistry, setIdentityRegistry] = useState([]);
 
-  // handleIdentityLoad — accepts v2.0 registry entries or v1.0 backward-compat shape.
-  // v2.0: [{ realName, pseudonym, color, periodIds, classLabels }]
-  // v1.0: [{ displayLabel, realName, color }] — promoted to minimal v2.0 shape
+  // handleIdentityLoad — normalizes any supported schema (v1.0–v3.0) into registry entries.
   const handleIdentityLoad = (entries) => {
-    const normalized = (entries || [])
-      .filter(e => e.realName && (e.pseudonym || e.displayLabel))
-      .map(e => ({
-        realName:    e.realName,
-        pseudonym:   e.pseudonym   || e.displayLabel,
-        color:       e.color       || "",
-        periodIds:   e.periodIds   || [],
-        classLabels: e.classLabels || {},
-      }));
+    const normalized = normalizeIdentityEntries(entries, allStudents);
     if (normalized.length > 0) setIdentityRegistry(normalized);
+  };
+
+  // handleUpdateIdentity — stores only {emoji, codename} in identityOverrides.
+  // Applied via patchIdentity during allStudents derivation; persisted to localStorage.
+  const handleUpdateIdentity = (studentId, { emoji, codename }) => {
+    setIdentityOverrides(prev => ({ ...prev, [studentId]: { emoji, codename } }));
   };
 
   // Bulk bundle import — deduplicates by id, never touches privateRosterMap
@@ -141,9 +149,10 @@ export default function App() {
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [currentChat, activePeriod]);
 
-  // Persist logs + KB to localStorage on every change
+  // Persist logs + KB + identity overrides to localStorage on every change
   useEffect(() => { try { localStorage.setItem("paraLogsV1", JSON.stringify(logs)); } catch {} }, [logs]);
   useEffect(() => { try { localStorage.setItem("paraKBV1",  JSON.stringify(knowledgeBase)); } catch {} }, [knowledgeBase]);
+  useEffect(() => { try { localStorage.setItem("paraIdentityOverridesV1", JSON.stringify(identityOverrides)); } catch {} }, [identityOverrides]);
 
   // Check Ollama on mount
   useEffect(() => {
@@ -329,11 +338,18 @@ export default function App() {
     setOllamaLoading(false);
   };
 
-  const exportCSV = filteredLogs => {
+  const exportCSV = (filteredLogs, mode = EXPORT_MODE.SAFE, realNameMap = null) => {
     const target = filteredLogs || logs; if (!target.length) { alert("No data!"); return; }
     const hdr = "Date,Period,Student,Type,Category,Flagged,Tags,Observation\n";
-    const rows = target.map(l => { const s = allStudents[l.studentId] || { pseudonym: l.studentId }; return `"${l.date}","${l.period}","${s.pseudonym}","${l.type}","${l.category || ""}","${l.flagged ? "Yes" : "No"}","${(l.tags || []).join(";")}","${(l.note || l.text || "").replace(/"/g, '""')}"`; }).join("\n");
-    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([hdr + rows], { type: "text/csv" })); a.download = `MrDre_ParaData_${currentDate}.csv`; a.click();
+    const rows = target.map(l => { const s = allStudents[l.studentId]; return `"${l.date}","${l.period}","${resolveExportName(s, mode, realNameMap) || l.studentId}","${l.type}","${l.category || ""}","${l.flagged ? "Yes" : "No"}","${(l.tags || []).join(";")}","${(l.note || l.text || "").replace(/"/g, '""')}"`; }).join("\n");
+    const suffix = mode === EXPORT_MODE.PRIVATE ? "_private" : "";
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([hdr + rows], { type: "text/csv" })); a.download = `MrDre_ParaData${suffix}_${currentDate}.csv`; a.click();
+  };
+
+  // Private export — builds realNameMap transiently at call time, disposes immediately
+  const exportCSVPrivate = (filteredLogs) => {
+    const realNameMap = buildRealNameMap(identityRegistry);
+    exportCSV(filteredLogs, EXPORT_MODE.PRIVATE, realNameMap);
   };
 
   // ══════════════════════════════════════════════════════════
@@ -458,7 +474,7 @@ export default function App() {
             <div style={{ overflowY: "auto", flex: 1, padding: "8px" }}>
               {effectivePeriodStudents.map(id => { const s = allStudents[id]; if (!s) return null; const health = getHealth(id, logs, currentDate); return (
                 <div key={id} className="student-card-small" style={{ marginBottom: "8px", borderLeft: `3px solid ${s.color}`, cursor: "pointer" }} onClick={() => setProfileStu(id)}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "3px" }}><span style={{ fontWeight: "700", fontSize: "13px", color: s.color }}>{s.pseudonym}</span><span>{hdot(health)}</span></div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "3px" }}><span style={{ fontWeight: "700", fontSize: "13px", color: s.color }}>{resolveLabel(s, "compact")}</span><span>{hdot(health)}</span></div>
                   <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "5px" }}>{s.eligibility}</div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", marginBottom: "6px" }}>{s.accs.slice(0, 3).map(a => <span key={a} style={{ fontSize: "10px", background: "#1e3a5f", color: "#93c5fd", padding: "2px 6px", borderRadius: "20px" }}>{a}</span>)}{s.accs.length > 3 && <span style={{ fontSize: "10px", color: "#64748b" }}>+{s.accs.length - 3}</span>}</div>
                   <div style={{ fontSize: "11px", color: "#4ade80" }}>Goals: {(s.goals || []).length} · Logs: {logs.filter(l => l.studentId === id).length}</div>
@@ -485,10 +501,10 @@ export default function App() {
     if (vaultTab === "goalProgress") filteredLogs = logs.filter(l => l.type === "Goal Progress");
     const vaultTabs = [{ id: "all", label: "All Logs" }, { id: "byStudent", label: "By Student" }, { id: "byPeriod", label: "By Period" }, { id: "flagged", label: `Flagged (${logs.filter(l => l.flagged).length})` }, { id: "handoffs", label: `Handoffs (${logs.filter(l => l.type === "Handoff Note").length})` }, { id: "goalProgress", label: `Goals (${logs.filter(l => l.type === "Goal Progress").length})` }, { id: "knowledge", label: `KB (${knowledgeBase.length})` }];
     return (<div>
-      <div className="header"><div><h1>Data Vault</h1><p className="teacher-subtitle">{logs.length} observations · {knowledgeBase.length} KB docs · FERPA-safe</p></div><div style={{ display: "flex", gap: "8px" }}><button className="btn btn-secondary" onClick={() => exportCSV(filteredLogs)}>Export Filtered</button><button className="btn btn-primary" onClick={() => exportCSV()}>Export All</button></div></div>
+      <div className="header"><div><h1>Data Vault</h1><p className="teacher-subtitle">{logs.length} observations · {knowledgeBase.length} KB docs · FERPA-safe</p></div><div style={{ display: "flex", gap: "8px" }}><button className="btn btn-secondary" onClick={() => exportCSV(filteredLogs)}>Export Filtered</button><button className="btn btn-primary" onClick={() => exportCSV()}>Export All</button>{identityRegistry.length > 0 && <button className="btn btn-secondary" style={{ borderColor: "#854d0e", color: "#fbbf24" }} onClick={() => exportCSVPrivate(filteredLogs)}>Export with Names</button>}</div></div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "12px", marginBottom: "20px" }}>{[{ h: "green", label: "Logged today", color: "var(--green)", border: "#166534" }, { h: "yellow", label: "This week", color: "var(--yellow)", border: "#854d0e" }, { h: "red", label: "Needs attention", color: "var(--red)", border: "#7f1d1d" }].map(({ h, label, color, border }) => (<div key={h} className="panel" style={{ padding: "14px 16px", borderColor: border }}><div style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "4px" }}>{label}</div><div style={{ fontSize: "28px", fontWeight: "700", color }}>{counts[h]}</div><div style={{ fontSize: "12px", color: "var(--text-muted)" }}>student{counts[h] !== 1 ? "s" : ""}</div></div>))}</div>
       <div style={{ display: "flex", gap: "4px", marginBottom: "16px", flexWrap: "wrap" }}>{vaultTabs.map(t => (<button key={t.id} onClick={() => { setVaultTab(t.id); setVaultFilter("all"); }} style={{ padding: "6px 14px", borderRadius: "6px", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: "500", background: vaultTab === t.id ? "#1d4ed8" : "var(--panel-bg)", color: vaultTab === t.id ? "#fff" : "var(--text-muted)" }}>{t.label}</button>))}</div>
-      {(vaultTab === "byStudent" || vaultTab === "byPeriod") && (<div style={{ marginBottom: "14px", display: "flex", gap: "8px", alignItems: "center" }}><span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Filter:</span><select value={vaultFilter} onChange={e => setVaultFilter(e.target.value)} className="period-select" style={{ maxWidth: "280px" }}><option value="all">All</option>{vaultTab === "byStudent" && Object.entries(allStudents).map(([id, s]) => (<option key={id} value={id}>{s.pseudonym} ({logs.filter(l => l.studentId === id).length})</option>))}{vaultTab === "byPeriod" && Object.entries(DB.periods).map(([id, p]) => (<option key={id} value={id}>{p.label}</option>))}</select></div>)}
+      {(vaultTab === "byStudent" || vaultTab === "byPeriod") && (<div style={{ marginBottom: "14px", display: "flex", gap: "8px", alignItems: "center" }}><span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Filter:</span><select value={vaultFilter} onChange={e => setVaultFilter(e.target.value)} className="period-select" style={{ maxWidth: "280px" }}><option value="all">All</option>{vaultTab === "byStudent" && Object.entries(allStudents).map(([id, s]) => (<option key={id} value={id}>{resolveLabel(s, "compact")} ({logs.filter(l => l.studentId === id).length})</option>))}{vaultTab === "byPeriod" && Object.entries(DB.periods).map(([id, p]) => (<option key={id} value={id}>{p.label}</option>))}</select></div>)}
       {vaultTab === "knowledge" && (<div>
         <div className="panel" style={{ padding: "16px", marginBottom: "16px" }}>
           <h3 style={{ margin: "0 0 4px", fontSize: "14px", color: "var(--accent)" }}>Add to Knowledge Base</h3>
@@ -541,40 +557,60 @@ export default function App() {
 
     <div className="app-layout" style={{ flex: 1, minWidth: 0 }}>
       <aside className="sidebar">
-        <div className="brand" style={{ fontSize: "11px", color: "#1e3a5f", padding: "0 4px 10px", marginBottom: "2px" }}>v2</div>
-        <div className="sidebar-control"><label>Date</label><input type="date" className="period-select" style={{ width: "100%", marginTop: "4px" }} value={currentDate} onChange={e => setCurrentDate(e.target.value)} /></div>
-        <div className="sidebar-control"><label>Active Period</label><select className="period-select" style={{ width: "100%", marginTop: "4px" }} value={activePeriod} onChange={e => setActivePeriod(e.target.value)}>{Object.entries(DB.periods).map(([id, p]) => (<option key={id} value={id}>{p.label}</option>))}</select></div>
-        <div style={{ marginTop: "8px" }}>
-          <div style={{ fontSize: "10px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: "6px", padding: "0 4px" }}>Navigation</div>
-          {[{ id: "dashboard", label: "📊 Dashboard", tip: "Main copilot view" }, { id: "vault", label: "🗄️ Data Vault", tip: "All logs, flagged items, knowledge base" }, { id: "import", label: "📥 IEP Import", tip: "Upload IEPs or paste student documents — converted to FERPA-safe structured student profiles automatically" }, { id: "analytics", label: "📈 Analytics", tip: "Visual data dashboard with custom date ranges and groups" }].map(({ id, label, tip }) => (
-            <Tip key={id} text={tip} pos="right"><button className={`nav-btn${view === id ? " active" : ""}`} onClick={() => setView(id)}>{label}</button></Tip>
-          ))}
-        </div>
-        <div style={{ marginTop: "16px" }}>
-          <div style={{ fontSize: "10px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: "6px", padding: "0 4px" }}>Toolbox <span style={{ color: "#334155", fontWeight: "400", textTransform: "none" }}>(dbl-click = pop out)</span></div>
-          {toolboxTools.map(t => (
-            <Tip key={t.id} text={t.tip} pos="right"><button className="nav-btn" style={activeToolbox === t.id ? { background: "#1e3a5f", color: "#93c5fd" } : {}}
-              onClick={() => setActiveToolbox(activeToolbox === t.id ? null : t.id)}
-              onDoubleClick={(e) => { e.preventDefault(); setActiveToolbox(null); if (!floatingTools.includes(t.id)) setFloatingTools(prev => [...prev, t.id]); }}
-            >{t.label}</button></Tip>
-          ))}
-        </div>
-        <div style={{ marginTop: "auto", paddingTop: "16px", borderTop: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: "6px" }}>
-          <Tip text="Hide all student data. Screen shows only classroom tools." pos="right">
-            <button onClick={() => setStealthMode(true)} style={{ width: "100%", padding: "6px", borderRadius: "6px", border: "1px solid #7f1d1d", background: "#1a0505", color: "#f87171", cursor: "pointer", fontSize: "11px", fontWeight: "600" }}>🛡️ Stealth Mode</button>
-          </Tip>
-          <Tip text="Simplified note-taking for paras. Large buttons, plain language — advanced processing runs in the background." pos="right">
-            <button onClick={() => setSimpleMode(!simpleMode)} style={{ width: "100%", padding: "7px", borderRadius: "6px", border: `1px solid ${simpleMode ? "#166534" : "#334155"}`, background: simpleMode ? "#14532d" : "transparent", color: simpleMode ? "#4ade80" : "#64748b", cursor: "pointer", fontSize: "11px", fontWeight: "600" }}>
-              {simpleMode ? "✓ Para Notes Mode" : "📝 Para Notes Mode"}
-            </button>
-          </Tip>
-          <Tip text="Private local reference panel for real student and class names. Never stored or exported." pos="right">
-            <button onClick={() => setRosterPanelOpen(!rosterPanelOpen)} style={{ width: "100%", padding: "7px", borderRadius: "6px", border: `1px solid ${rosterPanelOpen ? "#1d4ed8" : "#334155"}`, background: rosterPanelOpen ? "#1e3a5f" : "transparent", color: rosterPanelOpen ? "#93c5fd" : "#64748b", cursor: "pointer", fontSize: "11px", fontWeight: "600" }}>
-              {rosterPanelOpen ? "✓ Private Roster" : "👤 Private Roster"}
-            </button>
-          </Tip>
-          <div style={{ fontSize: "11px", color: "#334155", textAlign: "center", lineHeight: "1.8" }}>FERPA-Safe — Pseudonyms only</div>
-        </div>
+        {/* ── Sidebar sections are visibility-controlled by getSidebarVisibility ── */}
+        {(() => {
+          const sb = getSidebarVisibility(simpleMode);
+          return (<>
+            <div className="brand" style={{ fontSize: "11px", color: "#1e3a5f", padding: "0 4px 10px", marginBottom: "2px" }}>v2</div>
+
+            {/* Always visible: Simple Mode toggle */}
+            <Tip text="Simplified note-taking for paras. Large buttons, plain language — advanced processing runs in the background." pos="right">
+              <button onClick={() => setSimpleMode(!simpleMode)} style={{ width: "100%", padding: "9px 7px", borderRadius: "8px", border: `2px solid ${simpleMode ? "#166534" : "#1d4ed8"}`, background: simpleMode ? "#14532d" : "#0c1a2e", color: simpleMode ? "#4ade80" : "#93c5fd", cursor: "pointer", fontSize: "12px", fontWeight: "700", marginBottom: "10px" }}>
+                {simpleMode ? "✓ Simple Mode ON" : "📝 Simple Mode"}
+              </button>
+            </Tip>
+
+            {/* Always visible: Date + Period */}
+            <div className="sidebar-control"><label>Date</label><input type="date" className="period-select" style={{ width: "100%", marginTop: "4px" }} value={currentDate} onChange={e => setCurrentDate(e.target.value)} /></div>
+            <div className="sidebar-control"><label>Active Period</label><select className="period-select" style={{ width: "100%", marginTop: "4px" }} value={activePeriod} onChange={e => setActivePeriod(e.target.value)}>{Object.entries(DB.periods).map(([id, p]) => (<option key={id} value={id}>{p.label}</option>))}</select></div>
+
+            {/* Hidden in Simple Mode: Navigation */}
+            {sb.showNav && (
+              <div style={{ marginTop: "8px" }}>
+                <div style={{ fontSize: "10px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: "6px", padding: "0 4px" }}>Navigation</div>
+                {[{ id: "dashboard", label: "📊 Dashboard", tip: "Main copilot view" }, { id: "vault", label: "🗄️ Data Vault", tip: "All logs, flagged items, knowledge base" }, { id: "import", label: "📥 IEP Import", tip: "Upload IEPs or paste student documents — converted to FERPA-safe structured student profiles automatically" }, { id: "analytics", label: "📈 Analytics", tip: "Visual data dashboard with custom date ranges and groups" }].map(({ id, label, tip }) => (
+                  <Tip key={id} text={tip} pos="right"><button className={`nav-btn${view === id ? " active" : ""}`} onClick={() => setView(id)}>{label}</button></Tip>
+                ))}
+              </div>
+            )}
+
+            {/* Hidden in Simple Mode: Toolbox */}
+            {sb.showToolbox && (
+              <div style={{ marginTop: "16px" }}>
+                <div style={{ fontSize: "10px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: "6px", padding: "0 4px" }}>Toolbox <span style={{ color: "#334155", fontWeight: "400", textTransform: "none" }}>(dbl-click = pop out)</span></div>
+                {toolboxTools.map(t => (
+                  <Tip key={t.id} text={t.tip} pos="right"><button className="nav-btn" style={activeToolbox === t.id ? { background: "#1e3a5f", color: "#93c5fd" } : {}}
+                    onClick={() => setActiveToolbox(activeToolbox === t.id ? null : t.id)}
+                    onDoubleClick={(e) => { e.preventDefault(); setActiveToolbox(null); if (!floatingTools.includes(t.id)) setFloatingTools(prev => [...prev, t.id]); }}
+                  >{t.label}</button></Tip>
+                ))}
+              </div>
+            )}
+
+            {/* Always visible: Stealth, Private Roster, FERPA note */}
+            <div style={{ marginTop: "auto", paddingTop: "16px", borderTop: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: "6px" }}>
+              <Tip text="Hide all student data. Screen shows only classroom tools." pos="right">
+                <button onClick={() => setStealthMode(true)} style={{ width: "100%", padding: "6px", borderRadius: "6px", border: "1px solid #7f1d1d", background: "#1a0505", color: "#f87171", cursor: "pointer", fontSize: "11px", fontWeight: "600" }}>🛡️ Stealth Mode</button>
+              </Tip>
+              <Tip text="Private local reference panel for real student and class names. Never stored or exported." pos="right">
+                <button onClick={() => setRosterPanelOpen(!rosterPanelOpen)} style={{ width: "100%", padding: "7px", borderRadius: "6px", border: `1px solid ${rosterPanelOpen ? "#1d4ed8" : "#334155"}`, background: rosterPanelOpen ? "#1e3a5f" : "transparent", color: rosterPanelOpen ? "#93c5fd" : "#64748b", cursor: "pointer", fontSize: "11px", fontWeight: "600" }}>
+                  {rosterPanelOpen ? "✓ Private Roster" : "👤 Private Roster"}
+                </button>
+              </Tip>
+              <div style={{ fontSize: "11px", color: "#334155", textAlign: "center", lineHeight: "1.8" }}>FERPA-Safe — Pseudonyms only</div>
+            </div>
+          </>);
+        })()}
       </aside>
 
       <main className="main-content" style={{ flex: 1, overflowY: simpleMode ? "hidden" : "auto", padding: simpleMode ? 0 : undefined }}>
@@ -585,6 +621,8 @@ export default function App() {
               logs={logs}
               addLog={addLog}
               currentDate={currentDate}
+              allStudents={allStudents}
+              effectivePeriodStudents={effectivePeriodStudents}
             />
           : <>
               {view === "dashboard" && (
@@ -623,7 +661,7 @@ export default function App() {
       </aside>)}
 
       {/* Modals */}
-      {profileStu && (<StudentProfileModal studentId={profileStu} studentData={allStudents[profileStu]} logs={logs} currentDate={currentDate} onClose={() => setProfileStu(null)} onLog={addLog} onDraftEmail={(id) => { setProfileStu(null); draftEmail(id); }} />)}
+      {profileStu && (<StudentProfileModal studentId={profileStu} studentData={allStudents[profileStu]} logs={logs} currentDate={currentDate} onClose={() => setProfileStu(null)} onLog={addLog} onDraftEmail={(id) => { setProfileStu(null); draftEmail(id); }} onUpdateIdentity={handleUpdateIdentity} />)}
       {emailModal && (<EmailModal studentId={emailModal.studentId} studentData={allStudents[emailModal.studentId]} emailLoading={emailLoading} emailDraft={emailDraft} setEmailDraft={setEmailDraft} onClose={() => { setEmailModal(null); setEmailDraft(""); }} />)}
       {situationModal && (<SituationResponseModal situation={situationModal} students={effectivePeriodStudents} studentsMap={allStudents} onClose={() => setSituationModal(null)} onLog={(id, note, type) => addLog(id, note, type)} onOpenCard={() => { setSituationModal(null); setActiveToolbox("cards"); }} />)}
       {ollamaModal && (<OllamaInsightModal feature={ollamaModal.feature} text={ollamaModal.text} studentId={ollamaModal.studentId} onClose={() => setOllamaModal(null)} onLog={addLog} />)}

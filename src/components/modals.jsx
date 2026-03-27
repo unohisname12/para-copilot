@@ -4,6 +4,8 @@
 import React, { useState } from "react";
 import { DB, SUPPORT_CARDS, QUICK_ACTIONS, REG_TOOLS, GOAL_PROGRESS_OPTIONS } from '../data';
 import { getHealth, hdot } from '../models';
+import { migrateIdentity, getDefaultIdentity, isIdentityCustomized } from '../identity';
+import { resolveLabel } from '../privacy/nameResolver';
 
 // ── Student Profile Modal ────────────────────────────────────
 // studentData prop: pass merged student object (supports both DB and imported students)
@@ -18,11 +20,35 @@ function FieldText({ value, fallback = "—" }) {
   return <span>{value}</span>;
 }
 
-export function StudentProfileModal({ studentId, logs, currentDate, onClose, onLog, onDraftEmail, studentData }) {
+export function StudentProfileModal({ studentId, logs, currentDate, onClose, onLog, onDraftEmail, studentData, onUpdateIdentity }) {
   const s = studentData || DB.students[studentId];
   const stuLogs = logs.filter(l => l.studentId === studentId);
   const health = getHealth(studentId, logs, currentDate);
   const [tab, setTab] = useState("overview"), [logNote, setLogNote] = useState(""), [logType, setLogType] = useState("General Observation");
+
+  // Identity editor — initialized from current (or migrated) identity
+  const identity = migrateIdentity(s).identity;
+  const [emojiDraft, setEmojiDraft] = useState(identity.emoji);
+  const [codenameDraft, setCodenameDraft] = useState(identity.codename);
+  const identityDirty = emojiDraft.trim() !== identity.emoji || codenameDraft.trim() !== identity.codename;
+  const customized = isIdentityCustomized(identity);
+  const paletteDefault = getDefaultIdentity(identity.colorName);
+
+  // Sync drafts when studentData changes externally (e.g. after save or reset).
+  React.useEffect(() => {
+    setEmojiDraft(identity.emoji);
+    setCodenameDraft(identity.codename);
+  }, [identity.emoji, identity.codename]); // intentional: sync drafts only when identity changes
+
+  const handleSaveIdentity = () => {
+    if (onUpdateIdentity) onUpdateIdentity(studentId, { emoji: emojiDraft, codename: codenameDraft });
+  };
+  const handleResetIdentity = () => {
+    if (!paletteDefault || !onUpdateIdentity) return;
+    setEmojiDraft(paletteDefault.emoji);
+    setCodenameDraft(paletteDefault.codename);
+    onUpdateIdentity(studentId, { emoji: paletteDefault.emoji, codename: paletteDefault.codename });
+  };
 
   // Show "Support" tab only when student has v2 fields
   const hasV2 = (s.watchFors?.length > 0) || (s.doThisActions?.length > 0) || (s.healthNotes?.length > 0) || s.crossPeriodInfo?.note;
@@ -52,7 +78,7 @@ export function StudentProfileModal({ studentId, logs, currentDate, onClose, onL
         <div className="modal-header" style={{ borderLeft: `5px solid ${c}`, background: `linear-gradient(135deg, ${cFaint} 0%, transparent 60%)`, gap: "12px" }}>
           <div style={{ flex: 1 }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-              <span style={{ fontWeight: "700", fontSize: "17px", color: c }}>{s.pseudonym}</span>
+              <span style={{ fontWeight: "700", fontSize: "17px", color: c }}>{resolveLabel(s, "full")}</span>
               <span style={{ fontSize: "11px", background: cBorder, color: c, padding: "2px 9px", borderRadius: "20px" }}>{s.eligibility}</span>
               <span>{hdot(health)}</span>
               {s.eligibility?.includes("BIP") && <span style={{ fontSize: "11px", background: "#7f1d1d", color: "#fca5a5", padding: "2px 8px", borderRadius: "20px" }}>ACTIVE BIP</span>}
@@ -89,6 +115,54 @@ export function StudentProfileModal({ studentId, logs, currentDate, onClose, onL
               <textarea value={logNote} onChange={e => setLogNote(e.target.value)} className="data-textarea" style={{ height: "70px", marginBottom: "8px" }} placeholder="Type observation..." />
               <button className="btn btn-primary" style={{ background: c, borderColor: c, color: "#000" }} onClick={() => { if (logNote.trim()) { onLog(studentId, logNote, logType); setLogNote(""); } }}>Save to Vault</button>
             </div>
+            {onUpdateIdentity && (
+              <div className="panel" style={{ padding: "12px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
+                  <div style={{ fontSize: "11px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: ".07em" }}>Identity Label</div>
+                  {customized && (
+                    <span style={{ fontSize: "9px", background: cFaint, color: c, border: `1px solid ${cBorder}`, borderRadius: "10px", padding: "1px 6px", fontWeight: "600" }}>customized</span>
+                  )}
+                </div>
+                <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                  <input
+                    value={emojiDraft}
+                    onChange={e => setEmojiDraft(e.target.value)}
+                    className="period-select"
+                    style={{ width: "58px", textAlign: "center", fontSize: "20px", padding: "4px 6px" }}
+                    maxLength={10}
+                    title="Emoji (tap to change)"
+                    placeholder={identity.emoji}
+                  />
+                  <input
+                    value={codenameDraft}
+                    onChange={e => setCodenameDraft(e.target.value)}
+                    className="period-select"
+                    style={{ flex: 1, fontSize: "13px" }}
+                    maxLength={32}
+                    title="Codename"
+                    placeholder={identity.codename}
+                  />
+                  <button
+                    onClick={handleSaveIdentity}
+                    disabled={!identityDirty}
+                    style={{ padding: "5px 12px", borderRadius: "6px", border: `1px solid ${identityDirty ? cBorder : "#1e293b"}`, background: identityDirty ? cFaint : "transparent", color: identityDirty ? c : "#475569", fontSize: "11px", fontWeight: "700", cursor: identityDirty ? "pointer" : "default" }}
+                  >Save</button>
+                  {customized && paletteDefault && (
+                    <button
+                      onClick={handleResetIdentity}
+                      title={`Reset to ${paletteDefault.emoji} ${paletteDefault.codename}`}
+                      style={{ padding: "5px 8px", borderRadius: "6px", border: "1px solid #1e293b", background: "transparent", color: "#475569", fontSize: "13px", cursor: "pointer", lineHeight: 1 }}
+                    >↺</button>
+                  )}
+                </div>
+                {/* Live label preview */}
+                <div style={{ marginTop: "6px", display: "inline-flex", alignItems: "center", gap: "5px", background: cFaint, border: `1px solid ${cBorder}`, borderRadius: "6px", padding: "3px 8px" }}>
+                  <span style={{ fontSize: "14px" }}>{emojiDraft.trim() || identity.emoji}</span>
+                  <span style={{ fontSize: "11px", color: c, fontWeight: "600" }}>{codenameDraft.trim() || identity.codename}</span>
+                  <span style={{ fontSize: "11px", color: "#475569" }}>{identity.sequenceNumber}</span>
+                </div>
+              </div>
+            )}
           </div>)}
           {tab === "goals" && (<div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>{(s.goals || []).map((g, i) => {
             const gObj = typeof g === "string" ? { text: g, id: `goal_${i}`, area: "General" } : g;
@@ -149,7 +223,7 @@ export function EmailModal({ studentId, emailLoading, emailDraft, setEmailDraft,
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" style={{ width: "560px" }} onClick={e => e.stopPropagation()}>
-        <div className="modal-header"><div><div style={{ fontWeight: "700", fontSize: "16px" }}>AI Email Draft</div><div style={{ fontSize: "12px", color: s.color }}>{s.pseudonym} → {s.caseManager}</div></div><button className="close-btn" onClick={onClose}>×</button></div>
+        <div className="modal-header"><div><div style={{ fontWeight: "700", fontSize: "16px" }}>AI Email Draft</div><div style={{ fontSize: "12px", color: s.color }}>{getStudentLabel(s, "compact")} → {s.caseManager}</div></div><button className="close-btn" onClick={onClose}>×</button></div>
         <div className="modal-body">{emailLoading ? (<div style={{ textAlign: "center", padding: "40px", color: "#4ade80" }}>AI drafting...</div>) : (<textarea value={emailDraft} onChange={e => setEmailDraft(e.target.value)} className="data-textarea" style={{ height: "260px", fontFamily: "inherit", lineHeight: "1.6" }} />)}</div>
         {!emailLoading && (<div className="modal-footer"><button className="btn btn-primary" style={{ flex: 1 }} onClick={() => { navigator.clipboard.writeText(emailDraft); alert("Copied!"); }}>Copy to Clipboard</button><button className="btn btn-secondary" onClick={onClose}>Close</button></div>)}
       </div>
@@ -174,13 +248,13 @@ export function SituationResponseModal({ situation, students, onClose, onLog, on
         </div>
         <div className="modal-body" style={{ flex: 1, overflowY: "auto" }}>
           {watchStudents.length > 0 && <div style={{ marginBottom: "14px" }}><div style={{ fontSize: "12px", fontWeight: "600", color: "#fbbf24", marginBottom: "6px" }}>👀 Students to Watch</div>
-            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>{watchStudents.map(s => (<span key={s.id} style={{ fontSize: "12px", fontWeight: "600", color: s.color, background: s.color + "20", padding: "3px 10px", borderRadius: "20px" }}>{s.pseudonym}</span>))}</div>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>{watchStudents.map(s => (<span key={s.id} style={{ fontSize: "12px", fontWeight: "600", color: s.color, background: s.color + "20", padding: "3px 10px", borderRadius: "20px" }}>{getStudentLabel(s, "compact")}</span>))}</div>
           </div>}
           <div style={{ marginBottom: "14px" }}><div style={{ fontSize: "12px", fontWeight: "600", color: "#4ade80", marginBottom: "6px" }}>🎯 Recommended Moves</div>
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>{actions.map(a => (
               <div key={a.id} style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
                 <span style={{ fontSize: "12px", color: "#e2e8f0" }}>{a.icon} {a.label}</span>
-                {studs.map(s => (<button key={s.id} onClick={() => onLog(s.id, a.defaultNote, a.logType)} className="btn btn-action" style={{ fontSize: "10px", padding: "2px 8px" }}>{s.pseudonym}</button>))}
+                {studs.map(s => (<button key={s.id} onClick={() => onLog(s.id, a.defaultNote, a.logType)} className="btn btn-action" style={{ fontSize: "10px", padding: "2px 8px" }}>{getStudentLabel(s, "compact")}</button>))}
               </div>
             ))}</div>
           </div>

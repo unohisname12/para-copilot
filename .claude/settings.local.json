@@ -1,7 +1,18 @@
 {
   "permissions": {
     "allow": [
-      "Bash(curl -s http://localhost:3000)"
+      "Bash(curl -s http://localhost:3000)",
+      "Read(//home/dre/Documents/code\\\\ mach/JPDs-gZD/src/models/**)",
+      "Read(//home/dre/Documents/code\\\\ mach/JPDs-gZD/src/**)",
+      "Read(//home/dre/Documents/code\\\\ mach/JPDs-gZD/src/components/**)",
+      "Read(//home/dre/Documents/**)",
+      "Bash(npx react-scripts:*)",
+      "Bash(CI=true npx react-scripts test --testPathPattern=\"IEPImport\")",
+      "Bash(CI=true npx react-scripts test --testPathPattern=\"IEPImport|identity\")",
+      "Bash(CI=true npx react-scripts test)",
+      "Bash(CI=true npx react-scripts test --testPathPattern=\"rosterLookups\")",
+      "Bash(CI=true npx react-scripts test --testPathPattern=\"phase5\")",
+      "Bash(npx jest:*)"
     ]
   }
 }

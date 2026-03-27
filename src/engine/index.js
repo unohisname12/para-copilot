@@ -4,6 +4,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { DB, SITUATIONS, SUPPORT_CARDS, QUICK_ACTIONS, REG_TOOLS, KW } from '../data';
+import { getStudentLabel } from '../identity';
 
 // ── KB keyword search ────────────────────────────────────────
 export function searchKBDoc(doc, queryWords) {
@@ -81,7 +82,7 @@ export function runLocalEngine(text, studentIds, knowledgeBase, activePeriod, do
       return {
         topic: "unknown", situations: [], score: 0,
         moves: ["No keyword matched. What subject or situation? I can search your IEPs and Knowledge Base once I know."],
-        actions: studs.map(s => ({ label:`Log note: ${s.pseudonym}`, studentId:s.id, note:text, type:"General Note" })),
+        actions: studs.map(s => ({ label:`Log note: ${getStudentLabel(s)}`, studentId:s.id, note:text, type:"General Note" })),
         sources: [{ label:"IEP Database", icon:"📋", detail:"No match yet — give me more info" }],
         kbHits: [], followUp: "Try describing the subject or what you see.", docSnippet: null, needsNoteBuilding: true,
         recommendedCards: [], recommendedTools: [],
@@ -110,9 +111,9 @@ export function runLocalEngine(text, studentIds, knowledgeBase, activePeriod, do
   studs.forEach(s => {
     const relevantAccs = matchAccommodations(topic, s.accs);
     if (relevantAccs.length > 0) {
-      moves.push(`• ${s.pseudonym} — provide: ${relevantAccs.slice(0,2).join(", ")}`);
-      iepStudentsUsed.push(s.pseudonym);
-      actions.push({ label:`Log: ${relevantAccs[0]} for ${s.pseudonym}`, studentId:s.id, note:`Support provided: ${relevantAccs.join(", ")}`, type:"Accommodation Used" });
+      moves.push(`• ${getStudentLabel(s)} — provide: ${relevantAccs.slice(0,2).join(", ")}`);
+      iepStudentsUsed.push(getStudentLabel(s));
+      actions.push({ label:`Log: ${relevantAccs[0]} for ${getStudentLabel(s)}`, studentId:s.id, note:`Support provided: ${relevantAccs.join(", ")}`, type:"Accommodation Used" });
     }
   });
 
@@ -120,7 +121,7 @@ export function runLocalEngine(text, studentIds, knowledgeBase, activePeriod, do
   recActions.forEach(qa => {
     studs.forEach(s => {
       if (!actions.find(a => a.label.includes(qa.label) && a.studentId === s.id)) {
-        actions.push({ label:`${qa.icon} ${qa.label}: ${s.pseudonym}`, studentId:s.id, note:qa.defaultNote, type:qa.logType });
+        actions.push({ label:`${qa.icon} ${qa.label}: ${getStudentLabel(s)}`, studentId:s.id, note:qa.defaultNote, type:qa.logType });
       }
     });
   });

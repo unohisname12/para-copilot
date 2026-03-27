@@ -116,6 +116,44 @@ export function buildIdentityRegistry(bundleData) {
   return { registry, importStudents, periodMap };
 }
 
+// ── normalizeIdentityEntries ─────────────────────────────────
+// Converts raw private-roster entries (any schema version) into the v3.0 registry
+// shape: [{ realName, pseudonym, color, periodIds, classLabels, identity, studentId? }]
+//   • identity  — added via migrateIdentity() (no-op if already present)
+//   • studentId — resolved via studentId-first strategy:
+//       1. Use entry.studentId directly when present (v3.0+ artifacts)
+//       2. Fall back to pseudonym lookup for older artifacts without studentId
+//     Absent if neither path resolves.
+// Called by handleIdentityLoad in App.jsx; the single point of normalization.
+export function normalizeIdentityEntries(rawEntries, allStudents = {}) {
+  // Pseudonym-keyed lookup retained for backward compat with pre-v3.0 artifacts
+  // that were exported before studentId was added to the private roster schema.
+  const stuIdByPseudonym = {};
+  Object.values(allStudents).forEach(s => {
+    if (s.pseudonym) stuIdByPseudonym[s.pseudonym] = s.id;
+  });
+
+  return (rawEntries || [])
+    .filter(e => e.realName && (e.pseudonym || e.displayLabel))
+    .map(e => {
+      const pseudonym = e.pseudonym || e.displayLabel || "";
+      const base = {
+        realName:    e.realName,
+        pseudonym,
+        color:       e.color       || "",
+        periodIds:   e.periodIds   || [],
+        classLabels: e.classLabels || {},
+        // carry through identity if already present so migrateIdentity is a no-op
+        ...(e.identity ? { identity: e.identity } : {}),
+      };
+      const withIdentity = migrateIdentity(base);
+      // Phase C: prefer entry.studentId (stable, collision-safe).
+      // Fall back to pseudonym lookup only for older artifacts that lack studentId.
+      const studentId = e.studentId || stuIdByPseudonym[pseudonym];
+      return studentId ? { ...withIdentity, studentId } : withIdentity;
+    });
+}
+
 // ── Enriched Log Factory ─────────────────────────────────────
 // Every log entry gets full context — ready for analytics, AI, MCP
 let _logCounter = 0;

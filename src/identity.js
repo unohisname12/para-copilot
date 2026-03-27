@@ -114,6 +114,41 @@ export function migrateIdentity(student) {
   };
 }
 
+// ── getDefaultIdentity ────────────────────────────────────────
+// Returns { emoji, codename } from the palette for a given colorName, or null.
+export function getDefaultIdentity(colorName) {
+  const entry = IDENTITY_PALETTE.find(p => p.name === colorName);
+  return entry ? { emoji: entry.emoji, codename: entry.codename } : null;
+}
+
+// ── isIdentityCustomized ──────────────────────────────────────
+// Returns true when identity.emoji or identity.codename differs from palette defaults.
+// Returns false when colorName is unknown (no palette baseline to compare against).
+export function isIdentityCustomized(identity) {
+  if (!identity) return false;
+  const def = getDefaultIdentity(identity.colorName);
+  if (!def) return false;
+  return identity.emoji !== def.emoji || identity.codename !== def.codename;
+}
+
+// ── patchIdentity ─────────────────────────────────────────────
+// Safely applies emoji/codename overrides to a student's identity.
+// Normalizes via migrateIdentity first if identity is missing.
+// Preserves colorName, color, sequenceNumber.
+// Falls back to existing values when patch fields are empty/whitespace.
+export function patchIdentity(student, { emoji, codename }) {
+  const s = migrateIdentity(student);
+  const base = s.identity;
+  return {
+    ...s,
+    identity: {
+      ...base,
+      emoji:    emoji?.trim()    || base.emoji,
+      codename: codename?.trim() || base.codename,
+    },
+  };
+}
+
 // ── getColorName ──────────────────────────────────────────────
 export function getColorName(hex) {
   const entry = IDENTITY_PALETTE.find(p => p.hex === hex);

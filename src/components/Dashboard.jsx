@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { DB } from '../data';
 import { getHealth, hdot } from '../models';
+import { resolveLabel } from '../privacy/nameResolver';
 import { parseDocForPeriod } from '../engine';
 import { OllamaStatusBadge } from './OllamaStatusBadge';
 
@@ -96,7 +97,7 @@ export function Dashboard({
     const s = allStudents[studentId] || {};
     const note = extraNote.trim() || (topic ? `${action.type} — ${topic}` : action.type);
     addLog(studentId, note, action.type);
-    showToast(`✅ ${action.label} → ${s.pseudonym || studentId}`);
+    showToast(`✅ ${action.label} → ${resolveLabel(s, "compact")}`);
     setActiveAction(null);
     setNoteTarget(null);
     setNoteDraft("");
@@ -309,7 +310,7 @@ export function Dashboard({
                 <div style={{ padding: "11px 13px 9px", background: s.color + "14", borderBottom: `1px solid ${s.color}28`, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}
                   onClick={e => { if (!isTarget) { e.stopPropagation(); setProfileStu(id); } }}>
                   <div style={{ cursor: isTarget ? "default" : "pointer" }}>
-                    <div style={{ fontSize: "16px", fontWeight: "800", color: s.color, lineHeight: 1.2 }}>{s.pseudonym}</div>
+                    <div style={{ fontSize: "16px", fontWeight: "800", color: s.color, lineHeight: 1.2 }}>{resolveLabel(s, "compact")}</div>
                     <div style={{ display: "flex", gap: "4px", alignItems: "center", flexWrap: "wrap", marginTop: "2px" }}>
                       <span style={{ fontSize: "11px", color: "#64748b" }}>{s.eligibility}</span>
                       {s.flags?.iepNotYetOnFile && <span style={{ fontSize: "9px", background: "#1a1505", color: "#fbbf24", padding: "1px 5px", borderRadius: "20px", border: "1px solid #854d0e" }}>IEP Pending</span>}
@@ -342,7 +343,7 @@ export function Dashboard({
                   {DASH_ACTIONS.slice(0, 6).map(action => (
                     <button key={action.id}
                       onClick={e => handleCardAction(id, action, e)}
-                      title={`Log: ${action.type} for ${s.pseudonym}`}
+                      title={`Log: ${action.type} for ${resolveLabel(s, "compact")}`}
                       style={{ padding: "8px 5px", borderRadius: "8px", border: `1px solid ${action.border}50`, background: action.bg, color: action.color, cursor: "pointer", fontSize: "12px", fontWeight: "700", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", whiteSpace: "nowrap", transition: "filter 0.1s" }}>
                       {action.icon} {action.label}
                     </button>
@@ -496,7 +497,7 @@ export function Dashboard({
               {noteTarget.action.icon} {noteTarget.action.label}
             </div>
             <div style={{ fontSize: "13px", color: allStudents[noteTarget.studentId]?.color || "#e2e8f0", fontWeight: "600", marginBottom: "14px" }}>
-              {allStudents[noteTarget.studentId]?.pseudonym || noteTarget.studentId}
+              {resolveLabel(allStudents[noteTarget.studentId], "compact") || noteTarget.studentId}
             </div>
             <textarea autoFocus
               value={noteDraft}
