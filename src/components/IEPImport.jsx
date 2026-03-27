@@ -6,7 +6,7 @@
 import React, { useState, useRef } from "react";
 import { DB } from '../data';
 import { ollamaParseIEP } from '../engine/ollama';
-import { normalizeImportedStudent } from '../models';
+import { normalizeImportedStudent, buildIdentityRegistry } from '../models';
 
 // ── System 1: App Bundle validation ──────────────────────────
 // Accepts schemaVersion 2.0 / 2.1 app bundles only.
@@ -62,7 +62,7 @@ async function extractPDFText(file) {
   }
 }
 
-export function IEPImport({ onImport, onBulkImport, importedCount }) {
+export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCount }) {
   const [inputMode, setInputMode] = useState("paste"); // "paste" | "upload" | "manual" | "bundle"
 
   // ── Bundle state ──────────────────────────────────────────────
@@ -89,49 +89,34 @@ export function IEPImport({ onImport, onBulkImport, importedCount }) {
 
   const doBundleImport = () => {
     if (!bundleData || !onBulkImport) return;
-    const rawStudents = bundleData.normalizedStudents.students;
-    const normalized = rawStudents.map(s => normalizeImportedStudent(s));
-    const periodMapUpdates = {};
-    normalized.forEach(s => {
-      if (!s.periodId) return;
-      if (!periodMapUpdates[s.periodId]) periodMapUpdates[s.periodId] = [];
-      periodMapUpdates[s.periodId].push(s.id);
-    });
-    onBulkImport(normalized, periodMapUpdates);
-    setBundleImported(true);
-    setTimeout(() => { setBundleImported(false); setBundleData(null); }, 3500);
 
-    // Extract real names — prefer privateRosterMap (combined format) over inline fields.
-    const prMap = bundleData.privateRosterMap?.privateRosterMap;
-    let rosterEntries;
-    if (Array.isArray(prMap) && prMap.some(e => e && e.realName && String(e.realName).trim())) {
-      // Combined format: real names live in privateRosterMap.privateRosterMap
-      const colorByPseudonym = {};
-      rawStudents.forEach(s => { if (s.pseudonym) colorByPseudonym[s.pseudonym] = s.color || ""; });
-      rosterEntries = prMap
-        .filter(e => e && e.pseudonym)
-        .map(e => ({
-          color: colorByPseudonym[e.pseudonym] || "",
-          displayLabel: e.pseudonym,
-          realName: (e.realName || "").trim(),
-        }));
+    if (bundleData.privateRosterMap?.privateRosterMap?.length > 0) {
+      // Combined JSON with real names — build identity registry
+      const { registry, importStudents, periodMap } = buildIdentityRegistry(bundleData);
+      onBulkImport(Object.values(importStudents), periodMap);
+      if (registry.length > 0) onIdentityLoad?.(registry);
+      setBundleImported(true);
+      setTimeout(() => { setBundleImported(false); setBundleData(null); }, 3500);
+      if (registry.length > 0) {
+        setPendingRosterData(registry);
+        setShowRosterSaveModal(true);
+      } else {
+        setShowMissingNamesModal(true);
+      }
     } else {
-      // Inline format: check realName / studentName / name on each raw student
-      rosterEntries = rawStudents
-        .filter(s => s.pseudonym)
-        .map(s => ({
-          color: s.color || "",
-          displayLabel: s.pseudonym,
-          realName: (s.realName || s.studentName || s.name || "").trim(),
-        }));
-    }
-
-    const hasRealNames = rosterEntries.some(e => e.realName);
-    if (!hasRealNames) {
+      // Plain bundle without privateRosterMap — import with bundle pseudonyms, no real names
+      const rawStudents = bundleData.normalizedStudents.students;
+      const normalized  = rawStudents.map(s => normalizeImportedStudent(s));
+      const periodMapUpdates = {};
+      normalized.forEach(s => {
+        if (!s.periodId) return;
+        if (!periodMapUpdates[s.periodId]) periodMapUpdates[s.periodId] = [];
+        periodMapUpdates[s.periodId].push(s.id);
+      });
+      onBulkImport(normalized, periodMapUpdates);
+      setBundleImported(true);
+      setTimeout(() => { setBundleImported(false); setBundleData(null); }, 3500);
       setShowMissingNamesModal(true);
-    } else {
-      setPendingRosterData(rosterEntries);
-      setShowRosterSaveModal(true);
     }
   };
 
@@ -170,10 +155,10 @@ export function IEPImport({ onImport, onBulkImport, importedCount }) {
   const downloadPrivateRosterFromBundle = () => {
     const dateStr = new Date().toISOString().slice(0, 10);
     const json = {
-      schemaVersion: "1.0",
       type: "privateRoster",
+      schemaVersion: "2.0",
       createdAt: new Date().toISOString(),
-      students: pendingRosterData,
+      students: pendingRosterData, // [{ realName, pseudonym, color, periodIds, classLabels }]
     };
     const url = URL.createObjectURL(
       new Blob([JSON.stringify(json, null, 2)], { type: "application/json" })
@@ -681,10 +666,20 @@ export function IEPImport({ onImport, onBulkImport, importedCount }) {
               <div style={{ fontSize: "13px", fontWeight: "800", color: "#4ade80", marginBottom: "4px" }}>
                 🔒 Save Private Roster to your computer
               </div>
-              <div style={{ fontSize: "12px", color: "#64748b", lineHeight: "1.6" }}>
-                Real names were automatically extracted from your file. Download to keep them
-                private, then upload via the 👤 sidebar button to populate the Private Roster panel.
-                Real names are never stored in the app or sent anywhere.
+              <div style={{ fontSize: "13px", color: "#94a3b8", lineHeight: "1.75", marginBottom: "22px" }}>
+                Identities generated for{" "}
+                <strong style={{ color: "#e2e8f0" }}>
+                  {pendingRosterData.length} student{pendingRosterData.length !== 1 ? "s" : ""}
+                </strong>
+                {" "}— each real name now has one pseudonym and color across all their classes.
+                Save this file to your computer.
+                <br /><br />
+                Re-upload it via the <strong style={{ color: "#e2e8f0" }}>👤 Private Roster</strong> sidebar button
+                in any future session to restore name recognition.
+                <br /><br />
+                <span style={{ color: "#fbbf24" }}>
+                  ⚠ This file contains real names. Store it securely and never share it.
+                </span>
               </div>
             </div>
 
