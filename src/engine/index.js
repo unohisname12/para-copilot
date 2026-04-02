@@ -68,10 +68,10 @@ function matchAccommodations(topic, accs) {
 // MAIN LOCAL ENGINE — the core brain, zero API calls
 // Takes text + context, returns structured recommendations
 // ══════════════════════════════════════════════════════════════
-export function runLocalEngine(text, studentIds, knowledgeBase, activePeriod, docContent, periodLabel, recentLogs) {
+export function runLocalEngine(text, studentIds, knowledgeBase, activePeriod, docContent, periodLabel, recentLogs, allStudents = DB.students) {
   const t = text.toLowerCase();
   const situations = detectSituation(text);
-  const studs = studentIds.map(id => ({ id, ...DB.students[id] }));
+  const studs = studentIds.map(id => ({ id, ...(allStudents[id] || {}) }));
   const moves = [], actions = [], sources = [], kbHits = [];
   const iepStudentsUsed = [];
 
