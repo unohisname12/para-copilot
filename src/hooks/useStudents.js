@@ -64,11 +64,14 @@ export function useStudents({ activePeriod }) {
     if (students.length > 0) setDemoMode(false);
   };
 
+  const getStudentById = (id) => allStudents[id] || null;
+
   return {
     allStudents, effectivePeriodStudents,
     importedStudents, importedPeriodMap,
     demoMode, setDemoMode,
     identityOverrides, identityRegistry, setIdentityRegistry,
     handleImport, handleBundleImport, handleIdentityLoad, handleUpdateIdentity,
+    getStudentById,
   };
 }

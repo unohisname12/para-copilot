@@ -1,0 +1,841 @@
+// ══════════════════════════════════════════════════════════════
+// DEMO SEED DATA — Pre-seeded realistic case memory for showcase
+// Cross-references DEMO_STUDENTS from data.js
+// All dates relative to "today" minus N days for recency scoring
+// ══════════════════════════════════════════════════════════════
+
+function daysAgo(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString().split('T')[0];
+}
+
+function isoAgo(n, hour = 10) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  d.setHours(hour, 0, 0, 0);
+  return d.toISOString();
+}
+
+// ── DEMO INCIDENTS ─────────────────────────────────────────────
+export const DEMO_INCIDENTS = [
+  // Incident 1: Orange Student (Autism, sensory) — covered ears during loud group work
+  {
+    id: "inc_demo_001",
+    studentId: "stu_005",
+    date: daysAgo(3),
+    periodId: "p3",
+    timestamp: isoAgo(3, 10),
+    description: "Covered ears and put head down when group discussion got loud",
+    category: "regulation",
+    tags: ["sensory", "shutdown", "regulation"],
+    situationId: "sit_escalating",
+    antecedent: "Group work discussion volume increased suddenly",
+    setting: "group_work",
+    logIds: [],
+    interventionIds: ["intv_demo_001", "intv_demo_002"],
+    relatedIncidentIds: [],
+    status: "resolved",
+    resolvedAt: isoAgo(3, 10),
+    source: "manual",
+  },
+  // Incident 2: Pink Student (BIP Active) — refused work, voice rising
+  {
+    id: "inc_demo_002",
+    studentId: "stu_007",
+    date: daysAgo(2),
+    periodId: "p5",
+    timestamp: isoAgo(2, 13),
+    description: "Refused to start writing assignment, voice rising, pushed materials off desk",
+    category: "behavior",
+    tags: ["escalation", "refusal", "behavior"],
+    situationId: "sit_escalating",
+    antecedent: "Asked to start writing assignment without choice offered",
+    setting: "whole_class",
+    logIds: [],
+    interventionIds: ["intv_demo_003", "intv_demo_004"],
+    relatedIncidentIds: [],
+    status: "resolved",
+    resolvedAt: isoAgo(2, 13),
+    source: "manual",
+  },
+  // Incident 3: Purple Student (SLD Math) — frustrated with fractions
+  {
+    id: "inc_demo_003",
+    studentId: "stu_004",
+    date: daysAgo(4),
+    periodId: "p3",
+    timestamp: isoAgo(4, 10),
+    description: "Erasing excessively, getting frustrated with fraction addition worksheet",
+    category: "academic",
+    tags: ["math", "shutdown"],
+    situationId: "sit_math",
+    antecedent: "Fraction worksheet with unlike denominators, no tools on desk",
+    setting: "independent",
+    logIds: [],
+    interventionIds: ["intv_demo_005", "intv_demo_006"],
+    relatedIncidentIds: [],
+    status: "resolved",
+    resolvedAt: isoAgo(4, 10),
+    source: "manual",
+  },
+  // Incident 4: Red Student (SLD+ELL) — shut down during writing
+  {
+    id: "inc_demo_004",
+    studentId: "stu_001",
+    date: daysAgo(5),
+    periodId: "p1",
+    timestamp: isoAgo(5, 9),
+    description: "Head down, blank paper after 10 minutes of writing prompt",
+    category: "academic",
+    tags: ["writing", "shutdown", "ell"],
+    situationId: "sit_writing",
+    antecedent: "Open-ended writing prompt without graphic organizer",
+    setting: "independent",
+    logIds: [],
+    interventionIds: ["intv_demo_007"],
+    relatedIncidentIds: [],
+    status: "resolved",
+    resolvedAt: isoAgo(5, 9),
+    source: "manual",
+  },
+  // Incident 5: Green Student (ADHD) — off-task, tapping, can't focus
+  {
+    id: "inc_demo_005",
+    studentId: "stu_003",
+    date: daysAgo(1),
+    periodId: "p2",
+    timestamp: isoAgo(1, 11),
+    description: "Tapping desk, looking around room, hasn't started assignment after 8 minutes",
+    category: "behavior",
+    tags: ["off-task", "attention", "adhd"],
+    situationId: "sit_offtask",
+    antecedent: "Long written assignment, unclear instructions on board",
+    setting: "independent",
+    logIds: [],
+    interventionIds: ["intv_demo_008", "intv_demo_009"],
+    relatedIncidentIds: [],
+    status: "resolved",
+    resolvedAt: isoAgo(1, 11),
+    source: "manual",
+  },
+  // Incident 6: Orange Student — transition difficulty
+  {
+    id: "inc_demo_006",
+    studentId: "stu_005",
+    date: daysAgo(6),
+    periodId: "p3",
+    timestamp: isoAgo(6, 10),
+    description: "Refused to pack up when bell was about to ring, became rigid",
+    category: "regulation",
+    tags: ["transition", "regulation", "autism"],
+    situationId: "sit_transition",
+    antecedent: "Unannounced schedule change — class ending 5 min early",
+    setting: "transition",
+    logIds: [],
+    interventionIds: ["intv_demo_010"],
+    relatedIncidentIds: [],
+    status: "resolved",
+    resolvedAt: isoAgo(6, 10),
+    source: "manual",
+  },
+  // Incident 7: Pink Student — second escalation incident (pattern)
+  {
+    id: "inc_demo_007",
+    studentId: "stu_007",
+    date: daysAgo(5),
+    periodId: "p5",
+    timestamp: isoAgo(5, 14),
+    description: "Raised voice at peer during group project, stood up from seat",
+    category: "behavior",
+    tags: ["escalation", "behavior"],
+    situationId: "sit_escalating",
+    antecedent: "Peer made comment perceived as unfair during group work",
+    setting: "group_work",
+    logIds: [],
+    interventionIds: ["intv_demo_011"],
+    relatedIncidentIds: [],
+    status: "resolved",
+    resolvedAt: isoAgo(5, 14),
+    source: "manual",
+  },
+  // Incident 8: Purple Student — second math frustration
+  {
+    id: "inc_demo_008",
+    studentId: "stu_004",
+    date: daysAgo(1),
+    periodId: "p3",
+    timestamp: isoAgo(1, 10),
+    description: "Said 'I can't do this' and stopped working on decimal conversion",
+    category: "academic",
+    tags: ["math", "refusal"],
+    situationId: "sit_math",
+    antecedent: "Decimal-to-fraction conversion without calculator",
+    setting: "independent",
+    logIds: [],
+    interventionIds: ["intv_demo_012"],
+    relatedIncidentIds: ["inc_demo_003"],
+    status: "resolved",
+    resolvedAt: isoAgo(1, 10),
+    source: "manual",
+  },
+  // Incident 9: Pink Student — threw chair
+  {
+    id: "inc_demo_009",
+    studentId: "stu_007",
+    date: daysAgo(4),
+    periodId: "p5",
+    timestamp: isoAgo(4, 13),
+    description: "Threw chair across room during math",
+    category: "behavior",
+    tags: ["escalation", "behavior"],
+    situationId: "sit_escalating",
+    antecedent: "Corrected publicly by teacher in front of class",
+    setting: "whole_class",
+    logIds: [],
+    interventionIds: ["intv_demo_013"],
+    relatedIncidentIds: [],
+    status: "resolved",
+    resolvedAt: isoAgo(4, 13),
+    source: "manual",
+  },
+  // Incident 10: Green Student — refused all work
+  {
+    id: "inc_demo_010",
+    studentId: "stu_003",
+    date: daysAgo(3),
+    periodId: "p2",
+    timestamp: isoAgo(3, 11),
+    description: "Refused all work, head on desk",
+    category: "behavior",
+    tags: ["refusal", "shutdown"],
+    situationId: "sit_refusal",
+    antecedent: "Given full worksheet without chunking",
+    setting: "independent",
+    logIds: [],
+    interventionIds: ["intv_demo_014"],
+    relatedIncidentIds: [],
+    status: "resolved",
+    resolvedAt: isoAgo(3, 11),
+    source: "manual",
+  },
+  // Incident 11: Red Student — shut down during reading
+  {
+    id: "inc_demo_011",
+    studentId: "stu_001",
+    date: daysAgo(2),
+    periodId: "p1",
+    timestamp: isoAgo(2, 9),
+    description: "Shut down during reading, wouldn't respond",
+    category: "academic",
+    tags: ["reading", "shutdown"],
+    situationId: "sit_reading",
+    antecedent: "Cold-called to read aloud without warning",
+    setting: "whole_class",
+    logIds: [],
+    interventionIds: ["intv_demo_015"],
+    relatedIncidentIds: [],
+    status: "resolved",
+    resolvedAt: isoAgo(2, 9),
+    source: "manual",
+  },
+  // Incident 12: Pink Student — yelling at peer
+  {
+    id: "inc_demo_012",
+    studentId: "stu_007",
+    date: daysAgo(1),
+    periodId: "p5",
+    timestamp: isoAgo(1, 14),
+    description: "Yelling in class at peer",
+    category: "behavior",
+    tags: ["escalation", "behavior"],
+    situationId: "sit_escalating",
+    antecedent: "Peer took supplies without asking",
+    setting: "group_work",
+    logIds: [],
+    interventionIds: ["intv_demo_016"],
+    relatedIncidentIds: [],
+    status: "resolved",
+    resolvedAt: isoAgo(1, 14),
+    source: "manual",
+  },
+  // Incident 13: Pink Student — ran out of class
+  {
+    id: "inc_demo_013",
+    studentId: "stu_007",
+    date: daysAgo(6),
+    periodId: "p5",
+    timestamp: isoAgo(6, 13),
+    description: "Ran out of classroom without permission",
+    category: "behavior",
+    tags: ["escalation", "behavior"],
+    situationId: "sit_escalating",
+    antecedent: "Argument with peer escalated, felt cornered",
+    setting: "whole_class",
+    logIds: [],
+    interventionIds: ["intv_demo_017"],
+    relatedIncidentIds: [],
+    status: "resolved",
+    resolvedAt: isoAgo(6, 13),
+    source: "manual",
+  },
+
+  // Incident 14: Pink Student — escalation during group work (failed outcome)
+  {
+    id: "inc_demo_014",
+    studentId: "stu_007",
+    date: daysAgo(2),
+    periodId: "p5",
+    timestamp: isoAgo(2, 11),
+    description: "Yelling and throwing materials during group work",
+    category: "behavior",
+    tags: ["escalation", "behavior", "aggression"],
+    situationId: "sit_escalating",
+    antecedent: "Peer conflict during group project",
+    setting: "small_group",
+    logIds: [],
+    interventionIds: ["intv_demo_018"],
+    relatedIncidentIds: ["inc_demo_012"],
+    status: "open",
+    resolvedAt: null,
+    source: "manual",
+  },
+];
+
+// ── DEMO INTERVENTIONS ────────────────────────────────────────
+export const DEMO_INTERVENTIONS = [
+  // inc_demo_001: Orange Student sensory overload
+  {
+    id: "intv_demo_001",
+    incidentId: "inc_demo_001",
+    studentId: "stu_005",
+    timestamp: isoAgo(3, 10),
+    strategyId: null,
+    strategyLabel: "Offered noise-canceling headphones",
+    accommodationUsed: ["Noise Sensitivity — headphones OK"],
+    supportCardId: "sc_sensory",
+    staffNote: "Slid headphones across desk without speaking, waited",
+    source: "manual",
+  },
+  {
+    id: "intv_demo_002",
+    incidentId: "inc_demo_001",
+    studentId: "stu_005",
+    timestamp: isoAgo(3, 10),
+    strategyId: null,
+    strategyLabel: "Quiet redirect to calmer area",
+    accommodationUsed: ["Break Pass"],
+    supportCardId: "sc_sensory",
+    staffNote: "After headphones, gestured to quiet corner. Student moved on own.",
+    source: "manual",
+  },
+
+  // inc_demo_002: Pink Student escalation
+  {
+    id: "intv_demo_003",
+    incidentId: "inc_demo_002",
+    studentId: "stu_007",
+    timestamp: isoAgo(2, 13),
+    strategyId: null,
+    strategyLabel: "Slid break card silently on desk",
+    accommodationUsed: ["Break Pass", "De-escalation Steps"],
+    supportCardId: "sc_escal",
+    staffNote: "Did NOT correct publicly. Slid break card, stepped back, gave space.",
+    source: "manual",
+  },
+  {
+    id: "intv_demo_004",
+    incidentId: "inc_demo_002",
+    studentId: "stu_007",
+    timestamp: isoAgo(2, 13),
+    strategyId: null,
+    strategyLabel: "Offered 2 choices after de-escalation",
+    accommodationUsed: ["No public correction"],
+    supportCardId: "sc_escal",
+    staffNote: "After 2 min break: 'Would you like to start with #1 or #3?' Student chose #3.",
+    source: "manual",
+  },
+
+  // inc_demo_003: Purple Student math frustration
+  {
+    id: "intv_demo_005",
+    incidentId: "inc_demo_003",
+    studentId: "stu_004",
+    timestamp: isoAgo(4, 10),
+    strategyId: "str_chunk",
+    strategyLabel: "Chunked worksheet + provided calculator and mult chart",
+    accommodationUsed: ["Calculator", "Mult. Chart", "Graph Paper for alignment"],
+    supportCardId: "sc_math",
+    staffNote: "Put calculator and chart on desk. Covered bottom half of worksheet. 'Just do #1-3 first.'",
+    source: "manual",
+  },
+  {
+    id: "intv_demo_006",
+    incidentId: "inc_demo_003",
+    studentId: "stu_004",
+    timestamp: isoAgo(4, 10),
+    strategyId: null,
+    strategyLabel: "Graph paper for column alignment",
+    accommodationUsed: ["Graph Paper for alignment"],
+    supportCardId: "sc_math",
+    staffNote: "Switched to graph paper so columns line up. Student immediately more confident.",
+    source: "manual",
+  },
+
+  // inc_demo_004: Red Student writing shutdown
+  {
+    id: "intv_demo_007",
+    incidentId: "inc_demo_004",
+    studentId: "stu_001",
+    timestamp: isoAgo(5, 9),
+    strategyId: "str_vocab",
+    strategyLabel: "Provided graphic organizer + bilingual word bank",
+    accommodationUsed: ["Graphic Organizer", "Word Bank"],
+    supportCardId: "sc_write",
+    staffNote: "Gave graphic organizer with sentence starters. Added bilingual word bank. Student started writing within 3 min.",
+    source: "manual",
+  },
+
+  // inc_demo_005: Green Student off-task
+  {
+    id: "intv_demo_008",
+    incidentId: "inc_demo_005",
+    studentId: "stu_003",
+    timestamp: isoAgo(1, 11),
+    strategyId: "str_chunk",
+    strategyLabel: "Chunked assignment into 3 parts",
+    accommodationUsed: ["Chunked Tasks", "Fidget Allowed"],
+    supportCardId: null,
+    staffNote: "Broke assignment into 3 sections. 'Just do Part 1 — 5 questions.' Allowed fidget spinner.",
+    source: "manual",
+  },
+  {
+    id: "intv_demo_009",
+    incidentId: "inc_demo_005",
+    studentId: "stu_003",
+    timestamp: isoAgo(1, 11),
+    strategyId: null,
+    strategyLabel: "Movement break after Part 1",
+    accommodationUsed: ["Frequent Breaks"],
+    supportCardId: null,
+    staffNote: "After completing Part 1, sent on errand to office (movement break). Came back focused.",
+    source: "manual",
+  },
+
+  // inc_demo_006: Orange Student transition
+  {
+    id: "intv_demo_010",
+    incidentId: "inc_demo_006",
+    studentId: "stu_005",
+    timestamp: isoAgo(6, 10),
+    strategyId: "str_firstthen",
+    strategyLabel: "First/Then visual + advance warning",
+    accommodationUsed: ["Visual Schedule", "Advance Warning for Transitions"],
+    supportCardId: "sc_trans",
+    staffNote: "Showed visual: 'First put away materials, then walk to next class.' Gave 3 min instead of rushing.",
+    source: "manual",
+  },
+
+  // inc_demo_007: Pink Student second escalation
+  {
+    id: "intv_demo_011",
+    incidentId: "inc_demo_007",
+    studentId: "stu_007",
+    timestamp: isoAgo(5, 14),
+    strategyId: null,
+    strategyLabel: "Proximity + quiet 'I notice' language",
+    accommodationUsed: ["No public correction", "De-escalation Steps"],
+    supportCardId: "sc_escal",
+    staffNote: "Moved close, lowered voice: 'I notice you seem upset. Want to step out for a minute?' Student took break pass.",
+    source: "manual",
+  },
+
+  // inc_demo_008: Purple Student second math incident
+  {
+    id: "intv_demo_012",
+    incidentId: "inc_demo_008",
+    studentId: "stu_004",
+    timestamp: isoAgo(1, 10),
+    strategyId: "str_chunk",
+    strategyLabel: "Calculator + chunked problems + praised effort",
+    accommodationUsed: ["Calculator", "100s Chart"],
+    supportCardId: "sc_math",
+    staffNote: "Placed calculator on desk: 'Let's just try the first one together.' Praised attempt, not just answer.",
+    source: "manual",
+  },
+
+  // inc_demo_009: Pink Student threw chair
+  {
+    id: "intv_demo_013",
+    incidentId: "inc_demo_009",
+    studentId: "stu_007",
+    timestamp: isoAgo(4, 13),
+    strategyId: null,
+    strategyLabel: "Removed student, gave break, reduced workload",
+    accommodationUsed: ["Break Pass", "De-escalation Steps"],
+    supportCardId: "sc_escal",
+    staffNote: "Calmly asked student to step into hallway. Gave 5-min break, then offered reduced assignment.",
+    source: "manual",
+  },
+
+  // inc_demo_010: Green Student refused all work
+  {
+    id: "intv_demo_014",
+    incidentId: "inc_demo_010",
+    studentId: "stu_003",
+    timestamp: isoAgo(3, 11),
+    strategyId: "str_firstthen",
+    strategyLabel: "Used first-then strategy with visual",
+    accommodationUsed: ["Chunked Tasks", "Reduce Workload"],
+    supportCardId: null,
+    staffNote: "Visual first-then card: 'First do problems 1-3, then you can have 5 min free choice.'",
+    source: "manual",
+  },
+
+  // inc_demo_011: Red Student shut down during reading
+  {
+    id: "intv_demo_015",
+    incidentId: "inc_demo_011",
+    studentId: "stu_001",
+    timestamp: isoAgo(2, 9),
+    strategyId: null,
+    strategyLabel: "Provided 1-on-1 support and visuals",
+    accommodationUsed: ["Graphic Organizer", "Word Bank", "Preferential Seating"],
+    supportCardId: "sc_read",
+    staffNote: "Sat beside student, read passage aloud quietly, provided visual word bank.",
+    source: "manual",
+  },
+
+  // inc_demo_012: Pink Student yelling at peer
+  {
+    id: "intv_demo_016",
+    incidentId: "inc_demo_012",
+    studentId: "stu_007",
+    timestamp: isoAgo(1, 14),
+    strategyId: null,
+    strategyLabel: "Lowered voice, gave space, offered break card",
+    accommodationUsed: ["No public correction", "Break Pass"],
+    supportCardId: "sc_escal",
+    staffNote: "Lowered own voice, stepped back, slid break card across desk. Did not address peer conflict in the moment.",
+    source: "manual",
+  },
+
+  // inc_demo_013: Pink Student ran out of class
+  {
+    id: "intv_demo_017",
+    incidentId: "inc_demo_013",
+    studentId: "stu_007",
+    timestamp: isoAgo(6, 13),
+    strategyId: null,
+    strategyLabel: "Followed at safe distance, notified office support",
+    accommodationUsed: ["De-escalation Steps"],
+    supportCardId: "sc_escal",
+    staffNote: "Followed at distance, did not chase. Radioed office. Student stopped in hallway after 2 min.",
+    source: "manual",
+  },
+
+  // inc_demo_014: Pink Student — verbal redirect failed
+  {
+    id: "intv_demo_018",
+    incidentId: "inc_demo_014",
+    studentId: "stu_007",
+    timestamp: isoAgo(2, 11),
+    strategyId: null,
+    strategyLabel: "Verbal redirect and proximity",
+    accommodationUsed: ["De-escalation Steps"],
+    supportCardId: "sc_escal",
+    staffNote: "Tried verbal redirect — student escalated further. Should have gone straight to break card.",
+    source: "manual",
+  },
+];
+
+// ── DEMO OUTCOMES ─────────────────────────────────────────────
+export const DEMO_OUTCOMES = [
+  // Orange sensory — headphones worked
+  {
+    id: "out_demo_001",
+    interventionId: "intv_demo_001",
+    incidentId: "inc_demo_001",
+    studentId: "stu_005",
+    timestamp: isoAgo(3, 10),
+    result: "worked",
+    timeToResolve: 3,
+    studentResponse: "Put on headphones, regulated within 3 minutes, returned to work",
+    wouldRepeat: true,
+    note: "Headphones are reliable for this student when sensory overload is the trigger",
+  },
+  // Orange sensory — quiet redirect partly worked
+  {
+    id: "out_demo_002",
+    interventionId: "intv_demo_002",
+    incidentId: "inc_demo_001",
+    studentId: "stu_005",
+    timestamp: isoAgo(3, 10),
+    result: "partly",
+    timeToResolve: 8,
+    studentResponse: "Moved to corner but took extra time to re-engage",
+    wouldRepeat: true,
+    note: "Good secondary option but headphones alone usually sufficient",
+  },
+
+  // Pink escalation — break card worked
+  {
+    id: "out_demo_003",
+    interventionId: "intv_demo_003",
+    incidentId: "inc_demo_002",
+    studentId: "stu_007",
+    timestamp: isoAgo(2, 13),
+    result: "worked",
+    timeToResolve: 2,
+    studentResponse: "Took break card, walked to hallway, returned calm after 2 minutes",
+    wouldRepeat: true,
+    note: "Silent break card is KEY — never correct publicly with this student",
+  },
+  // Pink escalation — choices worked
+  {
+    id: "out_demo_004",
+    interventionId: "intv_demo_004",
+    incidentId: "inc_demo_002",
+    studentId: "stu_007",
+    timestamp: isoAgo(2, 13),
+    result: "worked",
+    timeToResolve: 5,
+    studentResponse: "Chose to start with #3, completed 60% of assignment",
+    wouldRepeat: true,
+    note: "Giving choice after de-escalation gets buy-in",
+  },
+
+  // Purple math — chunking + tools worked
+  {
+    id: "out_demo_005",
+    interventionId: "intv_demo_005",
+    incidentId: "inc_demo_003",
+    studentId: "stu_004",
+    timestamp: isoAgo(4, 10),
+    result: "worked",
+    timeToResolve: 5,
+    studentResponse: "Completed first 3 problems correctly with calculator, asked to try more",
+    wouldRepeat: true,
+    note: "Always ensure tools are on desk BEFORE the lesson starts",
+  },
+  // Purple math — graph paper worked
+  {
+    id: "out_demo_006",
+    interventionId: "intv_demo_006",
+    incidentId: "inc_demo_003",
+    studentId: "stu_004",
+    timestamp: isoAgo(4, 10),
+    result: "worked",
+    timeToResolve: 2,
+    studentResponse: "Immediately calmed down when columns aligned. Completed rest independently.",
+    wouldRepeat: true,
+    note: "Graph paper is a game changer for this student",
+  },
+
+  // Red writing — graphic organizer worked
+  {
+    id: "out_demo_007",
+    interventionId: "intv_demo_007",
+    incidentId: "inc_demo_004",
+    studentId: "stu_001",
+    timestamp: isoAgo(5, 9),
+    result: "worked",
+    timeToResolve: 3,
+    studentResponse: "Started filling in organizer within 3 min, wrote full paragraph by end of class",
+    wouldRepeat: true,
+    note: "Always pair graphic organizer with bilingual word bank for this student",
+  },
+
+  // Green off-task — chunking worked
+  {
+    id: "out_demo_008",
+    interventionId: "intv_demo_008",
+    incidentId: "inc_demo_005",
+    studentId: "stu_003",
+    timestamp: isoAgo(1, 11),
+    result: "worked",
+    timeToResolve: 2,
+    studentResponse: "Completed Part 1 in 8 minutes with fidget, then asked for break",
+    wouldRepeat: true,
+    note: "Chunking + fidget is reliable combo for this student",
+  },
+  // Green off-task — movement break worked
+  {
+    id: "out_demo_009",
+    interventionId: "intv_demo_009",
+    incidentId: "inc_demo_005",
+    studentId: "stu_003",
+    timestamp: isoAgo(1, 11),
+    result: "worked",
+    timeToResolve: 5,
+    studentResponse: "Came back from errand focused, finished Part 2 without prompting",
+    wouldRepeat: true,
+    note: "Errand-as-movement-break works better than sitting at desk",
+  },
+
+  // Orange transition — first/then partly worked
+  {
+    id: "out_demo_010",
+    interventionId: "intv_demo_010",
+    incidentId: "inc_demo_006",
+    studentId: "stu_005",
+    timestamp: isoAgo(6, 10),
+    result: "partly",
+    timeToResolve: 5,
+    studentResponse: "Eventually packed up but was late to next class. Need more advance warning.",
+    wouldRepeat: true,
+    note: "Next time give 5 min warning minimum. Unannounced changes are the real trigger.",
+  },
+
+  // Pink second escalation — proximity worked
+  {
+    id: "out_demo_011",
+    interventionId: "intv_demo_011",
+    incidentId: "inc_demo_007",
+    studentId: "stu_007",
+    timestamp: isoAgo(5, 14),
+    result: "worked",
+    timeToResolve: 3,
+    studentResponse: "Took break pass immediately when offered with 'I notice' language",
+    wouldRepeat: true,
+    note: "'I notice' language works consistently — never use 'you are' or 'you need to'",
+  },
+
+  // Purple second math — calculator + encouragement worked
+  {
+    id: "out_demo_012",
+    interventionId: "intv_demo_012",
+    incidentId: "inc_demo_008",
+    studentId: "stu_004",
+    timestamp: isoAgo(1, 10),
+    result: "worked",
+    timeToResolve: 4,
+    studentResponse: "Tried first problem with support, got it right, smiled. Completed 5 more.",
+    wouldRepeat: true,
+    note: "Praise effort not just answers — 'I see you trying' goes a long way",
+  },
+
+  // Threw chair — removed + break worked
+  {
+    id: "out_demo_013",
+    interventionId: "intv_demo_013",
+    incidentId: "inc_demo_009",
+    studentId: "stu_007",
+    timestamp: isoAgo(4, 13),
+    result: "worked",
+    timeToResolve: 5,
+    studentResponse: "Student calmed after 5 minutes in hallway, returned and completed reduced work",
+    wouldRepeat: true,
+    note: "Removing from audience is key — never address in front of peers",
+  },
+
+  // Refused all work — first-then worked
+  {
+    id: "out_demo_014",
+    interventionId: "intv_demo_014",
+    incidentId: "inc_demo_010",
+    studentId: "stu_003",
+    timestamp: isoAgo(3, 11),
+    result: "worked",
+    timeToResolve: 4,
+    studentResponse: "Completed partial assignment after visual first-then card",
+    wouldRepeat: true,
+    note: "Visual first-then is more effective than verbal for this student",
+  },
+
+  // Shut down during reading — 1-on-1 worked
+  {
+    id: "out_demo_015",
+    interventionId: "intv_demo_015",
+    incidentId: "inc_demo_011",
+    studentId: "stu_001",
+    timestamp: isoAgo(2, 9),
+    result: "worked",
+    timeToResolve: 4,
+    studentResponse: "Re-engaged after 4 minutes of 1-on-1 support with visuals",
+    wouldRepeat: true,
+    note: "Never cold-call this student to read aloud — always prep first",
+  },
+
+  // Yelling at peer — lowered voice + space worked
+  {
+    id: "out_demo_016",
+    interventionId: "intv_demo_016",
+    incidentId: "inc_demo_012",
+    studentId: "stu_007",
+    timestamp: isoAgo(1, 14),
+    result: "worked",
+    timeToResolve: 3,
+    studentResponse: "De-escalated within 3 minutes, took break card and walked to hallway",
+    wouldRepeat: true,
+    note: "Lowering own voice is consistently effective with this student",
+  },
+
+  // Ran out of class — followed at distance worked
+  {
+    id: "out_demo_017",
+    interventionId: "intv_demo_017",
+    incidentId: "inc_demo_013",
+    studentId: "stu_007",
+    timestamp: isoAgo(6, 13),
+    result: "worked",
+    timeToResolve: 5,
+    studentResponse: "Returned safely after 5 minutes, sat in hallway to cool down",
+    wouldRepeat: true,
+    note: "Never chase — follow at distance and radio for support",
+  },
+
+  // Failed outcome: Pink Student — verbal redirect during escalation did NOT work
+  {
+    id: "out_demo_018",
+    interventionId: "intv_demo_018",
+    incidentId: "inc_demo_014",
+    studentId: "stu_007",
+    timestamp: isoAgo(2, 11),
+    result: "did_not_work",
+    timeToResolve: null,
+    studentResponse: "Student escalated further — began throwing materials, had to call office support",
+    wouldRepeat: false,
+    note: "Verbal redirect made it worse. Next time skip straight to break card or space.",
+  },
+];
+
+// ── DEMO LOGS ─────────────────────────────────────────────────
+// Spread across last 5 days, realistic mix
+export const DEMO_LOGS = [
+  // Day 5 (oldest)
+  { studentId: "stu_001", note: "Checked glasses — on and clean. Pre-taught 3 vocabulary words before reading.", type: "Accommodation Used", date: daysAgo(5), tags: ["ell", "reading", "accommodation"] },
+  { studentId: "stu_001", note: "[Help] Provided graphic organizer + bilingual word bank", type: "Intervention", date: daysAgo(5), tags: ["writing", "help_intervention"] },
+  { studentId: "stu_007", note: "Check-in at start of period — seemed calm, asked about weekend.", type: "General Observation", date: daysAgo(5), tags: ["checkin", "bip"] },
+  { studentId: "stu_007", note: "[Help] Outcome: worked — Took break pass immediately when offered", type: "Outcome", date: daysAgo(5), tags: ["behavior", "help_outcome"] },
+  { studentId: "stu_004", note: "Ensured calculator, mult chart, and graph paper on desk before lesson.", type: "Accommodation Used", date: daysAgo(5), tags: ["math", "accommodation"] },
+
+  // Day 4
+  { studentId: "stu_004", note: "[Help] Chunked worksheet + provided calculator and mult chart", type: "Intervention", date: daysAgo(4), tags: ["math", "help_intervention"] },
+  { studentId: "stu_004", note: "[Help] Outcome: worked — Completed first 3 problems correctly", type: "Outcome", date: daysAgo(4), tags: ["math", "help_outcome"] },
+  { studentId: "stu_005", note: "Visual schedule posted. Reviewed transitions for the day.", type: "Accommodation Used", date: daysAgo(4), tags: ["autism", "transition"] },
+  { studentId: "stu_002", note: "Provided large print version of reading passage. Reading strips on desk.", type: "Accommodation Used", date: daysAgo(4), tags: ["low-vision", "reading"] },
+  { studentId: "stu_008", note: "Identified myself before speaking. Described diagram verbally.", type: "Accommodation Used", date: daysAgo(4), tags: ["low-vision", "autism"] },
+
+  // Day 3
+  { studentId: "stu_005", note: "[Help] Offered noise-canceling headphones — regulated within 3 min", type: "Intervention", date: daysAgo(3), tags: ["sensory", "help_intervention"] },
+  { studentId: "stu_005", note: "[Help] Outcome: worked — Put on headphones, returned to work", type: "Outcome", date: daysAgo(3), tags: ["sensory", "help_outcome"] },
+  { studentId: "stu_003", note: "Standing desk used for first 15 min. On task the whole time.", type: "Positive Note", date: daysAgo(3), tags: ["adhd", "positive"] },
+  { studentId: "stu_006", note: "Used speech-to-text for lab report. Composed 6 sentences independently!", type: "Positive Note", date: daysAgo(3), tags: ["speech", "writing", "positive"] },
+  { studentId: "stu_009", note: "Anchor chart reminder before quiz. Self-corrected 2 errors.", type: "Academic Support", date: daysAgo(3), tags: ["math", "accommodation"] },
+
+  // Day 2
+  { studentId: "stu_007", note: "[Help] Slid break card silently — student de-escalated in 2 min", type: "Intervention", date: daysAgo(2), tags: ["behavior", "bip", "help_intervention"] },
+  { studentId: "stu_007", note: "[Help] Outcome: worked — Returned calm, completed 60% of assignment", type: "Outcome", date: daysAgo(2), tags: ["behavior", "help_outcome"] },
+  { studentId: "stu_002", note: "Excellent focus during partner reading. Used strips independently.", type: "Positive Note", date: daysAgo(2), tags: ["reading", "positive"] },
+  { studentId: "stu_008", note: "Initiated greeting with Ms. Moore — great social progress!", type: "Positive Note", date: daysAgo(2), tags: ["social", "positive"] },
+  { studentId: "stu_001", note: "Used context clues to figure out 'photosynthesis' — gave a verbal explanation.", type: "Goal Progress", date: daysAgo(2), tags: ["reading", "ell", "goal"] },
+
+  // Day 1 (yesterday)
+  { studentId: "stu_003", note: "[Help] Chunked assignment + fidget allowed — completed Part 1 in 8 min", type: "Intervention", date: daysAgo(1), tags: ["adhd", "help_intervention"] },
+  { studentId: "stu_003", note: "[Help] Outcome: worked — Movement break then finished Part 2", type: "Outcome", date: daysAgo(1), tags: ["adhd", "help_outcome"] },
+  { studentId: "stu_004", note: "[Help] Calculator + encouragement — completed 5 problems", type: "Intervention", date: daysAgo(1), tags: ["math", "help_intervention"] },
+  { studentId: "stu_009", note: "Rushed through fraction quiz without checking. Reminded to use anchor chart.", type: "Academic Support", date: daysAgo(1), tags: ["math"] },
+  { studentId: "stu_006", note: "Gave 10-second processing time on each question. Answered 3 out of 4 correctly.", type: "General Observation", date: daysAgo(1), tags: ["speech"] },
+  { studentId: "stu_005", note: "Great day — followed visual schedule, used headphones proactively during transitions.", type: "Positive Note", date: daysAgo(1), tags: ["autism", "positive", "sensory"] },
+];

@@ -1,12 +1,15 @@
 // ══════════════════════════════════════════════════════════════
 // DASHBOARD — Fast UX, 1-click logging, resizable, saved layout
 // ══════════════════════════════════════════════════════════════
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { DB } from '../../data';
 import { getHealth, hdot } from '../../models';
 import { resolveLabel } from '../../privacy/nameResolver';
-import { parseDocForPeriod } from '../../engine';
+import { parseDocForPeriod, matchCaseKeywords } from '../../engine';
 import { OllamaStatusBadge } from '../../components/OllamaStatusBadge';
+import { HelpButton } from '../help';
+import { ShowcaseBanner } from '../showcase';
+import { DEMO_INCIDENTS, DEMO_INTERVENTIONS, DEMO_OUTCOMES, DEMO_LOGS } from '../../data/demoSeedData';
 
 // ── Constants ────────────────────────────────────────────────
 const LAYOUT_KEY  = "dashLayoutV3";
@@ -58,6 +61,9 @@ export function Dashboard({
   chatEndRef,
   docContent, docLink, setDocLink, fetchDoc, docLoading,
   setProfileStu,
+  caseMemory,
+  onLoadDemo,
+  onClearDemo,
 }) {
   // ── Persisted layout ──────────────────────────────────────
   const [layout, setLayout] = useLS(LAYOUT_KEY, { cols: 2, chatOpen: false, chatH: 320 });
@@ -128,6 +134,12 @@ export function Dashboard({
   }, [topic, effectivePeriodStudents, addLog, period, showToast]);
 
   const docSnippet = docContent ? parseDocForPeriod(docContent, period.label || "") : null;
+
+  // ── Inline case memory suggestions ───────────────────────
+  const caseSuggestions = useMemo(() => {
+    if (!noteTarget || !noteDraft || !caseMemory) return [];
+    return matchCaseKeywords(noteDraft, caseMemory.incidents, caseMemory.interventions, caseMemory.outcomes, 3);
+  }, [noteDraft, noteTarget, caseMemory]);
 
   // ── Styles ────────────────────────────────────────────────
   const card   = { borderRadius: "12px", overflow: "hidden" };
@@ -273,6 +285,15 @@ export function Dashboard({
             )}
           </div>
         </div>
+
+        {/* ── SHOWCASE BANNER ────────────────────────────── */}
+        {onLoadDemo && (
+          <ShowcaseBanner
+            onLoadDemo={() => onLoadDemo({ incidents: DEMO_INCIDENTS, interventions: DEMO_INTERVENTIONS, outcomes: DEMO_OUTCOMES, logs: DEMO_LOGS })}
+            hasLogs={logs.length > 0}
+            hasCaseData={caseMemory && caseMemory.incidents.length > 0}
+          />
+        )}
 
         {/* ── STUDENT GRID ──────────────────────────────── */}
         <div style={{ display: "grid", gridTemplateColumns: `repeat(${layout.cols}, 1fr)`, gap: "10px" }}>
@@ -505,6 +526,20 @@ export function Dashboard({
               onKeyDown={e => { if (e.key === "Enter" && e.ctrlKey) quickLog(noteTarget.studentId, noteTarget.action, noteDraft); }}
               placeholder="What happened? Add detail (optional) — Ctrl+Enter to log"
               style={{ width: "100%", background: "#0a1120", border: `1px solid ${noteTarget.action.border}`, borderRadius: "8px", color: "#e2e8f0", padding: "10px 12px", fontSize: "14px", resize: "none", height: "90px", fontFamily: "inherit", boxSizing: "border-box", outline: "none" }} />
+            {caseSuggestions.length > 0 && (
+              <div style={{ marginTop: '8px', padding: '10px 12px', background: '#0a1628', border: '1px solid #1e3a5f', borderRadius: '8px', maxHeight: '180px', overflow: 'auto' }}>
+                <div style={{ fontSize: '11px', fontWeight: '700', color: '#60a5fa', marginBottom: '8px' }}>
+                  🧠 Previous Similar Situations
+                </div>
+                {caseSuggestions.map((s, i) => (
+                  <div key={i} style={{ padding: '8px 0', borderTop: i > 0 ? '1px solid #1e293b' : 'none', fontSize: '12px', lineHeight: '1.5' }}>
+                    <div style={{ color: '#e2e8f0' }}><strong>Behavior:</strong> {s.behavior}</div>
+                    {s.intervention && <div style={{ color: '#4ade80' }}><strong>Tried:</strong> {s.intervention}</div>}
+                    {s.outcome && <div style={{ color: '#60a5fa' }}><strong>Result:</strong> {s.outcome}</div>}
+                  </div>
+                ))}
+              </div>
+            )}
             <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
               <button onClick={() => quickLog(noteTarget.studentId, noteTarget.action, noteDraft)}
                 style={{ flex: 1, padding: "13px", background: noteTarget.action.bg, color: noteTarget.action.color, border: `1.5px solid ${noteTarget.action.border}`, borderRadius: "10px", cursor: "pointer", fontSize: "16px", fontWeight: "800" }}>
@@ -518,6 +553,30 @@ export function Dashboard({
           </div>
         </div>
       )}
+
+      {/* ══ HELP BUTTON ══════════════════════════════════════ */}
+      {caseMemory && effectivePeriodStudents.length > 0 && (() => {
+        const helpStu = noteTarget?.studentId
+          ? allStudents[noteTarget.studentId]
+          : effectivePeriodStudents.length === 1 ? allStudents[effectivePeriodStudents[0]] : null;
+        const lastUserMsg = [...(currentChat || [])].reverse().find(m => m.sender === 'user')?.text || '';
+        return helpStu ? (
+          <HelpButton
+            student={helpStu}
+            allStudents={allStudents}
+            incidents={caseMemory.incidents}
+            interventions={caseMemory.interventions}
+            outcomes={caseMemory.outcomes}
+            addIncident={caseMemory.addIncident}
+            addIntervention={caseMemory.addIntervention}
+            addOutcome={caseMemory.addOutcome}
+            addLog={addLog}
+            currentDate={currentDate}
+            activePeriod={activePeriod}
+            lastChatMessage={lastUserMsg}
+          />
+        ) : null;
+      })()}
 
       {/* ══ TOAST ═══════════════════════════════════════════ */}
       {toast && (

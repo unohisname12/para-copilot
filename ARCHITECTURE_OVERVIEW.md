@@ -21,23 +21,26 @@ Para Copilot is a React 19 classroom tool for special education paraprofessional
 │                    Custom Hooks Layer                     │
 │  useLocalStorage · useOllama · useLogs · useStudents     │
 │  useChat · useDocuments · useKnowledgeBase               │
-│  useOllamaInsights                                       │
+│  useOllamaInsights · useCaseMemory                       │
 ├──────────────────────────────────────────────────────────┤
 │                   Feature Components                      │
 │  Dashboard · VaultView · AnalyticsDashboard · IEPImport  │
 │  SimpleMode · StealthScreen · RosterPanel                │
+│  HelpButton · HelpPanel · ShowcaseLoader                 │
 ├──────────────────────────────────────────────────────────┤
 │                   Shared Components                       │
 │  Panels (8) · Modals (4) · Tools (6) · Layout (2)       │
 │  BrandHeader · OllamaStatusBadge · Tip                   │
 ├──────────────────────────────────────────────────────────┤
 │                     Engine Layer                          │
-│  engine/index.js — situation detection, KB search        │
-│  engine/ollama.js — Ollama API (7 feature functions)     │
+│  engine/index.js — situation detection, KB search,       │
+│                    searchCaseMemory                       │
+│  engine/ollama.js — Ollama API (8 feature functions)     │
 ├──────────────────────────────────────────────────────────┤
 │                     Model Layer                           │
-│  models/index.js — createLog, createStudent, getHealth   │
-│  context/buildContext.js — AI prompt context packing     │
+│  models/index.js — createLog, createIncident,            │
+│    createIntervention, createOutcome, getHealth           │
+│  context/buildContext.js — AI prompt + case memory pack   │
 ├──────────────────────────────────────────────────────────┤
 │                    Privacy Layer                          │
 │  privacy/nameResolver.js — FERPA-safe name resolution    │
@@ -100,6 +103,7 @@ The Private Roster panel (`features/roster/RosterPanel.jsx`) is the only entry p
 | Ollama connection | `useOllama` → `OllamaProvider` | Dashboard, Analytics, BrandHeader |
 | Student data | `useStudents` → `StudentsProvider` | Dashboard, SimpleMode, Modals, Roster |
 | Logs | `useLogs` → `LogsProvider` | Dashboard, Vault, Analytics, Profile |
+| Case Memory | `useCaseMemory` (hook) | Dashboard (Help), App.jsx |
 | Chat | `useChat` (hook) | Dashboard only |
 | Documents | `useDocuments` (hook) | App.jsx (fetchDoc wiring) |
 | Knowledge Base | `useKnowledgeBase` (hook) | Vault KB tab |
@@ -112,25 +116,40 @@ The Private Roster panel (`features/roster/RosterPanel.jsx`) is the only entry p
 ```
 src/
   app/providers/    — React Context providers (3 files)
-  features/         — Feature-specific components (7 folders)
+  features/         — Feature-specific components (9 folders)
+    help/           — Help Button + Case Memory UI (5 components)
+    showcase/       — Demo data loader (ShowcaseLoader, ShowcaseBanner)
   components/       — Shared UI components + re-export stubs
     tools/          — 6 student-safe classroom tools
     panels/         — 8 sidebar panels (support card, ABC, goals, etc.)
     modals/         — 4 modal dialogs
     layout/         — FloatingToolWindow, FullscreenTool
     ui/             — Tip tooltip
-  hooks/            — 8 custom hooks
-  engine/           — Pure logic (situation detection, Ollama API)
-  models/           — Data factories and health calculations
-  context/          — AI prompt context building
+  data/             — Demo seed data (demoSeedData.js)
+  hooks/            — 9 custom hooks (+ useCaseMemory)
+  engine/           — Pure logic (situation detection, Ollama API, searchCaseMemory)
+  models/           — Data factories (createLog, createIncident, createIntervention, createOutcome)
+  context/          — AI prompt context building (+ serializeForCaseMemoryPrompt)
   privacy/          — FERPA name resolution
   utils/            — exportCSV, sidebarVisibility
   styles/           — CSS
-  __tests__/        — 14 test suites (197 tests)
+  __tests__/        — 19 test suites (255 tests)
+```
+
+## Case Memory Data Flow
+
+```
+User describes situation
+  → HelpPanel auto-detects tags
+    → searchCaseMemory() scores past incidents
+      → CaseMemoryCards displayed with outcomes
+        → "Try This Again" → InterventionLogger (pre-filled)
+          → OutcomeLogger → outcome saved
+            → Companion Log created via addLog()
 ```
 
 ## Test Strategy
 
-- **Unit tests** (Jest + jsdom): 14 suites, 197 tests covering models, engine, privacy, identity, IEP import, simple mode, roster utilities, sidebar visibility
-- **E2E tests** (Playwright): `e2e/uiAudit.mjs` — 39 automated checks across 15 interactive surface categories
+- **Unit tests** (Jest + jsdom): 19 suites, 255 tests covering models, engine, privacy, identity, IEP import, case memory, showcase data, help flow integration
+- **E2E tests** (Playwright): `e2e/uiAudit.mjs` (39 checks), `e2e/helpButtonAudit.mjs` (Help flow), `e2e/showcaseAudit.mjs` (demo data)
 - **Re-export stubs** in `src/components/` preserve all test import paths after file moves

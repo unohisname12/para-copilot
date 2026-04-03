@@ -8,6 +8,7 @@ import { DB } from '../../data';
 import { ollamaParseIEP } from '../../engine/ollama';
 import { normalizeImportedStudent, buildIdentityRegistry, buildIdentityRegistryFromMasterRoster } from '../../models';
 import { assignIdentity, IDENTITY_PALETTE } from '../../identity';
+import { DEMO_INCIDENTS, DEMO_INTERVENTIONS, DEMO_OUTCOMES, DEMO_LOGS } from '../../data/demoSeedData';
 
 // ── System 1: App Bundle validation ──────────────────────────
 // Accepts schemaVersion 2.0 / 2.1 app bundles only.
@@ -80,8 +81,14 @@ async function extractPDFText(file) {
   }
 }
 
-export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCount }) {
-  const [inputMode, setInputMode] = useState("paste"); // "paste" | "upload" | "manual" | "bundle"
+export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCount, onLoadDemo }) {
+  const [inputMode, setInputMode] = useState("prepared"); // "prepared" | "paste" | "upload" | "manual" | "bundle" | "masterRoster"
+
+  // ── Prepared import state ───────────────────────────────────
+  const [preparedData, setPreparedData] = useState(null);
+  const [preparedError, setPreparedError] = useState("");
+  const [preparedImported, setPreparedImported] = useState(false);
+  const preparedFileRef = useRef();
 
   // ── Bundle state ──────────────────────────────────────────────
   const [bundleData,          setBundleData]          = useState(null);
@@ -168,6 +175,45 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
     if (registry.length > 0) {
       setPendingRosterData(registry);
       setShowRosterSaveModal(true);
+    }
+  };
+
+  // ── Prepared import handlers ─────────────────────────────────
+  const handlePreparedFile = async (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    setPreparedError(""); setPreparedData(null); setPreparedImported(false);
+    try {
+      const json = JSON.parse(await file.text());
+      const err = validateBundle(json);
+      if (err) { setPreparedError(err); return; }
+      setPreparedData(json);
+    } catch (err) { setPreparedError("Could not parse JSON: " + err.message); }
+    e.target.value = "";
+  };
+
+  const doPreparedImport = () => {
+    if (!preparedData || !onBulkImport) return;
+    // Reuse the same logic as bundle import
+    if (preparedData.privateRosterMap?.privateRosterMap?.length > 0) {
+      const { registry, importStudents, periodMap } = buildIdentityRegistry(preparedData);
+      onBulkImport(Object.values(importStudents), periodMap);
+      if (registry.length > 0) onIdentityLoad?.(registry);
+      setPreparedImported(true);
+      if (registry.length > 0) {
+        setPendingRosterData(registry);
+        setShowRosterSaveModal(true);
+      }
+    } else {
+      const rawStudents = preparedData.normalizedStudents.students;
+      const normalized = rawStudents.map(s => normalizeImportedStudent(s));
+      const periodMapUpdates = {};
+      normalized.forEach(s => {
+        if (!s.periodId) return;
+        if (!periodMapUpdates[s.periodId]) periodMapUpdates[s.periodId] = [];
+        periodMapUpdates[s.periodId].push(s.id);
+      });
+      onBulkImport(normalized, periodMapUpdates);
+      setPreparedImported(true);
     }
   };
 
@@ -401,24 +447,27 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
 
       {/* Mode tabs */}
       <div style={{ display: "flex", gap: "4px", marginBottom: "20px", flexWrap: "wrap" }}>
-        {[["paste", "📋 Paste Text"], ["upload", "📎 Upload File"], ["manual", "✏️ Manual Entry"], ["bundle", "📦 App Bundle JSON"], ["masterRoster", "🗂️ Master Roster JSON"]].map(([id, label]) => (
-          <button key={id} onClick={() => { setInputMode(id); setParsed(null); setParseError(""); setBundleError(""); setMasterRosterData(null); setMasterRosterError(""); setMasterRosterImported(false); }}
+        {[["prepared", "🎯 Load Profiles"], ["paste", "📋 Paste Text"], ["upload", "📎 Upload File"], ["manual", "✏️ Manual Entry"], ["bundle", "📦 App Bundle JSON"], ["masterRoster", "🗂️ Master Roster JSON"]].map(([id, label]) => (
+          <button key={id} onClick={() => { setInputMode(id); setParsed(null); setParseError(""); setBundleError(""); setMasterRosterData(null); setMasterRosterError(""); setMasterRosterImported(false); setPreparedError(""); setPreparedData(null); setPreparedImported(false); }}
             style={{
               padding: "8px 16px",
               borderRadius: "8px",
-              border: id === "bundle"      ? "1px solid #6d28d9"
+              border: id === "prepared"     ? "1px solid #1d4ed8"
+                    : id === "bundle"      ? "1px solid #6d28d9"
                     : id === "masterRoster" ? "1px solid #166534"
                     : "none",
               cursor: "pointer",
               fontSize: "13px",
               fontWeight: "600",
               background: inputMode === id ? (
-                  id === "bundle"       ? "#1e1b4b"
+                  id === "prepared"      ? "#0c1a3d"
+                : id === "bundle"       ? "#1e1b4b"
                 : id === "masterRoster" ? "#0d2010"
                 : "#1d4ed8"
               ) : "var(--panel-bg)",
               color: inputMode === id ? (
-                  id === "bundle"       ? "#a78bfa"
+                  id === "prepared"      ? "#60a5fa"
+                : id === "bundle"       ? "#a78bfa"
                 : id === "masterRoster" ? "#4ade80"
                 : "#fff"
               ) : "var(--text-muted)",
@@ -427,6 +476,99 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
           </button>
         ))}
       </div>
+
+      {/* ── PREPARED PROFILES (simplified demo import) ────────── */}
+      {inputMode === "prepared" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+
+          {/* Friendly intro */}
+          <div style={{ padding: "14px 16px", background: "#0c1a3d", border: "1px solid #1d4ed8", borderRadius: "12px", fontSize: "13px", color: "#93c5fd", lineHeight: "1.7" }}>
+            <strong style={{ color: "#60a5fa" }}>Load Prepared Student Profiles</strong><br />
+            Upload a JSON file with pre-built student profiles (goals, accommodations, strategies, schedules). This is the fastest way to get started.
+          </div>
+
+          {/* File input */}
+          <input type="file" ref={preparedFileRef} style={{ display: "none" }} accept=".json" onChange={handlePreparedFile} />
+
+          {/* Big upload button */}
+          <button onClick={() => preparedFileRef.current?.click()}
+            style={{
+              width: "100%", padding: "28px 20px", borderRadius: "14px",
+              border: `2px dashed ${preparedData ? "#1d4ed8" : "#334155"}`,
+              background: preparedData ? "#0c1a3d" : "var(--bg-surface)",
+              color: preparedData ? "#60a5fa" : "var(--text-primary)",
+              fontSize: "16px", fontWeight: "700", cursor: "pointer",
+              display: "flex", flexDirection: "column", alignItems: "center", gap: "8px",
+            }}>
+            <span style={{ fontSize: "36px" }}>{preparedData ? "✓" : "📁"}</span>
+            <span>{preparedData
+              ? `Loaded — ${preparedData.normalizedStudents.students.length} student${preparedData.normalizedStudents.students.length !== 1 ? "s" : ""} ready`
+              : "Upload Prepared Profiles (JSON)"
+            }</span>
+            {!preparedData && <span style={{ fontSize: "12px", color: "var(--text-muted)", fontWeight: "400" }}>App Bundle JSON (schemaVersion 2.0 / 2.1)</span>}
+          </button>
+
+          {/* Validation error */}
+          {preparedError && (
+            <div style={{ padding: "10px 14px", background: "#1a0505", border: "1px solid #7f1d1d", borderRadius: "8px", fontSize: "12px", color: "#f87171" }}>
+              {preparedError}
+            </div>
+          )}
+
+          {/* Preview + import */}
+          {preparedData && !preparedImported && (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
+                {[
+                  { label: "Students", val: preparedData.normalizedStudents.students.length, color: "#e2e8f0" },
+                  { label: "With Goals", val: preparedData.normalizedStudents.students.filter(s => (s.goals || []).length > 0).length, color: "#60a5fa" },
+                  { label: "With Accs", val: preparedData.normalizedStudents.students.filter(s => (s.accs || s.accommodations || []).length > 0).length, color: "#4ade80" },
+                ].map(({ label, val, color }) => (
+                  <div key={label} style={{ background: "var(--bg-surface)", borderRadius: "8px", padding: "10px 12px", textAlign: "center" }}>
+                    <div style={{ fontSize: "22px", fontWeight: "700", color }}>{val}</div>
+                    <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "2px" }}>{label}</div>
+                  </div>
+                ))}
+              </div>
+
+              <button onClick={doPreparedImport}
+                style={{ width: "100%", padding: "14px", borderRadius: "12px", border: "1px solid #1d4ed8", background: "#0c1a3d", color: "#60a5fa", fontSize: "15px", fontWeight: "800", cursor: "pointer" }}>
+                Load {preparedData.normalizedStudents.students.length} Student{preparedData.normalizedStudents.students.length !== 1 ? "s" : ""} into App
+              </button>
+            </>
+          )}
+
+          {/* Success */}
+          {preparedImported && (
+            <div style={{ padding: "20px", borderRadius: "12px", background: "#0d2010", border: "2px solid #166534", color: "#4ade80", textAlign: "center", fontSize: "16px", fontWeight: "700" }}>
+              Profiles loaded! Navigate to your schedule to start working.
+            </div>
+          )}
+
+          {/* Divider */}
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", margin: "4px 0" }}>
+            <div style={{ flex: 1, height: "1px", background: "#1e293b" }} />
+            <span style={{ fontSize: "11px", color: "#475569", fontWeight: "600" }}>OR</span>
+            <div style={{ flex: 1, height: "1px", background: "#1e293b" }} />
+          </div>
+
+          {/* Demo students button */}
+          <button
+            onClick={() => {
+              if (onLoadDemo) {
+                onLoadDemo({ incidents: DEMO_INCIDENTS, interventions: DEMO_INTERVENTIONS, outcomes: DEMO_OUTCOMES, logs: DEMO_LOGS });
+                setPreparedImported(true);
+              }
+            }}
+            style={{
+              width: "100%", padding: "12px", borderRadius: "10px",
+              border: "1px solid #334155", background: "var(--bg-surface)",
+              color: "var(--text-secondary)", fontSize: "13px", fontWeight: "600", cursor: "pointer",
+            }}>
+            Load Demo Students (try the app with sample data)
+          </button>
+        </div>
+      )}
 
       {/* ── BUNDLE IMPORT UI ─────────────────────────────────── */}
       {inputMode === "bundle" && (
@@ -608,7 +750,7 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
       )}
 
       {/* ── ORIGINAL IEP/AI IMPORT (paste / upload / manual) ──── */}
-      {inputMode !== "bundle" && inputMode !== "masterRoster" && <div style={{ display: "grid", gridTemplateColumns: parsed || inputMode === "manual" ? "1fr 1fr" : "1fr", gap: "20px" }}>
+      {inputMode !== "prepared" && inputMode !== "bundle" && inputMode !== "masterRoster" && <div style={{ display: "grid", gridTemplateColumns: parsed || inputMode === "manual" ? "1fr 1fr" : "1fr", gap: "20px" }}>
 
         {/* Left: Input */}
         <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>

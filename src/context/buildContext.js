@@ -211,3 +211,37 @@ export function serializeForEmailPrompt(student, logs) {
     `Start the email with "Hi ${student.caseManager || "Team"},"`,
   ].join("\n");
 }
+
+// ── Case Memory serializer ────────────────────────────────────
+export function serializeForCaseMemoryPrompt(student, currentDescription, caseMemoryResults) {
+  const lines = [
+    `STUDENT: ${resolveLabel(student)}`,
+    `Eligibility: ${_fieldText(student.eligibility)}`,
+    `Accommodations: ${_fieldText(student.accs)}`,
+    `Strategies: ${_fieldText(student.strategies)}`,
+    `Triggers: ${_fieldText(student.triggers)}`,
+    "",
+    "CURRENT SITUATION:",
+    currentDescription || "(no description provided)",
+    "",
+  ];
+
+  if (caseMemoryResults && caseMemoryResults.length > 0) {
+    lines.push("PAST CASES:");
+    caseMemoryResults.forEach((r, i) => {
+      lines.push(`  Case ${i + 1}: ${r.incident.description} [${r.incident.date}]`);
+      r.interventions.forEach(ci => {
+        const result = ci.outcome ? ci.outcome.result : "no outcome recorded";
+        lines.push(`    Tried: ${ci.intervention.strategyLabel || ci.intervention.staffNote || "unspecified"} → ${result}`);
+        if (ci.outcome?.studentResponse) lines.push(`    Response: ${ci.outcome.studentResponse}`);
+      });
+    });
+    lines.push("");
+  } else {
+    lines.push("PAST CASES: None recorded for this student yet.");
+    lines.push("");
+  }
+
+  lines.push("Based on this student's profile and past cases, give 2-3 specific, immediately actionable recommendations for this moment.");
+  return lines.join("\n");
+}

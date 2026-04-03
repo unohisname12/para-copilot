@@ -23,6 +23,7 @@ import { useChat } from './hooks/useChat';
 import { useDocuments } from './hooks/useDocuments';
 import { useKnowledgeBase } from './hooks/useKnowledgeBase';
 import { useOllamaInsights } from './hooks/useOllamaInsights';
+import { useCaseMemory } from './hooks/useCaseMemory';
 
 // Utilities
 import { exportCSV, exportCSVPrivate } from './utils/exportCSV';
@@ -86,7 +87,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
 
   // Destructure for convenience
   const { allStudents, effectivePeriodStudents, identityRegistry } = students;
-  const { logs, addLog, toggleFlag, deleteLog, updateLogText } = logsBag;
+  const { logs, addLog, toggleFlag, deleteLog, updateLogText, loadDemoLogs, clearDemoLogs } = logsBag;
   const { knowledgeBase } = kb;
 
   // ── UI state ───────────────────────────────────────────────
@@ -109,6 +110,20 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
     ollamaErrorHandler: ollama.ollamaErrorHandler,
     setCurrentChat: chat.setCurrentChat,
   });
+
+  // ── Case Memory ────────────────────────────────────────────
+  const caseMemory = useCaseMemory();
+
+  // ── Showcase (demo mode) ──────────────────────────────────
+  const handleLoadDemo = ({ incidents, interventions, outcomes, logs: demoLogs }) => {
+    caseMemory.loadDemoCaseMemory({ incidents, interventions, outcomes });
+    if (demoLogs) loadDemoLogs(demoLogs);
+    students.setDemoMode(true);
+  };
+  const handleClearDemo = () => {
+    caseMemory.clearCaseMemory();
+    clearDemoLogs();
+  };
 
   // ── Vault state ────────────────────────────────────────────
   const [vaultTab, setVaultTab] = useState("all"), [vaultFilter, setVaultFilter] = useState("all"), [editingLog, setEditingLog] = useState(null);
@@ -318,10 +333,13 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
                   docContent={docs.docContent} docLink={docs.docLink} setDocLink={docs.setDocLink}
                   fetchDoc={fetchDoc} docLoading={docs.docLoading}
                   setProfileStu={setProfileStu}
+                  caseMemory={caseMemory}
+                  onLoadDemo={handleLoadDemo}
+                  onClearDemo={handleClearDemo}
                 />
               )}
               {view === "vault" && renderVault()}
-              {view === "import" && <IEPImport onImport={students.handleImport} onBulkImport={students.handleBundleImport} onIdentityLoad={students.handleIdentityLoad} importedCount={Object.keys(students.importedStudents).length} />}
+              {view === "import" && <IEPImport onImport={students.handleImport} onBulkImport={students.handleBundleImport} onIdentityLoad={students.handleIdentityLoad} importedCount={Object.keys(students.importedStudents).length} onLoadDemo={handleLoadDemo} />}
               {view === "analytics" && <AnalyticsDashboard logs={logs} groups={groups} setGroups={setGroups} onOpenProfile={setProfileStu} ollamaOnline={ollama.ollamaOnline} ollamaLoading={ollama.ollamaLoading} onOllamaPatternSummary={insights.handleOllamaPatternSummary} allStudents={allStudents} />}
             </>
         }
@@ -339,7 +357,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
         <div style={{ flex: 1, overflowY: "auto" }}>{toolboxTools.find(t => t.id === activeToolbox)?.component}</div>
       </aside>)}
 
-      {profileStu && (<StudentProfileModal studentId={profileStu} studentData={allStudents[profileStu]} logs={logs} currentDate={currentDate} onClose={() => setProfileStu(null)} onLog={addLog} onDraftEmail={(id) => { setProfileStu(null); insights.draftEmail(id); }} onUpdateIdentity={students.handleUpdateIdentity} />)}
+      {profileStu && (<StudentProfileModal studentId={profileStu} studentData={allStudents[profileStu]} logs={logs} currentDate={currentDate} activePeriod={activePeriod} onClose={() => setProfileStu(null)} onLog={addLog} onDraftEmail={(id) => { setProfileStu(null); insights.draftEmail(id); }} onUpdateIdentity={students.handleUpdateIdentity} caseMemory={caseMemory} />)}
       {insights.emailModal && (<EmailModal studentId={insights.emailModal.studentId} studentData={allStudents[insights.emailModal.studentId]} emailLoading={insights.emailLoading} emailDraft={insights.emailDraft} setEmailDraft={insights.setEmailDraft} onClose={() => { insights.setEmailModal(null); insights.setEmailDraft(""); }} />)}
       {situationModal && (<SituationResponseModal situation={situationModal} students={effectivePeriodStudents} studentsMap={allStudents} onClose={() => setSituationModal(null)} onLog={(id, note, type) => addLog(id, note, type)} onOpenCard={() => { setSituationModal(null); setActiveToolbox("cards"); }} />)}
       {insights.ollamaModal && (<OllamaInsightModal feature={insights.ollamaModal.feature} text={insights.ollamaModal.text} studentId={insights.ollamaModal.studentId} onClose={() => insights.setOllamaModal(null)} onLog={addLog} />)}

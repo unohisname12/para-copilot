@@ -1,8 +1,30 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { GOAL_PROGRESS_OPTIONS } from '../../data';
 import { getHealth, hdot } from '../../models';
 import { migrateIdentity, getDefaultIdentity, isIdentityCustomized } from '../../identity';
 import { resolveLabel } from '../../privacy/nameResolver';
+import { matchCaseKeywords, isHelpWorthy } from '../../engine';
+import { createIncident, createIntervention, createOutcome } from '../../models';
+
+// ── Guided follow-up chip options ────────────────────────────
+const ANTECEDENT_OPTIONS = ["Work demand", "Loud room", "Transition", "Peer conflict", "Schedule change", "Unclear directions", "Other"];
+const INTERVENTION_OPTIONS = ["Break", "Chunked work", "Headphones", "First/then", "Calm voice", "Gave space", "Visual support", "Reduced workload", "Called support", "Other"];
+const RESULT_OPTIONS = [
+  { label: "Worked", value: "worked", color: "#4ade80" },
+  { label: "Partly worked", value: "partly", color: "#fbbf24" },
+  { label: "Did not work", value: "did_not_work", color: "#f87171" },
+  { label: "Not sure yet", value: "unsure", color: "#94a3b8" },
+];
+const AFTERMATH_OPTIONS = ["Calmed down", "Returned to work", "Stayed upset", "Escalated more", "Left room", "Needed office/support", "Other"];
+
+function Chip({ label, selected, onClick, color }) {
+  return (
+    <button onClick={onClick} style={{
+      padding: "4px 10px", borderRadius: "14px", fontSize: "11px", fontWeight: "600", cursor: "pointer", border: selected ? `1.5px solid ${color || '#60a5fa'}` : "1px solid #1e293b",
+      background: selected ? (color || '#60a5fa') + '20' : 'transparent', color: selected ? (color || '#60a5fa') : '#8fa3c4', transition: "all .15s",
+    }}>{label}</button>
+  );
+}
 
 // Renders a field that may be a plain string (v1) or an array (v2)
 function FieldText({ value, fallback = "\u2014" }) {
@@ -15,11 +37,56 @@ function FieldText({ value, fallback = "\u2014" }) {
   return <span>{value}</span>;
 }
 
-export function StudentProfileModal({ studentId, logs, currentDate, onClose, onLog, onDraftEmail, studentData, onUpdateIdentity }) {
+export function StudentProfileModal({ studentId, logs, currentDate, activePeriod, onClose, onLog, onDraftEmail, studentData, onUpdateIdentity, caseMemory }) {
   const s = studentData;
   const stuLogs = logs.filter(l => l.studentId === studentId);
   const health = getHealth(studentId, logs, currentDate);
   const [tab, setTab] = useState("overview"), [logNote, setLogNote] = useState(""), [logType, setLogType] = useState("General Observation");
+
+  const caseSuggestions = useMemo(() => {
+    if (!logNote || !caseMemory) return [];
+    return matchCaseKeywords(logNote, caseMemory.incidents, caseMemory.interventions, caseMemory.outcomes, 3);
+  }, [logNote, caseMemory]);
+
+  // ── Guided follow-up state ──────────────────────────────────
+  // Phases: "note" (normal) → "prompt" (detected help-worthy) → "guided" (user opted in) → saved
+  const [helpPhase, setHelpPhase] = useState("note");
+  const [antecedent, setAntecedent] = useState(null);
+  const [intervention, setIntervention] = useState(null);
+  const [result, setResult] = useState(null);
+  const [aftermath, setAftermath] = useState(null);
+  const [staffNote, setStaffNote] = useState("");
+  const helpWorthy = useMemo(() => isHelpWorthy(logNote), [logNote]);
+
+  const resetGuidedFlow = () => { setHelpPhase("note"); setAntecedent(null); setIntervention(null); setResult(null); setAftermath(null); setStaffNote(""); };
+
+  const handleSaveNote = () => {
+    if (!logNote.trim()) return;
+    onLog(studentId, logNote, logType);
+    setLogNote("");
+    resetGuidedFlow();
+  };
+
+  const handleSaveGuided = () => {
+    if (!logNote.trim()) return;
+    // 1. Save plain log
+    onLog(studentId, logNote, logType);
+    // 2. Save structured case memory if caseMemory hooks are available
+    if (caseMemory?.addIncident) {
+      const inc = createIncident({ studentId, description: logNote, date: currentDate, periodId: activePeriod || "p1", category: "behavior", antecedent: antecedent || "", setting: "other", source: "guided" });
+      caseMemory.addIncident(inc);
+      if (intervention) {
+        const intv = createIntervention({ incidentId: inc.id, studentId, strategyLabel: intervention, staffNote: staffNote || "", source: "guided" });
+        caseMemory.addIntervention(intv);
+        if (result) {
+          const out = createOutcome({ interventionId: intv.id, incidentId: inc.id, studentId, result: result, studentResponse: aftermath || "", wouldRepeat: result === "worked" || result === "partly" ? true : false, note: staffNote || "" });
+          caseMemory.addOutcome(out);
+        }
+      }
+    }
+    setLogNote("");
+    resetGuidedFlow();
+  };
 
   // Identity editor — initialized from current (or migrated) identity
   const identity = migrateIdentity(s).identity;
@@ -108,7 +175,82 @@ export function StudentProfileModal({ studentId, logs, currentDate, onClose, onL
               <div style={{ fontSize: "11px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: ".07em", marginBottom: "8px" }}>Quick Log</div>
               <select value={logType} onChange={e => setLogType(e.target.value)} className="period-select" style={{ width: "100%", marginBottom: "8px" }}><option>Academic Support</option><option>Accommodation Used</option><option>Behavior Note</option><option>Positive Note</option><option>General Observation</option><option>Parent Contact</option><option>Goal Progress</option><option>Handoff Note</option></select>
               <textarea value={logNote} onChange={e => setLogNote(e.target.value)} className="data-textarea" style={{ height: "70px", marginBottom: "8px" }} placeholder="Type observation..." />
-              <button className="btn btn-primary" style={{ background: c, borderColor: c, color: "#000" }} onClick={() => { if (logNote.trim()) { onLog(studentId, logNote, logType); setLogNote(""); } }}>Save to Vault</button>
+              {caseSuggestions.length > 0 && (
+                <div style={{ marginBottom: '8px', padding: '10px 12px', background: '#0a1628', border: '1px solid #1e3a5f', borderRadius: '8px', maxHeight: '180px', overflow: 'auto' }}>
+                  <div style={{ fontSize: '11px', fontWeight: '700', color: '#60a5fa', marginBottom: '8px' }}>
+                    🧠 Previous Similar Situations
+                  </div>
+                  {caseSuggestions.map((s, i) => (
+                    <div key={i} style={{ padding: '8px 0', borderTop: i > 0 ? '1px solid #1e293b' : 'none', fontSize: '12px', lineHeight: '1.5' }}>
+                      <div style={{ color: '#e2e8f0' }}><strong>Behavior:</strong> {s.behavior}</div>
+                      {s.intervention && <div style={{ color: '#4ade80' }}><strong>Tried:</strong> {s.intervention}</div>}
+                      {s.outcome && <div style={{ color: '#60a5fa' }}><strong>Result:</strong> {s.outcome}</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {/* ── Guided follow-up prompt ── */}
+              {helpPhase === "note" && helpWorthy && logNote.trim().length > 0 && (
+                <div style={{ marginBottom: '8px', padding: '10px 12px', background: '#0d1a0d', border: '1px solid #166534', borderRadius: '8px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: '700', color: '#4ade80', marginBottom: '6px' }}>💡 This looks significant — want to add details?</div>
+                  <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '8px' }}>Capture what happened before, what you tried, and whether it worked. Completely optional.</div>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button onClick={() => setHelpPhase("guided")} style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid #166534', background: '#166534', color: '#4ade80', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>Add Help Details</button>
+                    <button onClick={handleSaveNote} style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid #1e293b', background: 'transparent', color: '#8fa3c4', fontSize: '11px', cursor: 'pointer' }}>Keep as Note</button>
+                  </div>
+                </div>
+              )}
+              {/* ── Guided flow ── */}
+              {helpPhase === "guided" && (
+                <div style={{ marginBottom: '8px', padding: '12px', background: '#0a1628', border: '1px solid #1e3a5f', borderRadius: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: '700', color: '#60a5fa' }}>📋 Guided Details</div>
+                    <button onClick={() => { resetGuidedFlow(); }} style={{ fontSize: '10px', color: '#64748b', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Cancel</button>
+                  </div>
+                  {/* Antecedent */}
+                  <div style={{ marginBottom: '10px' }}>
+                    <div style={{ fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '5px' }}>What happened before?</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                      {ANTECEDENT_OPTIONS.map(opt => <Chip key={opt} label={opt} selected={antecedent === opt} onClick={() => setAntecedent(antecedent === opt ? null : opt)} />)}
+                    </div>
+                  </div>
+                  {/* Intervention */}
+                  <div style={{ marginBottom: '10px' }}>
+                    <div style={{ fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '5px' }}>What did you try?</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                      {INTERVENTION_OPTIONS.map(opt => <Chip key={opt} label={opt} selected={intervention === opt} onClick={() => setIntervention(intervention === opt ? null : opt)} />)}
+                    </div>
+                  </div>
+                  {/* Result */}
+                  <div style={{ marginBottom: '10px' }}>
+                    <div style={{ fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '5px' }}>Did it work?</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                      {RESULT_OPTIONS.map(opt => <Chip key={opt.value} label={opt.label} selected={result === opt.value} onClick={() => setResult(result === opt.value ? null : opt.value)} color={opt.color} />)}
+                    </div>
+                  </div>
+                  {/* Aftermath */}
+                  <div style={{ marginBottom: '10px' }}>
+                    <div style={{ fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '5px' }}>What happened after?</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                      {AFTERMATH_OPTIONS.map(opt => <Chip key={opt} label={opt} selected={aftermath === opt} onClick={() => setAftermath(aftermath === opt ? null : opt)} />)}
+                    </div>
+                  </div>
+                  {/* Staff note */}
+                  <div style={{ marginBottom: '10px' }}>
+                    <div style={{ fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '5px' }}>Staff note (optional)</div>
+                    <textarea value={staffNote} onChange={e => setStaffNote(e.target.value)} className="data-textarea" style={{ height: '40px', fontSize: '11px' }} placeholder="Any extra context..." />
+                  </div>
+                  {/* Save guided */}
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button onClick={handleSaveGuided} style={{ padding: '6px 14px', borderRadius: '6px', border: `1px solid ${c}`, background: c, color: '#000', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>Save with Details</button>
+                    <button onClick={handleSaveNote} style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #1e293b', background: 'transparent', color: '#8fa3c4', fontSize: '11px', cursor: 'pointer' }}>Just Save Note</button>
+                  </div>
+                </div>
+              )}
+              {/* Default save button — hidden when guided flow is active or prompt is showing */}
+              {helpPhase === "note" && !(helpWorthy && logNote.trim().length > 0) && (
+                <button className="btn btn-primary" style={{ background: c, borderColor: c, color: "#000" }} onClick={handleSaveNote}>Save to Vault</button>
+              )}
             </div>
             {onUpdateIdentity && (
               <div className="panel" style={{ padding: "12px" }}>

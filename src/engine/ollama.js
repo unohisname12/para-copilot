@@ -180,7 +180,24 @@ export async function ollamaExtractPDF(rawText) {
   return callOllama(SYS_PDF_EXTRACT, rawText);
 }
 
-// Feature 6: IEP document parsing — replaces Claude in IEPImport
+// Feature 6: Case Memory Insight — AI-powered recommendations from past cases
+const SYS_CASE_INSIGHT = `You are a special education case memory analyst.
+Given a student's current situation and their past incidents with interventions and outcomes,
+provide 2-3 specific recommendations based on what has worked before.
+
+Rules:
+- Reference specific past interventions that succeeded
+- Note patterns (time of day, triggers, what helps)
+- If nothing has worked, suggest trying something new based on the IEP
+- Use only pseudonyms, never real names
+- Keep under 150 words
+- Be practical and actionable for a para in the moment`;
+
+export async function ollamaCaseInsight(serializedContext) {
+  return callOllama(SYS_CASE_INSIGHT, serializedContext);
+}
+
+// Feature 7: IEP document parsing — replaces Claude in IEPImport
 export async function ollamaParseIEP(documentText) {
   const raw = await callOllama(SYS_IEP_PARSE, documentText);
   // Strip any accidental markdown fencing

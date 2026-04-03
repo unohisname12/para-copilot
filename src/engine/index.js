@@ -162,4 +162,93 @@ export function runLocalEngine(text, studentIds, knowledgeBase, activePeriod, do
     recommendedTools: recTools, followUp: followUp || null };
 }
 
+// ── Case Memory Search ──────────────────────────────────────
+// Retrieves past incidents for a student (or similar students) ranked by relevance.
+// Returns composite records: incident + interventions with outcomes.
+export function searchCaseMemory(studentId, currentContext, allIncidents, allInterventions, allOutcomes, options = {}) {
+  const { maxResults = 5, includeOtherStudents = false } = options;
+  const { category, tags: contextTags = [], situationId } = currentContext || {};
+
+  let candidates = allIncidents.filter(inc => inc.id !== currentContext?.id);
+  if (!includeOtherStudents) {
+    candidates = candidates.filter(inc => inc.studentId === studentId);
+  }
+
+  const scored = candidates.map(inc => {
+    let score = 0;
+    const reasons = [];
+
+    // Same student is strongest signal
+    if (inc.studentId === studentId) { score += 3; reasons.push("same_student"); }
+
+    // Same category
+    if (category && inc.category === category) { score += 2; reasons.push("same_category"); }
+
+    // Tag overlap
+    const tagOverlap = (inc.tags || []).filter(t => contextTags.includes(t)).length;
+    if (tagOverlap > 0) { score += tagOverlap; reasons.push("similar_tags"); }
+
+    // Same situation
+    if (situationId && inc.situationId === situationId) { score += 2; reasons.push("same_situation"); }
+
+    // Recency bonus (within 7 days)
+    const daysSince = Math.floor((Date.now() - new Date(inc.timestamp).getTime()) / 86400000);
+    if (daysSince <= 7) { score += 1; reasons.push("recent"); }
+
+    // Build composite record with linked interventions + outcomes
+    const intvsForInc = allInterventions.filter(i => i.incidentId === inc.id);
+    const compositeInterventions = intvsForInc.map(intv => ({
+      intervention: intv,
+      outcome: allOutcomes.find(o => o.interventionId === intv.id) || null,
+    }));
+
+    // Boost for interventions that worked
+    const workedCount = compositeInterventions.filter(c => c.outcome?.result === "worked").length;
+    score += workedCount * 2;
+    if (workedCount > 0) reasons.push("has_success");
+
+    return { incident: inc, interventions: compositeInterventions, relevanceScore: score, matchReasons: reasons };
+  });
+
+  return scored
+    .filter(s => s.relevanceScore > 0)
+    .sort((a, b) => b.relevanceScore - a.relevanceScore)
+    .slice(0, maxResults);
+}
+
+// ── Inline Case Memory — simple keyword matching ────────────
+const _stopwords = new Set(['the','and','was','for','that','with','this','from','but','not','are','has','had','have','been','were','being','she','her','his','him','they','them','then','than']);
+function _normalize(s) { return (s || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 2 && !_stopwords.has(w)); }
+
+export function matchCaseKeywords(text, incidents, interventions, outcomes, maxResults = 3) {
+  if (!text || text.trim().length < 3) return [];
+  const inputWords = _normalize(text);
+  if (inputWords.length === 0) return [];
+
+  const scored = incidents.map(inc => {
+    const descWords = _normalize(inc.description);
+    const overlap = inputWords.filter(w => descWords.some(dw => dw.includes(w) || w.includes(dw))).length;
+    if (overlap === 0) return null;
+
+    const intv = interventions.find(i => i.incidentId === inc.id);
+    const out = intv ? outcomes.find(o => o.interventionId === intv.id) : null;
+
+    return {
+      behavior: inc.description,
+      intervention: intv?.strategyLabel || intv?.staffNote || null,
+      outcome: out?.studentResponse || (out?.result === 'worked' ? 'Resolved' : out?.result) || null,
+      score: overlap,
+    };
+  }).filter(Boolean);
+
+  return scored.sort((a, b) => b.score - a.score).slice(0, maxResults);
+}
+
+// ── Help-worthy keyword detection ──────────────────────────
+const _helpPatterns = /\b(threw|throw|hit|hitting|yelling|yelled|ran\s*out|refused|shut\s*down|escalat\w*|crying|cried|unsafe|aggressive|left\s*room|meltdown|dysregulated|kicked|punched|screaming|eloped|bolted|destroying|flipped)\b/i;
+export function isHelpWorthy(text) {
+  if (!text || text.trim().length < 5) return false;
+  return _helpPatterns.test(text);
+}
+
 // callClaude removed — all AI now runs through src/engine/ollama.js (local Ollama)
