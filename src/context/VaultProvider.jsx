@@ -104,6 +104,30 @@ export function VaultProvider({ identityRegistry, onPurgeIdentityRegistry, child
     setConfirmPersistOpen(false);
   }, []);
 
+  // Merge in a batch of { paraAppNumber -> realName } entries. If persistence
+  // is on, the merged set is written back to IndexedDB. Returns a summary.
+  const mergeVault = useCallback(async (additions) => {
+    if (!additions || Object.keys(additions).length === 0) {
+      return { added: 0, updated: 0 };
+    }
+    let added = 0, updated = 0;
+    const next = { ...vault };
+    Object.entries(additions).forEach(([k, v]) => {
+      const key = String(k).trim();
+      const name = String(v).trim();
+      if (!key || !name) return;
+      if (next[key] === name) return;
+      if (next[key]) updated++; else added++;
+      next[key] = name;
+    });
+    setVault(next);
+    setShowRealNames(true);
+    if (persisted) {
+      try { await updatePersistedNames(next); } catch {}
+    }
+    return { added, updated };
+  }, [vault, persisted]);
+
   const purgeVault = useCallback(async () => {
     try { await dbPurge(); } catch {}
     setVault({});
@@ -130,12 +154,13 @@ export function VaultProvider({ identityRegistry, onPurgeIdentityRegistry, child
     cancelEnablePersistence,
     purgeVault,
     dismissExpiredBanner,
+    mergeVault,
   }), [
     showRealNames, vault, hasVault, persisted, expiredBanner,
     confirmPersistOpen,
     toggleShowRealNames, requestEnablePersistence,
     confirmEnablePersistence, cancelEnablePersistence,
-    purgeVault, dismissExpiredBanner,
+    purgeVault, dismissExpiredBanner, mergeVault,
   ]);
 
   return <VaultContext.Provider value={value}>{children}</VaultContext.Provider>;

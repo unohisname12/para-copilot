@@ -9,6 +9,7 @@ import { ollamaParseIEP } from '../../engine/ollama';
 import { normalizeImportedStudent, buildIdentityRegistry, buildIdentityRegistryFromMasterRoster } from '../../models';
 import { useTeamOptional } from '../../context/TeamProvider';
 import { pushStudents } from '../../services/teamSync';
+import RosterOnlyImport from './RosterOnlyImport';
 import { assignIdentity, IDENTITY_PALETTE } from '../../identity';
 import { DEMO_INCIDENTS, DEMO_INTERVENTIONS, DEMO_OUTCOMES, DEMO_LOGS } from '../../data/demoSeedData';
 
@@ -84,7 +85,7 @@ async function extractPDFText(file) {
 }
 
 export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCount, onLoadDemo }) {
-  const [inputMode, setInputMode] = useState("prepared"); // "prepared" | "paste" | "upload" | "manual" | "bundle" | "masterRoster"
+  const [inputMode, setInputMode] = useState("prepared"); // "prepared" | "paste" | "upload" | "manual" | "bundle" | "masterRoster" | "rosterOnly"
 
   // Cloud team context — null when app is offline-only (no Supabase env configured).
   const team = useTeamOptional();
@@ -470,14 +471,15 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
 
       {/* Mode tabs */}
       <div style={{ display: "flex", gap: "4px", marginBottom: "20px", flexWrap: "wrap" }}>
-        {[["prepared", "🎯 Load Profiles"], ["paste", "📋 Paste Text"], ["upload", "📎 Upload File"], ["manual", "✏️ Manual Entry"], ["bundle", "📦 App Bundle JSON"], ["masterRoster", "🗂️ Master Roster JSON"]].map(([id, label]) => (
+        {[["prepared", "🎯 Load Profiles"], ["rosterOnly", "👥 Names + Para #s"], ["paste", "📋 Paste Text"], ["upload", "📎 Upload File"], ["manual", "✏️ Manual Entry"], ["bundle", "📦 App Bundle JSON"], ["masterRoster", "🗂️ Master Roster JSON"]].map(([id, label]) => (
           <button key={id} onClick={() => { setInputMode(id); setParsed(null); setParseError(""); setBundleError(""); setMasterRosterData(null); setMasterRosterError(""); setMasterRosterImported(false); setPreparedError(""); setPreparedData(null); setPreparedImported(false); }}
             style={{
               padding: "8px 16px",
               borderRadius: "8px",
-              border: id === "prepared"     ? "1px solid #1d4ed8"
-                    : id === "bundle"      ? "1px solid #6d28d9"
-                    : id === "masterRoster" ? "1px solid #166534"
+              border: id === "prepared"      ? "1px solid #1d4ed8"
+                    : id === "bundle"        ? "1px solid #6d28d9"
+                    : id === "masterRoster"  ? "1px solid #166534"
+                    : id === "rosterOnly"    ? "1px solid var(--accent-border)"
                     : "none",
               cursor: "pointer",
               fontSize: "13px",
@@ -486,12 +488,14 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
                   id === "prepared"      ? "#0c1a3d"
                 : id === "bundle"       ? "#1e1b4b"
                 : id === "masterRoster" ? "#0d2010"
+                : id === "rosterOnly"   ? "var(--accent-glow)"
                 : "#1d4ed8"
               ) : "var(--panel-bg)",
               color: inputMode === id ? (
                   id === "prepared"      ? "#60a5fa"
                 : id === "bundle"       ? "#a78bfa"
                 : id === "masterRoster" ? "#4ade80"
+                : id === "rosterOnly"   ? "var(--accent-hover)"
                 : "#fff"
               ) : "var(--text-muted)",
             }}>
@@ -499,6 +503,9 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
           </button>
         ))}
       </div>
+
+      {/* ── ROSTER ONLY (Names + Para App Numbers; seeds the vault) ─── */}
+      {inputMode === "rosterOnly" && <RosterOnlyImport />}
 
       {/* ── PREPARED PROFILES (simplified demo import) ────────── */}
       {inputMode === "prepared" && (
