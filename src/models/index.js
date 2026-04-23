@@ -151,6 +151,13 @@ export function normalizeIdentityEntries(rawEntries, allStudents = {}) {
     .filter(e => e.realName && (e.pseudonym || e.displayLabel))
     .map(e => {
       const pseudonym = e.pseudonym || e.displayLabel || "";
+      // Preserve paraAppNumber (and legacy externalKey variants) so the
+      // real-name vault can key on it. Without this, the vault never learns
+      // about any student and the "Show real names" toggle has nothing to do.
+      const paraAppNumber = e.paraAppNumber
+        ?? e.externalKey
+        ?? e.externalStudentKey
+        ?? null;
       const base = {
         realName:    e.realName,
         pseudonym,
@@ -159,6 +166,7 @@ export function normalizeIdentityEntries(rawEntries, allStudents = {}) {
         classLabels: e.classLabels || {},
         // carry through identity if already present so migrateIdentity is a no-op
         ...(e.identity ? { identity: e.identity } : {}),
+        ...(paraAppNumber ? { paraAppNumber } : {}),
       };
       const withIdentity = migrateIdentity(base);
       // Phase C: prefer entry.studentId (stable, collision-safe).
