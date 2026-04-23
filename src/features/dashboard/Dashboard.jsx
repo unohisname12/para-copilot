@@ -68,10 +68,14 @@ export function Dashboard({
   // ── Persisted layout ──────────────────────────────────────
   const [layout, setLayout] = useLS(LAYOUT_KEY, { cols: 2, chatOpen: false, chatH: 320 });
   const [topic, setTopic]   = useLS(topicKey(activePeriod, currentDate), "");
+  // 'write' = type the topic in the app; 'fetch' = pull from Google Doc URL;
+  // 'none' = skip (no plan today). Persisted per-period-per-day.
+  const [planMode, setPlanMode] = useLS(`planMode_${activePeriod}_${currentDate}`, 'write');
 
   // ── Ephemeral UI state ───────────────────────────────────
   const [topicEdit,   setTopicEdit]   = useState(false);
   const [topicDraft,  setTopicDraft]  = useState(topic);
+  const [exportOpen,  setExportOpen]  = useState(false);
   const [activeAction, setActiveAction] = useState(null); // class-wide action selector
   const [noteTarget,  setNoteTarget]  = useState(null);   // { studentId, action }
   const [noteDraft,   setNoteDraft]   = useState("");
@@ -252,129 +256,224 @@ export function Dashboard({
       {/* ══ SCROLLABLE BODY ══════════════════════════════════ */}
       <div style={{ flex: 1, overflowY: "auto", padding: "0 var(--space-6) var(--space-6)", display: "flex", flexDirection: "column", gap: "var(--space-4)", minHeight: 0 }}>
 
-        {/* ── TOPIC CARD ─────────────────────────────────── */}
+        {/* ── TODAY'S PLAN CARD (merged Topic + Class Notes Doc) ─ */}
         <div style={{
-          background: topic
+          background: (topic || docContent)
             ? "linear-gradient(135deg, rgba(122,156,255,0.1), var(--panel-bg))"
             : "var(--panel-bg)",
-          border: `1px solid ${topic ? "var(--accent-border)" : "var(--border)"}`,
+          border: `1px solid ${(topic || docContent) ? "var(--accent-border)" : "var(--border)"}`,
           borderRadius: "var(--radius-xl)",
           overflow: "hidden",
           transition: "all 200ms cubic-bezier(0.16,1,0.3,1)",
-          boxShadow: topic ? "var(--shadow-glow)" : "var(--shadow-sm)",
+          boxShadow: (topic || docContent) ? "var(--shadow-glow)" : "var(--shadow-sm)",
         }}>
-          <div
-            style={{
-              padding: "var(--space-4) var(--space-5)",
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              cursor: "pointer", userSelect: "none", gap: "var(--space-3)",
-            }}
-            onClick={() => !topicEdit && setTopicEdit(true)}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", flex: 1, minWidth: 0 }}>
+          {/* Header row: icon + label + mode selector + export */}
+          <div style={{
+            padding: "var(--space-4) var(--space-5)",
+            display: "flex", alignItems: "center", gap: "var(--space-3)",
+            flexWrap: "wrap",
+          }}>
+            <div style={{
+              width: 44, height: 44,
+              background: (topic || docContent) ? "var(--grad-primary)" : "var(--bg-dark)",
+              borderRadius: "var(--radius-md)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 20, flexShrink: 0,
+              boxShadow: (topic || docContent) ? "0 4px 14px rgba(122,156,255,0.4)" : "none",
+            }}>
+              📚
+            </div>
+            <div style={{ flex: 1, minWidth: 160 }}>
               <div style={{
-                width: 44, height: 44,
-                background: topic ? "var(--grad-primary)" : "var(--bg-dark)",
-                borderRadius: "var(--radius-md)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 20, flexShrink: 0,
-                boxShadow: topic ? "0 4px 14px rgba(122,156,255,0.4)" : "none",
+                fontSize: 10, fontWeight: 700,
+                textTransform: "uppercase", letterSpacing: "0.1em",
+                color: (topic || docContent) ? "var(--accent-hover)" : "var(--text-muted)",
               }}>
-                📚
+                Today's Plan
               </div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{
-                  fontSize: 10, fontWeight: 700,
-                  textTransform: "uppercase", letterSpacing: "0.1em",
-                  color: topic ? "var(--accent-hover)" : "var(--text-muted)",
-                }}>
-                  What are we doing today?
-                </div>
-                {topic
-                  ? <div style={{
-                      fontSize: 17, fontWeight: 700,
-                      color: "var(--text-primary)", marginTop: 3,
-                      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                    }}>{topic}</div>
-                  : <div style={{
-                      fontSize: 13, color: "var(--text-dim)",
-                      fontStyle: "italic", marginTop: 2,
-                    }}>Tap to set today's lesson focus…</div>
-                }
+              <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>
+                What are we doing today?
               </div>
             </div>
-            <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-              {topic && !topicEdit && (
+            {/* Mode selector — pill segmented control */}
+            <div style={{
+              display: "flex", gap: 2,
+              background: "var(--bg-dark)",
+              borderRadius: "var(--radius-md)",
+              padding: 3,
+              border: "1px solid var(--border)",
+            }}>
+              {[
+                ["write", "✏️ Write it"],
+                ["fetch", "📄 Fetch Doc"],
+                ["none",  "— Skip"],
+              ].map(([id, label]) => (
                 <button
-                  onClick={e => { e.stopPropagation(); logTopic(); }}
-                  title="Log this topic to the session"
-                  className="btn btn-secondary btn-sm"
-                  style={{ color: "var(--green)", borderColor: "rgba(52,211,153,0.3)" }}
+                  key={id}
+                  onClick={() => setPlanMode(id)}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: "var(--radius-sm)",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: 12, fontWeight: 600,
+                    fontFamily: "inherit",
+                    background: planMode === id ? "var(--grad-primary)" : "transparent",
+                    color: planMode === id ? "#fff" : "var(--text-secondary)",
+                    transition: "all 120ms cubic-bezier(0.16,1,0.3,1)",
+                    whiteSpace: "nowrap",
+                  }}
                 >
-                  📋 Log
+                  {label}
                 </button>
-              )}
-              <button
-                onClick={e => { e.stopPropagation(); setTopicEdit(true); setTopicDraft(topic); }}
-                className="btn btn-primary btn-sm"
-              >
-                {topic ? "✏ Edit" : "+ Set Topic"}
-              </button>
+              ))}
             </div>
+            <button
+              onClick={() => setExportOpen(true)}
+              className="btn btn-secondary btn-sm"
+              title="Format today's plan + logs as text to paste into your Class Notes doc"
+              style={{ whiteSpace: "nowrap" }}
+            >
+              📋 Export today
+            </button>
           </div>
 
-          {topicEdit && (
+          {/* Body — conditional on mode */}
+          {planMode === "write" && (
             <div style={{
               padding: "var(--space-3) var(--space-5) var(--space-4)",
               borderTop: "1px solid var(--border)",
-            }} onClick={e => e.stopPropagation()}>
-              <textarea autoFocus
-                value={topicDraft}
-                onChange={e => setTopicDraft(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveTopic(); } }}
-                placeholder={`e.g. "Decimals — converting fractions with manipulatives"\n\nPress Enter to save, Shift+Enter for new line`}
-                className="data-textarea"
-                style={{ height: 80 }}
-              />
-              <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
-                <button onClick={saveTopic} className="btn btn-primary" style={{ flex: 1 }}>
-                  ✓ Save
-                </button>
-                <button
-                  onClick={() => { setTopicEdit(false); setTopicDraft(topic); }}
-                  className="btn btn-secondary"
+            }}>
+              {!topicEdit ? (
+                <div
+                  onClick={() => { setTopicEdit(true); setTopicDraft(topic); }}
+                  style={{
+                    cursor: "pointer", userSelect: "none",
+                    padding: "var(--space-2) 0",
+                    display: "flex", gap: "var(--space-3)", alignItems: "center",
+                  }}
                 >
-                  Cancel
-                </button>
-                {topicDraft.trim() && (
-                  <button
-                    onClick={() => { setTopic(""); setTopicEdit(false); setTopicDraft(""); showToast("Topic cleared"); }}
-                    className="btn btn-secondary"
-                    style={{ color: "var(--red)", borderColor: "rgba(248,113,113,0.3)" }}
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {topic ? (
+                      <div style={{
+                        fontSize: 17, fontWeight: 700, color: "var(--text-primary)",
+                        whiteSpace: "pre-wrap", wordBreak: "break-word",
+                      }}>{topic}</div>
+                    ) : (
+                      <div style={{ fontSize: 13, color: "var(--text-dim)", fontStyle: "italic" }}>
+                        Tap to set today's lesson focus — what you're teaching, what to watch for, etc.
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                    {topic && (
+                      <button
+                        onClick={e => { e.stopPropagation(); logTopic(); }}
+                        title="Log this topic as a Class Note"
+                        className="btn btn-secondary btn-sm"
+                        style={{ color: "var(--green)", borderColor: "rgba(52,211,153,0.3)" }}
+                      >
+                        📋 Log
+                      </button>
+                    )}
+                    <button className="btn btn-primary btn-sm">
+                      {topic ? "✏ Edit" : "+ Set"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <textarea
+                    autoFocus
+                    value={topicDraft}
+                    onChange={e => setTopicDraft(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveTopic(); } }}
+                    placeholder={`e.g. "Decimals — converting fractions with manipulatives"\n\nPress Enter to save, Shift+Enter for new line.`}
+                    className="data-textarea"
+                    style={{ height: 90 }}
+                  />
+                  <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
+                    <button onClick={saveTopic} className="btn btn-primary" style={{ flex: 1 }}>
+                      ✓ Save
+                    </button>
+                    <button onClick={() => { setTopicEdit(false); setTopicDraft(topic); }}
+                            className="btn btn-secondary">
+                      Cancel
+                    </button>
+                    {topicDraft.trim() && (
+                      <button
+                        onClick={() => { setTopic(""); setTopicEdit(false); setTopicDraft(""); showToast("Topic cleared"); }}
+                        className="btn btn-secondary"
+                        style={{ color: "var(--red)", borderColor: "rgba(248,113,113,0.3)" }}
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           )}
 
-          {/* Doc snippet if loaded */}
-          {docSnippet && !topicEdit && (
+          {planMode === "fetch" && (
             <div style={{
-              padding: "var(--space-3) var(--space-5)",
+              padding: "var(--space-3) var(--space-5) var(--space-4)",
               borderTop: "1px solid var(--border)",
-              background: "var(--bg-dark)",
+              display: "flex", flexDirection: "column", gap: "var(--space-2)",
             }}>
-              <span className="pill pill-accent" style={{ fontSize: 10, marginBottom: 4 }}>
-                📄 Class Notes
-              </span>
-              <div style={{
-                fontSize: 12, color: "var(--text-secondary)",
-                lineHeight: 1.5, marginTop: 4,
-              }}>
-                {docSnippet.slice(0, 220)}{docSnippet.length > 220 ? "…" : ""}
+              <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", flexWrap: "wrap" }}>
+                <input
+                  value={docLink}
+                  onChange={e => setDocLink(e.target.value)}
+                  placeholder="Paste Google Doc link for today's lesson notes…"
+                  className="chat-input"
+                  style={{ flex: 1, minWidth: 220 }}
+                />
+                <button
+                  onClick={fetchDoc}
+                  disabled={docLoading || !docLink.trim()}
+                  className={docContent ? "btn btn-secondary" : "btn btn-primary"}
+                  style={{
+                    color: docContent ? "var(--green)" : undefined,
+                    borderColor: docContent ? "rgba(52,211,153,0.35)" : undefined,
+                  }}
+                >
+                  {docLoading ? "Fetching…" : docContent ? "✓ Loaded" : "Fetch"}
+                </button>
               </div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.5 }}>
+                The doc must be <b>"Anyone with the link can view"</b>. The app pulls the text, finds
+                the section for this period, and shows a snippet below.
+              </div>
+              {docSnippet && (
+                <div style={{
+                  padding: "var(--space-3)",
+                  background: "var(--bg-dark)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius-md)",
+                  marginTop: "var(--space-2)",
+                }}>
+                  <span className="pill pill-accent" style={{ fontSize: 10 }}>
+                    📄 Class Notes · {period.label}
+                  </span>
+                  <div style={{
+                    fontSize: 12.5, color: "var(--text-primary)",
+                    lineHeight: 1.55, marginTop: 6, whiteSpace: "pre-wrap",
+                  }}>
+                    {docSnippet.slice(0, 500)}{docSnippet.length > 500 ? "…" : ""}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {planMode === "none" && (
+            <div style={{
+              padding: "var(--space-3) var(--space-5) var(--space-4)",
+              borderTop: "1px solid var(--border)",
+              fontSize: 12.5, color: "var(--text-muted)", fontStyle: "italic",
+            }}>
+              No plan set for today. Your student logs still export normally.
             </div>
           )}
         </div>
@@ -651,21 +750,20 @@ export function Dashboard({
           })}
         </div>
 
-        {/* ── CLASS NOTES DOC BAR ───────────────────────── */}
-        <div style={{ ...panel, padding: "8px 12px" }}>
-          <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
-            <span style={{ fontSize: "11px", color: "#475569", whiteSpace: "nowrap", fontWeight: "600" }}>📄 Class Notes Doc:</span>
-            <input value={docLink} onChange={e => setDocLink(e.target.value)}
-              placeholder="Paste Google Doc link for today's lesson notes…"
-              style={{ flex: 1, minWidth: "180px", padding: "6px 10px", background: "#0a1120", border: "1px solid #1e293b", borderRadius: "7px", color: "white", fontSize: "12px" }} />
-            <button onClick={fetchDoc} disabled={docLoading}
-              style={{ padding: "6px 14px", background: docContent ? "#0d2010" : "#1e293b", color: docContent ? "#4ade80" : "#94a3b8", border: `1px solid ${docContent ? "#166534" : "#334155"}`, borderRadius: "7px", cursor: "pointer", fontSize: "12px", fontWeight: "600", whiteSpace: "nowrap" }}>
-              {docLoading ? "Fetching…" : docContent ? "✓ Loaded" : "Fetch"}
-            </button>
-          </div>
-        </div>
-
       </div>{/* end scrollable body */}
+
+      {exportOpen && (
+        <ExportTodayModal
+          period={period}
+          activePeriod={activePeriod}
+          currentDate={currentDate}
+          topic={topic}
+          docSnippet={docSnippet}
+          logs={logs}
+          allStudents={allStudents}
+          onClose={() => setExportOpen(false)}
+        />
+      )}
 
       {/* ══ PARA COPILOT — docked to bottom, resizable ══════ */}
       {layout.chatOpen && (
@@ -849,6 +947,176 @@ export function Dashboard({
           {toast}
         </div>
       )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+// Export Today Modal
+// Formats period label + date + topic + doc snippet + today's logs as
+// a plain-text block the para can copy and paste into their live
+// Google Doc (or wherever they're keeping Class Notes).
+// ══════════════════════════════════════════════════════════════
+function ExportTodayModal({ period, activePeriod, currentDate, topic, docSnippet, logs, allStudents, onClose }) {
+  const [copied, setCopied] = React.useState(false);
+  const [includeDocSnippet, setIncludeDocSnippet] = React.useState(Boolean(docSnippet));
+
+  // Filter logs to today + this period.
+  const todaysLogs = React.useMemo(() => {
+    return (logs || [])
+      .filter(l => l.date === currentDate && (l.periodId === activePeriod || l.period === activePeriod))
+      .sort((a, b) => (a.timestamp || '').localeCompare(b.timestamp || ''));
+  }, [logs, currentDate, activePeriod]);
+
+  // Group logs by student.
+  const byStudent = React.useMemo(() => {
+    const out = new Map();
+    todaysLogs.forEach(l => {
+      if (!out.has(l.studentId)) out.set(l.studentId, []);
+      out.get(l.studentId).push(l);
+    });
+    return out;
+  }, [todaysLogs]);
+
+  const text = React.useMemo(() => {
+    const dateStr = new Date(currentDate + 'T12:00:00').toLocaleDateString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'short', day: 'numeric',
+    });
+    const lines = [];
+    lines.push(`--- ${period.label} | ${dateStr} ---`);
+    lines.push('');
+
+    if (topic && topic.trim()) {
+      lines.push('📚 Today\'s focus:');
+      lines.push(topic.trim());
+      lines.push('');
+    }
+
+    if (includeDocSnippet && docSnippet) {
+      lines.push('📄 From Class Notes Doc:');
+      lines.push(docSnippet.trim());
+      lines.push('');
+    }
+
+    if (todaysLogs.length === 0) {
+      lines.push('(No student logs for this period today.)');
+    } else {
+      lines.push(`📝 Student notes (${todaysLogs.length} entr${todaysLogs.length === 1 ? 'y' : 'ies'}):`);
+      lines.push('');
+      byStudent.forEach((stuLogs, studentId) => {
+        const s = allStudents[studentId];
+        const name = s?.realName || s?.pseudonym || studentId;
+        lines.push(`• ${name}`);
+        stuLogs.forEach(l => {
+          const t = l.timestamp
+            ? new Date(l.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : '';
+          const type = l.type ? `[${l.type}]` : '';
+          const note = (l.note || l.text || '').trim();
+          lines.push(`   ${t ? t + ' ' : ''}${type}${note ? ' — ' + note : ''}`);
+        });
+        lines.push('');
+      });
+    }
+
+    lines.push(`— Exported from SupaPara on ${new Date().toLocaleString()} —`);
+    return lines.join('\n');
+  }, [period, currentDate, topic, docSnippet, includeDocSnippet, todaysLogs, byStudent, allStudents]);
+
+  function copy() {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    });
+  }
+
+  function download() {
+    const safeDate = currentDate.replace(/[^0-9-]/g, '');
+    const safePeriod = (period.label || activePeriod).replace(/[^a-z0-9]+/gi, '_');
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `supapara-${safePeriod}-${safeDate}.txt`;
+    a.click();
+  }
+
+  // Esc to close
+  React.useEffect(() => {
+    function k(e) { if (e.key === 'Escape') onClose(); }
+    document.addEventListener('keydown', k);
+    return () => document.removeEventListener('keydown', k);
+  }, [onClose]);
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div
+        className="modal-content"
+        style={{ maxWidth: 720, width: '100%', maxHeight: '90vh', display: 'flex', flexDirection: 'column', position: 'relative' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          className="close-btn"
+          aria-label="Close"
+          style={{ position: 'absolute', top: 12, right: 12, zIndex: 3 }}
+        >×</button>
+        <div style={{ height: 3, background: 'var(--grad-primary)' }} />
+        <div style={{ padding: 'var(--space-5) var(--space-6)', borderBottom: '1px solid var(--border)' }}>
+          <h3 style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.01em' }}>
+            📋 Export today's notes
+          </h3>
+          <p style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.5 }}>
+            Copy this and paste it into your Class Notes doc. Your live doc stays the source of truth;
+            SupaPara just gives you a clean, dated block for today.
+          </p>
+          <div style={{ marginTop: 'var(--space-3)', display: 'flex', gap: 'var(--space-3)', alignItems: 'center', flexWrap: 'wrap' }}>
+            {docSnippet && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={includeDocSnippet}
+                  onChange={e => setIncludeDocSnippet(e.target.checked)}
+                />
+                Include fetched doc snippet
+              </label>
+            )}
+          </div>
+        </div>
+        <div style={{ padding: 'var(--space-4) var(--space-6)', overflowY: 'auto', flex: 1 }}>
+          <pre style={{
+            whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+            background: 'var(--bg-dark)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-md)',
+            padding: 'var(--space-4)',
+            fontSize: 13, fontFamily: 'JetBrains Mono, monospace',
+            color: 'var(--text-primary)',
+            lineHeight: 1.55,
+            margin: 0,
+          }}>
+            {text}
+          </pre>
+        </div>
+        <div style={{
+          padding: 'var(--space-3) var(--space-6)',
+          borderTop: '1px solid var(--border)',
+          display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end',
+          background: 'var(--bg-surface)',
+        }}>
+          <button onClick={download} className="btn btn-secondary">⬇ Download .txt</button>
+          <button
+            onClick={copy}
+            className={copied ? "btn btn-secondary" : "btn btn-primary"}
+            style={{
+              color: copied ? 'var(--green)' : undefined,
+              borderColor: copied ? 'rgba(52,211,153,0.35)' : undefined,
+            }}
+          >
+            {copied ? '✓ Copied!' : '📋 Copy to clipboard'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
