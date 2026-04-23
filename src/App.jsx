@@ -41,6 +41,7 @@ import { Dashboard } from './components/Dashboard';
 import { BrandHeader } from './components/BrandHeader';
 import TeamSwitcher from './components/TeamSwitcher';
 import HandoffInbox from './components/HandoffInbox';
+import OnboardingModal, { hasSeenOnboarding } from './components/OnboardingModal';
 import { getSidebarVisibility } from './utils/sidebarVisibility';
 
 // Cloud layer — runs only when Supabase is configured. Offline install works unchanged.
@@ -101,6 +102,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
   const [view, setView] = useState("dashboard");
   const [simpleMode, setSimpleMode] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState(() => !hasSeenOnboarding());
 
   // ── Context hooks ──────────────────────────────────────────
   const ollama = useOllamaContext();
@@ -420,7 +422,23 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
                 </button>
               </Tip>
               {supabaseConfigured && <HandoffInbox />}
-              <div style={{ fontSize: "11px", color: "#334155", textAlign: "center", lineHeight: "1.8" }}>FERPA-Safe — Pseudonyms only</div>
+              <button
+                type="button"
+                onClick={() => setOnboardingOpen(true)}
+                title="How does this app work?"
+                style={{
+                  width: "100%", padding: "7px",
+                  borderRadius: "var(--radius-md)",
+                  border: "1px solid var(--border)",
+                  background: "transparent",
+                  color: "var(--text-secondary)",
+                  cursor: "pointer", fontSize: 11, fontWeight: 600,
+                  marginTop: 6,
+                }}
+              >
+                ❓ How it works
+              </button>
+              <div style={{ fontSize: "11px", color: "#334155", textAlign: "center", lineHeight: "1.8", marginTop: 4 }}>FERPA-Safe — Pseudonyms only</div>
             </div>
           </>);
         })()}
@@ -484,6 +502,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
 
       {fullscreenTool && (<FullscreenTool tool={toolboxTools.find(t => t.id === fullscreenTool) || toolboxTools[0]} onClose={() => setFullscreenTool(null)} />)}
       {stealthMode && (<StealthScreen activeTool={stealthTool} toolboxTools={toolboxTools} onSelectTool={setStealthTool} onExit={() => setStealthMode(false)} />)}
+      {onboardingOpen && <OnboardingModal onClose={() => setOnboardingOpen(false)} />}
     </div>
     </div>
     </div>

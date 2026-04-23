@@ -115,7 +115,7 @@ function toTeamStudentRow(teamId, s, userId) {
     health_notes: s.healthNotes || s.health_notes || [],
     cross_period: s.crossPeriodInfo || s.cross_period || {},
     source_meta: s.sourceMeta || s.source_meta || {},
-    external_key: s.externalStudentKey || s.external_key || null,
+    external_key: s.paraAppNumber || s.externalKey || s.externalStudentKey || s.external_key || null,
     created_by: userId,
   };
 }

@@ -62,6 +62,13 @@ export function buildIdentityRegistry(bundleData) {
     const classLabels = {};
     appearances.forEach(a => { if (a.periodId) classLabels[a.periodId] = a.classLabel || ""; });
 
+    // Para App Number: admin-assigned 6-digit stable student ID (e.g. "847293").
+    // Same number on every para's device + on the cloud server. Real name never
+    // rides with it to the server. Accept legacy field names for backward compat.
+    const paraAppNumber = appearances
+      .map(a => (a.paraAppNumber || a.externalKey || a.externalStudentKey || "").toString().trim())
+      .find(k => k) || null;
+
     const raws = appearances.map(a => rawById[a.studentId]).filter(Boolean);
     raws.forEach(r => coveredRawIds.add(r.id));
 
@@ -92,6 +99,9 @@ export function buildIdentityRegistry(bundleData) {
       accs:       mergedAccs.length  ? mergedAccs  : (primaryRaw.accs  || []),
       periodId:   primaryEntry?.periodId   || "",
       classLabel: primaryEntry?.classLabel || "",
+      // Para App Number: admin-assigned 6-digit stable ID. Cloud-safe.
+      // Pseudonymous — does not identify the student without the local roster vault.
+      paraAppNumber,
     }));
 
     importStudents[studentId] = profile;
@@ -99,7 +109,11 @@ export function buildIdentityRegistry(bundleData) {
       if (!periodMap[pid]) periodMap[pid] = [];
       periodMap[pid].push(studentId);
     });
-    registry.push({ realName, pseudonym, color, periodIds, classLabels, identity: entry.identity });
+    registry.push({
+      realName, pseudonym, color, periodIds, classLabels,
+      identity: entry.identity,
+      paraAppNumber,
+    });
   });
 
   // Include any normalizedStudents not in privateRosterMap (safe fallback)
@@ -306,10 +320,20 @@ export function normalizeImportedStudent(raw) {
     };
   });
 
+  // Para App Number — admin-assigned stable ID. Accept any historical field name.
+  // null (not "") so downstream logic can distinguish "not provided" from empty.
+  const paraAppNumberRaw = raw.paraAppNumber
+    ?? raw.externalKey
+    ?? raw.external_key
+    ?? raw.externalStudentKey
+    ?? null;
+  const paraAppNumber = paraAppNumberRaw != null ? String(paraAppNumberRaw).trim() || null : null;
+
   return {
     id:           String(raw.id           || `stu_imp_${Date.now()}`),
     pseudonym:    String(raw.pseudonym    || "Unnamed Student"),
     color:        String(raw.color        || "#94a3b8"),
+    paraAppNumber,
     periodId:     String(raw.periodId     || ""),
     periodNumber: Number(raw.periodNumber)  || 0,
     classLabel:   String(raw.classLabel   || ""),
