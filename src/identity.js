@@ -68,8 +68,14 @@ export function formatLabel(identity, format = "compact") {
 }
 
 // ── getStudentLabel ───────────────────────────────────────────
-// Uses identity when present; falls back to legacy pseudonym.
+// Precedence (when VaultProvider has enriched the student object):
+//   1. student.realName — real name from the local vault (requires toggle ON)
+//   2. student.identity — codename ("🔥 Ember 1")
+//   3. student.pseudonym — legacy ("Red Student 1")
+// Real names only exist on the student object when the user has explicitly
+// enabled "Show real names" AND the vault contains a paraAppNumber match.
 export function getStudentLabel(student, format = "compact") {
+  if (student?.realName) return student.realName;
   if (student?.identity) return formatLabel(student.identity, format);
   return student?.pseudonym || "Unknown";
 }

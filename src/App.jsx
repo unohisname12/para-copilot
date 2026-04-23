@@ -42,6 +42,8 @@ import { BrandHeader } from './components/BrandHeader';
 import TeamSwitcher from './components/TeamSwitcher';
 import HandoffInbox from './components/HandoffInbox';
 import OnboardingModal, { hasSeenOnboarding } from './components/OnboardingModal';
+import RealNamesControls from './components/RealNamesControls';
+import { VaultProvider, useVault, enrichStudentsWithNames } from './context/VaultProvider';
 import { getSidebarVisibility } from './utils/sidebarVisibility';
 
 // Cloud layer — runs only when Supabase is configured. Offline install works unchanged.
@@ -86,15 +88,31 @@ function AppCore() {
   return (
     <OllamaProvider>
       <StudentsProvider activePeriod={activePeriod}>
-        <LogsProvider currentDate={currentDate} periodLabel={period.label} activePeriod={activePeriod}>
-          <AppShell
-            currentDate={currentDate} setCurrentDate={setCurrentDate}
-            activePeriod={activePeriod} setActivePeriod={setActivePeriod}
-            period={period}
-          />
-        </LogsProvider>
+        <VaultBridge>
+          <LogsProvider currentDate={currentDate} periodLabel={period.label} activePeriod={activePeriod}>
+            <AppShell
+              currentDate={currentDate} setCurrentDate={setCurrentDate}
+              activePeriod={activePeriod} setActivePeriod={setActivePeriod}
+              period={period}
+            />
+          </LogsProvider>
+        </VaultBridge>
       </StudentsProvider>
     </OllamaProvider>
+  );
+}
+
+// Bridge: reads identityRegistry from StudentsContext and hands it to VaultProvider.
+// Lets VaultProvider sit in the tree without StudentsProvider needing to know about it.
+function VaultBridge({ children }) {
+  const students = useStudentsContext();
+  return (
+    <VaultProvider
+      identityRegistry={students.identityRegistry}
+      onPurgeIdentityRegistry={() => students.setIdentityRegistry([])}
+    >
+      {children}
+    </VaultProvider>
   );
 }
 
@@ -124,9 +142,18 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
   });
 
   // Destructure for convenience
-  const { allStudents, effectivePeriodStudents, identityRegistry } = students;
+  const { allStudents: allStudentsRaw, effectivePeriodStudents, identityRegistry } = students;
   const { logs, addLog, toggleFlag, deleteLog, updateLogText, loadDemoLogs, clearDemoLogs } = logsBag;
   const { knowledgeBase } = kb;
+
+  // Vault enrichment — when user flips "Show real names" ON and the vault has
+  // a match on paraAppNumber, each student gets a `realName` field that
+  // getStudentLabel / resolveLabel prefer. No changes needed at call sites.
+  const vaultCtx = useVault();
+  const allStudents = React.useMemo(
+    () => enrichStudentsWithNames(allStudentsRaw, vaultCtx.vault, vaultCtx.showRealNames),
+    [allStudentsRaw, vaultCtx.vault, vaultCtx.showRealNames]
+  );
 
   // ── UI state ───────────────────────────────────────────────
   const [profileStu, setProfileStu] = useState(null);
@@ -421,6 +448,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
                   {rosterPanelOpen ? "✓ Private Roster" : "👤 Private Roster"}
                 </button>
               </Tip>
+              <RealNamesControls />
               {supabaseConfigured && <HandoffInbox />}
               <button
                 type="button"
