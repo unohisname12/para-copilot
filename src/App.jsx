@@ -39,9 +39,43 @@ import { IEPImport } from './components/IEPImport';
 import { OllamaStatusBadge } from './components/OllamaStatusBadge';
 import { Dashboard } from './components/Dashboard';
 import { BrandHeader } from './components/BrandHeader';
+import TeamSwitcher from './components/TeamSwitcher';
 import { getSidebarVisibility } from './utils/sidebarVisibility';
 
+// Cloud layer — runs only when Supabase is configured. Offline install works unchanged.
+import { supabaseConfigured } from './services/supabaseClient';
+import { TeamProvider, useTeam } from './context/TeamProvider';
+import SignInScreen from './components/SignInScreen';
+import TeamOnboardingModal from './components/TeamOnboardingModal';
+
 export default function App() {
+  if (!supabaseConfigured) {
+    // No cloud env — skip auth, run fully local as before.
+    return <AppCore />;
+  }
+  return (
+    <TeamProvider>
+      <CloudGate>
+        <AppCore />
+      </CloudGate>
+    </TeamProvider>
+  );
+}
+
+function CloudGate({ children }) {
+  const { authReady, session, teams, teamsLoading } = useTeam();
+  if (!authReady) {
+    return <div style={{ padding: 40, color: 'white', background: '#04080f', minHeight: '100vh' }}>Loading…</div>;
+  }
+  if (!session) return <SignInScreen />;
+  if (teamsLoading) {
+    return <div style={{ padding: 40, color: 'white', background: '#04080f', minHeight: '100vh' }}>Loading your teams…</div>;
+  }
+  if (teams.length === 0) return <TeamOnboardingModal mustChoose />;
+  return children;
+}
+
+function AppCore() {
   const today = new Date(), localISO = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split("T")[0];
   const [currentDate, setCurrentDate] = useState(localISO);
   const [activePeriod, setActivePeriod] = useState("p3");
@@ -242,7 +276,12 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
   // ══════════════════════════════════════════════════════════
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
-      <BrandHeader right={<OllamaStatusBadge online={ollama.ollamaOnline} model={ollama.ollamaModel} />} />
+      <BrandHeader right={
+        <>
+          {supabaseConfigured && <TeamSwitcher />}
+          <OllamaStatusBadge online={ollama.ollamaOnline} model={ollama.ollamaModel} />
+        </>
+      } />
 
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
       {rosterPanelOpen && (
