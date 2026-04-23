@@ -33,16 +33,94 @@ export function assignIdentity(paletteIndex, sequenceNumber) {
   };
 }
 
+// FNV-1a 32-bit hash — deterministic, fast, no deps.
+// Used to derive palette index from a Para App Number.
+function fnv1a(str) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = (h * 0x01000193) >>> 0;
+  }
+  return h >>> 0;
+}
+
+// Derive { palette entry, sequence number } deterministically from a Para App
+// Number. Same number everywhere → same identity everywhere. Sequence is the
+// last 3 digits (or last 3 chars hashed) — guarantees cross-para stability
+// without requiring knowledge of the full roster.
+export function deriveIdentityFromParaAppNumber(paraAppNumber) {
+  const key = String(paraAppNumber || '').trim();
+  if (!key) return null;
+  const paletteIndex = fnv1a(key) % IDENTITY_PALETTE.length;
+  const entry = IDENTITY_PALETTE[paletteIndex];
+  // Use last 3 digits when available (6-digit Para App Numbers), else hash.
+  const tail = key.length >= 3 ? key.slice(-3) : key.padStart(3, '0');
+  const sequenceNumber = /^\d+$/.test(tail)
+    ? parseInt(tail, 10)
+    : (fnv1a(key + ':seq') % 900) + 100;
+  return {
+    paletteIndex,
+    entry,
+    sequenceNumber,
+    pseudonym: `${entry.name} Student ${sequenceNumber}`,
+    color: entry.hex,
+    identity: assignIdentity(paletteIndex, sequenceNumber),
+  };
+}
+
 // ── generateIdentitySet ───────────────────────────────────────
-// Input:  string[] of unique real names in desired assignment order
+// Accepts either:
+//   (A) string[] — legacy: sequence by input order, one palette entry per bucket
+//   (B) {name, paraAppNumber?, pseudonym?, color?}[] — per-entry:
+//       - If entry has `pseudonym`, honor it (admin override).
+//       - Else if entry has `paraAppNumber`, derive deterministically.
+//       - Else fall back to (A)-style incremental assignment.
 // Output: Map<name, { pseudonym, color, identity }>
-export function generateIdentitySet(uniqueNames) {
-  if (!Array.isArray(uniqueNames)) {
-    throw new TypeError('generateIdentitySet: uniqueNames must be an Array');
+export function generateIdentitySet(input) {
+  if (!Array.isArray(input)) {
+    throw new TypeError('generateIdentitySet: input must be an Array');
   }
   const colorCounts = {};
   const result = new Map();
-  uniqueNames.forEach((name, i) => {
+
+  input.forEach((raw, i) => {
+    const isObj = raw && typeof raw === 'object' && !Array.isArray(raw);
+    const name = isObj ? raw.name : raw;
+    if (!name) return;
+
+    const paraAppNumber = isObj ? raw.paraAppNumber : null;
+    const overridePseudonym = isObj ? raw.pseudonym : null;
+    const overrideColor = isObj ? raw.color : null;
+
+    // (1) Explicit admin-provided pseudonym wins — preserved exactly, color
+    //     derived from palette if one matches, else keep override color.
+    if (overridePseudonym) {
+      const paletteEntry = IDENTITY_PALETTE.find(p => overridePseudonym.startsWith(p.name))
+        || IDENTITY_PALETTE[0];
+      const seqMatch = overridePseudonym.match(/\d+/);
+      const seq = seqMatch ? parseInt(seqMatch[0], 10) : 1;
+      result.set(name, {
+        pseudonym: overridePseudonym,
+        color: overrideColor || paletteEntry.hex,
+        identity: assignIdentity(IDENTITY_PALETTE.indexOf(paletteEntry), seq),
+      });
+      return;
+    }
+
+    // (2) Deterministic from Para App Number.
+    if (paraAppNumber) {
+      const derived = deriveIdentityFromParaAppNumber(paraAppNumber);
+      if (derived) {
+        result.set(name, {
+          pseudonym: derived.pseudonym,
+          color: derived.color,
+          identity: derived.identity,
+        });
+        return;
+      }
+    }
+
+    // (3) Legacy fallback — input-order palette cycle.
     const paletteIndex = i % IDENTITY_PALETTE.length;
     const entry = IDENTITY_PALETTE[paletteIndex];
     colorCounts[entry.name] = (colorCounts[entry.name] || 0) + 1;

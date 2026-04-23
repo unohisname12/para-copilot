@@ -48,8 +48,17 @@ export function buildIdentityRegistry(bundleData) {
     byRealName.get(name).push(entry);
   });
 
-  // One pseudonym+color per unique person
-  const pseudonymMap = generatePseudonymSet([...byRealName.keys()]);
+  // One pseudonym+color per unique person. Prefer deterministic derivation
+  // from Para App Number when available so every para on every device
+  // produces the SAME pseudonym for the same kid.
+  const pseudonymInput = [...byRealName.entries()].map(([name, appearances]) => {
+    const paraAppNumber = appearances
+      .map(a => (a.paraAppNumber || a.externalKey || a.externalStudentKey || '').toString().trim())
+      .find(k => k) || null;
+    const pseudonym = appearances.map(a => a.pseudonym).find(p => p) || null;
+    return { name, paraAppNumber, pseudonym };
+  });
+  const pseudonymMap = generatePseudonymSet(pseudonymInput);
 
   let idCounter = 1;
   const coveredRawIds = new Set();
@@ -424,9 +433,14 @@ export function buildIdentityRegistryFromMasterRoster(masterRosterData) {
     }
   });
 
-  // Generate pseudonym set using deduped names in sorted order
-  const dedupedNames = sortedStudents.map(s => dedupedNameMap.get(s.id) || s.fullName || "");
-  const pseudonymMap = generatePseudonymSet(dedupedNames);
+  // Generate pseudonym set using deduped names in sorted order.
+  // Prefer deterministic derivation from Para App Number when present.
+  const pseudonymInput = sortedStudents.map(s => ({
+    name: dedupedNameMap.get(s.id) || s.fullName || '',
+    paraAppNumber: s.paraAppNumber || s.externalKey || s.externalStudentKey || null,
+    pseudonym: s.pseudonym || null,  // admin override if present
+  }));
+  const pseudonymMap = generatePseudonymSet(pseudonymInput);
 
   const registry       = [];
   const importStudents = {};
