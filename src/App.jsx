@@ -504,24 +504,29 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
                 type="button"
                 onClick={() => {
                   if (!window.confirm(
-                    'Reset all local data?\n\n' +
-                    'This clears:\n' +
-                    '  • All logs (paraLogsV1)\n' +
+                    'Reset local working data only?\n\n' +
+                    'THIS CLEARS (on this device):\n' +
+                    '  • All logs\n' +
                     '  • All imported students and rosters\n' +
                     '  • Case memory (incidents, interventions, outcomes)\n' +
                     '  • Knowledge base documents\n' +
                     '  • Identity overrides\n\n' +
-                    'Does NOT touch: the real-name vault (purge separately above), ' +
-                    'cloud team data, or your Google sign-in.\n\n' +
-                    'Can\'t be undone.'
+                    'THIS KEEPS (cloud + device):\n' +
+                    '  • Cloud team records keyed by Para App Number\n' +
+                    '    (that\'s how the app builds a knowledge base for\n' +
+                    '    each student across paras and sessions)\n' +
+                    '  • Real-name vault (separate Purge button above)\n' +
+                    '  • Google sign-in / team membership\n\n' +
+                    'Use this to start a clean demo. Your accumulated cloud\n' +
+                    'data for each student is safe.'
                   )) return;
                   logsBag.setLogs([]);
                   students.resetImports();
                   caseMemory.clearCaseMemory();
                   kb.setKnowledgeBase([]);
-                  setTimeout(() => window.alert('Local data cleared.'), 50);
+                  setTimeout(() => window.alert('Local working data cleared. Cloud records untouched.'), 50);
                 }}
-                title="Wipe logs, imports, case memory, and KB docs. Vault and cloud untouched."
+                title="Clear local working data. Cloud team records (keyed by Para App Number) stay — that's the student knowledge base."
                 style={{
                   width: "100%", padding: "7px",
                   borderRadius: "var(--radius-md)",
