@@ -435,10 +435,13 @@ export function buildIdentityRegistryFromMasterRoster(masterRosterData) {
 
   // Generate pseudonym set using deduped names in sorted order.
   // Prefer deterministic derivation from Para App Number when present.
+  // NOTE: do NOT forward raw s.pseudonym — in the Master Roster format it
+  // carries the fake name ("Jordan Smith"), not a color-label like
+  // "Red Student 1". Using it as an override would collapse every student
+  // to palette[0] (Red) since no fake name matches a palette color prefix.
   const pseudonymInput = sortedStudents.map(s => ({
     name: dedupedNameMap.get(s.id) || s.fullName || '',
     paraAppNumber: s.paraAppNumber || s.externalKey || s.externalStudentKey || null,
-    pseudonym: s.pseudonym || null,  // admin override if present
   }));
   const pseudonymMap = generatePseudonymSet(pseudonymInput);
 

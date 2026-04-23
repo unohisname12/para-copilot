@@ -54,11 +54,27 @@ describe('generateIdentitySet — deterministic path', () => {
     expect(a.get('Alice').pseudonym).toBe(b.get('Alice').pseudonym);
   });
 
-  test('pseudonym override from roster wins', () => {
+  test('pseudonym override from roster wins when it matches color-label format', () => {
     const result = generateIdentitySet([
       { name: 'Maria', paraAppNumber: '847293', pseudonym: 'Red Student 1' },
     ]);
     expect(result.get('Maria').pseudonym).toBe('Red Student 1');
+  });
+
+  test('non-color-label pseudonym (like a fake name) is ignored, not forced to palette[0]', () => {
+    // Master Roster format uses s.pseudonym as a fake-name alias.
+    // Would previously collapse everyone to palette[0] (Red). Now ignored,
+    // so paraAppNumber-driven derivation takes over.
+    const result = generateIdentitySet([
+      { name: 'Jordan Smith', paraAppNumber: '111111', pseudonym: 'Jordan Smith' },
+      { name: 'Taylor Johnson', paraAppNumber: '222222', pseudonym: 'Taylor Johnson' },
+      { name: 'Casey Williams', paraAppNumber: '333333', pseudonym: 'Casey Williams' },
+    ]);
+    const colors = [...result.values()].map(v => v.color);
+    // At least one student must have a non-Red color — otherwise the bug
+    // is still present.
+    const reds = colors.filter(c => c === '#ef4444').length;
+    expect(reds).toBeLessThan(colors.length);
   });
 
   test('legacy string[] input still works', () => {

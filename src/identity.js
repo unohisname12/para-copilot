@@ -33,13 +33,14 @@ export function assignIdentity(paletteIndex, sequenceNumber) {
   };
 }
 
-// FNV-1a 32-bit hash — deterministic, fast, no deps.
-// Used to derive palette index from a Para App Number.
-function fnv1a(str) {
-  let h = 0x811c9dc5;
+// Deterministic hash with good diffusion (murmur3-inspired). Gives near-
+// uniform distribution across a 12-bucket palette for realistic Para App
+// Number inputs. Same input → same output, stable across devices.
+function hashKey(str) {
+  let h = 0;
   for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = (h * 0x01000193) >>> 0;
+    h = Math.imul(h ^ str.charCodeAt(i), 2654435761);
+    h = (h << 13) | (h >>> 19);
   }
   return h >>> 0;
 }
@@ -51,13 +52,13 @@ function fnv1a(str) {
 export function deriveIdentityFromParaAppNumber(paraAppNumber) {
   const key = String(paraAppNumber || '').trim();
   if (!key) return null;
-  const paletteIndex = fnv1a(key) % IDENTITY_PALETTE.length;
+  const paletteIndex = hashKey(key) % IDENTITY_PALETTE.length;
   const entry = IDENTITY_PALETTE[paletteIndex];
   // Use last 3 digits when available (6-digit Para App Numbers), else hash.
   const tail = key.length >= 3 ? key.slice(-3) : key.padStart(3, '0');
   const sequenceNumber = /^\d+$/.test(tail)
     ? parseInt(tail, 10)
-    : (fnv1a(key + ':seq') % 900) + 100;
+    : (hashKey(key + ':seq') % 900) + 100;
   return {
     paletteIndex,
     entry,
@@ -92,19 +93,24 @@ export function generateIdentitySet(input) {
     const overridePseudonym = isObj ? raw.pseudonym : null;
     const overrideColor = isObj ? raw.color : null;
 
-    // (1) Explicit admin-provided pseudonym wins — preserved exactly, color
-    //     derived from palette if one matches, else keep override color.
+    // (1) Explicit admin-provided pseudonym — honored ONLY if it parses as a
+    //     color-label format ("Red Student 3", "Blue Student 12", etc.).
+    //     Any other string (e.g. the fake name "Jordan Smith" used as an
+    //     alias in some roster schemas) is ignored so we don't bucket every
+    //     student into palette[0].
     if (overridePseudonym) {
-      const paletteEntry = IDENTITY_PALETTE.find(p => overridePseudonym.startsWith(p.name))
-        || IDENTITY_PALETTE[0];
-      const seqMatch = overridePseudonym.match(/\d+/);
-      const seq = seqMatch ? parseInt(seqMatch[0], 10) : 1;
-      result.set(name, {
-        pseudonym: overridePseudonym,
-        color: overrideColor || paletteEntry.hex,
-        identity: assignIdentity(IDENTITY_PALETTE.indexOf(paletteEntry), seq),
-      });
-      return;
+      const paletteEntry = IDENTITY_PALETTE.find(p => overridePseudonym.startsWith(p.name));
+      const seqMatch = overridePseudonym.match(/^\w+\s+Student\s+(\d+)/i);
+      if (paletteEntry && seqMatch) {
+        const seq = parseInt(seqMatch[1], 10);
+        result.set(name, {
+          pseudonym: overridePseudonym,
+          color: overrideColor || paletteEntry.hex,
+          identity: assignIdentity(IDENTITY_PALETTE.indexOf(paletteEntry), seq),
+        });
+        return;
+      }
+      // else fall through to paraAppNumber / legacy path
     }
 
     // (2) Deterministic from Para App Number.
