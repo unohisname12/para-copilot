@@ -13,6 +13,12 @@ import {
   regenerateInviteCode,
   getTeamStudents,
   subscribeTeamStudents,
+  pullSharedTeamLogs,
+  subscribeSharedLogs,
+  pullRecentHandoffs,
+  subscribeHandoffs,
+  pullCaseMemory,
+  subscribeCaseMemory,
 } from '../services/teamSync';
 import { supabaseConfigured } from '../services/supabaseClient';
 
@@ -106,6 +112,107 @@ export function TeamProvider({ children }) {
     return () => { cancelled = true; if (off) off(); };
   }, [activeTeamId]);
 
+  // ── Shared team logs ─────────────────────────────────────────
+  const [sharedLogs, setSharedLogs] = useState([]);
+  useEffect(() => {
+    if (!activeTeamId) { setSharedLogs([]); return; }
+    let cancelled = false;
+    let off;
+    (async () => {
+      try {
+        const initial = await pullSharedTeamLogs(activeTeamId);
+        if (!cancelled) setSharedLogs(initial);
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error('[sharedLogs] initial load failed', e);
+      }
+      if (cancelled) return;
+      off = subscribeSharedLogs(activeTeamId, (payload) => {
+        setSharedLogs((prev) => {
+          if (prev.find((l) => l.id === payload.new.id)) return prev;
+          return [payload.new, ...prev];
+        });
+      });
+    })();
+    return () => { cancelled = true; if (off) off(); };
+  }, [activeTeamId]);
+
+  // ── Handoffs ─────────────────────────────────────────────────
+  const [handoffs, setHandoffs] = useState([]);
+  useEffect(() => {
+    if (!activeTeamId) { setHandoffs([]); return; }
+    let cancelled = false;
+    let off;
+    (async () => {
+      try {
+        const initial = await pullRecentHandoffs(activeTeamId);
+        if (!cancelled) setHandoffs(initial);
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error('[handoffs] initial load failed', e);
+      }
+      if (cancelled) return;
+      off = subscribeHandoffs(activeTeamId, (payload) => {
+        setHandoffs((prev) => {
+          if (payload.eventType === 'INSERT') {
+            if (prev.find((h) => h.id === payload.new.id)) return prev;
+            return [payload.new, ...prev];
+          }
+          if (payload.eventType === 'UPDATE') {
+            return prev.map((h) => (h.id === payload.new.id ? payload.new : h));
+          }
+          if (payload.eventType === 'DELETE') {
+            return prev.filter((h) => h.id !== payload.old.id);
+          }
+          return prev;
+        });
+      });
+    })();
+    return () => { cancelled = true; if (off) off(); };
+  }, [activeTeamId]);
+
+  // ── Case memory (incidents, interventions, outcomes) ─────────
+  const [caseMemoryCloud, setCaseMemoryCloud] = useState({
+    incidents: [], interventions: [], outcomes: [],
+  });
+  useEffect(() => {
+    if (!activeTeamId) {
+      setCaseMemoryCloud({ incidents: [], interventions: [], outcomes: [] });
+      return;
+    }
+    let cancelled = false;
+    let off;
+    (async () => {
+      try {
+        const initial = await pullCaseMemory(activeTeamId);
+        if (!cancelled) setCaseMemoryCloud(initial);
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error('[caseMemory] initial load failed', e);
+      }
+      if (cancelled) return;
+      off = subscribeCaseMemory(activeTeamId, (kind, payload) => {
+        const pluralKey = { incident: 'incidents', intervention: 'interventions', outcome: 'outcomes' }[kind];
+        if (!pluralKey) return;
+        setCaseMemoryCloud((prev) => {
+          const list = prev[pluralKey] || [];
+          if (payload.eventType === 'INSERT') {
+            if (list.find((x) => x.id === payload.new.id)) return prev;
+            return { ...prev, [pluralKey]: [payload.new, ...list] };
+          }
+          if (payload.eventType === 'UPDATE') {
+            return { ...prev, [pluralKey]: list.map((x) => (x.id === payload.new.id ? payload.new : x)) };
+          }
+          if (payload.eventType === 'DELETE') {
+            return { ...prev, [pluralKey]: list.filter((x) => x.id !== payload.old.id) };
+          }
+          return prev;
+        });
+      });
+    })();
+    return () => { cancelled = true; if (off) off(); };
+  }, [activeTeamId]);
+
   const value = useMemo(() => ({
     session,
     user: session?.user || null,
@@ -115,6 +222,9 @@ export function TeamProvider({ children }) {
     activeTeamId,
     teamsLoading,
     teamStudents,
+    sharedLogs,
+    handoffs,
+    caseMemoryCloud,
     setActiveTeamId,
     signInWithGoogle,
     signOut: async () => {
@@ -155,7 +265,10 @@ export function TeamProvider({ children }) {
       setTeams((ts) => ts.map((t) => (t.id === activeTeamId ? { ...t, inviteCode: code } : t)));
       return code;
     },
-  }), [session, authReady, teams, activeTeam, activeTeamId, teamsLoading, teamStudents]);
+  }), [
+    session, authReady, teams, activeTeam, activeTeamId, teamsLoading,
+    teamStudents, sharedLogs, handoffs, caseMemoryCloud,
+  ]);
 
   return <TeamContext.Provider value={value}>{children}</TeamContext.Provider>;
 }

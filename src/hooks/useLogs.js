@@ -1,7 +1,7 @@
 import { useLocalStorage } from './useLocalStorage';
 import { createLog } from '../models';
 
-export function useLogs({ currentDate, periodLabel, activePeriod }) {
+export function useLogs({ currentDate, periodLabel, activePeriod, onLogCreated }) {
   const [logs, setLogs] = useLocalStorage('paraLogsV1', []);
 
   const addLog = (studentId, note, type, extras = {}) => {
@@ -11,6 +11,14 @@ export function useLogs({ currentDate, periodLabel, activePeriod }) {
       ...extras,
     });
     setLogs(prev => [log, ...prev]);
+    if (onLogCreated) {
+      // Fire-and-forget; local save already succeeded.
+      try { onLogCreated(log, extras); } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error('[onLogCreated] handler threw', e);
+      }
+    }
+    return log;
   };
 
   const toggleFlag = id =>

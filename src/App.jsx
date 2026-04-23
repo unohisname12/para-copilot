@@ -40,6 +40,7 @@ import { OllamaStatusBadge } from './components/OllamaStatusBadge';
 import { Dashboard } from './components/Dashboard';
 import { BrandHeader } from './components/BrandHeader';
 import TeamSwitcher from './components/TeamSwitcher';
+import HandoffInbox from './components/HandoffInbox';
 import { getSidebarVisibility } from './utils/sidebarVisibility';
 
 // Cloud layer — runs only when Supabase is configured. Offline install works unchanged.
@@ -341,6 +342,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
                   {rosterPanelOpen ? "✓ Private Roster" : "👤 Private Roster"}
                 </button>
               </Tip>
+              {supabaseConfigured && <HandoffInbox />}
               <div style={{ fontSize: "11px", color: "#334155", textAlign: "center", lineHeight: "1.8" }}>FERPA-Safe — Pseudonyms only</div>
             </div>
           </>);

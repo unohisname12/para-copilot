@@ -154,3 +154,205 @@ export function subscribeTeamStudents(teamId, onChange) {
     .subscribe();
   return () => supabase.removeChannel(channel);
 }
+
+// ---------- Logs ----------
+
+function toLogRow(teamId, userId, log) {
+  return {
+    team_id: teamId,
+    user_id: userId,
+    student_id: log.studentDbId || null,
+    type: log.type || null,
+    category: log.category || null,
+    note: log.note || null,
+    date: log.date || null,
+    timestamp: log.timestamp || new Date().toISOString(),
+    period_id: log.periodId || log.period || null,
+    tags: log.tags || [],
+    source: log.source || 'manual',
+    situation_id: log.situationId || null,
+    strategy_used: log.strategyUsed || null,
+    goal_id: log.goalId || null,
+    flagged: Boolean(log.flagged),
+    shared: Boolean(log.shared),
+  };
+}
+
+export async function pushLog(teamId, userId, log) {
+  requireClient();
+  const row = sanitize(toLogRow(teamId, userId, log), 'logs row');
+  const { data, error } = await supabase.from('logs').insert(row).select().single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function pullMyLogs(teamId, userId) {
+  requireClient();
+  const { data, error } = await supabase
+    .from('logs').select('*').eq('team_id', teamId).eq('user_id', userId)
+    .order('created_at', { ascending: false }).limit(1000);
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function pullSharedTeamLogs(teamId) {
+  requireClient();
+  const { data, error } = await supabase
+    .from('logs').select('*').eq('team_id', teamId).eq('shared', true)
+    .order('created_at', { ascending: false }).limit(500);
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export function subscribeSharedLogs(teamId, onChange) {
+  requireClient();
+  const channel = supabase
+    .channel(`logs_shared:${teamId}`)
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'logs', filter: `team_id=eq.${teamId}` },
+      (payload) => { if (payload.new?.shared) onChange(payload); }
+    )
+    .subscribe();
+  return () => supabase.removeChannel(channel);
+}
+
+// ---------- Handoffs ----------
+
+export async function pushHandoff(teamId, fromUserId, h) {
+  requireClient();
+  const row = sanitize({
+    team_id: teamId,
+    from_user_id: fromUserId,
+    student_id: h.studentDbId || null,
+    audience: h.audience || null,
+    urgency: h.urgency || 'normal',
+    body: h.body,
+  }, 'handoffs row');
+  const { data, error } = await supabase.from('handoffs').insert(row).select().single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function pullRecentHandoffs(teamId) {
+  requireClient();
+  const { data, error } = await supabase
+    .from('handoffs').select('*').eq('team_id', teamId)
+    .gte('expires_at', new Date().toISOString())
+    .order('created_at', { ascending: false }).limit(50);
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export function subscribeHandoffs(teamId, onChange) {
+  requireClient();
+  const channel = supabase
+    .channel(`handoffs:${teamId}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'handoffs', filter: `team_id=eq.${teamId}` },
+      (payload) => onChange(payload)
+    )
+    .subscribe();
+  return () => supabase.removeChannel(channel);
+}
+
+export async function acknowledgeHandoff(handoffId, userId) {
+  requireClient();
+  const { data: existing, error: e1 } = await supabase
+    .from('handoffs').select('acknowledged_by').eq('id', handoffId).single();
+  if (e1) throw new Error(e1.message);
+  const next = Array.from(new Set([...(existing.acknowledged_by || []), userId]));
+  const { error: e2 } = await supabase
+    .from('handoffs').update({ acknowledged_by: next }).eq('id', handoffId);
+  if (e2) throw new Error(e2.message);
+}
+
+// ---------- Case memory ----------
+
+export async function pushIncident(teamId, userId, incident) {
+  requireClient();
+  const row = sanitize({
+    team_id: teamId,
+    user_id: userId,
+    student_id: incident.studentDbId || null,
+    description: incident.description,
+    period_id: incident.periodId || null,
+    intensity: incident.intensity || null,
+    triggers: incident.triggers || [],
+    antecedent: incident.antecedent || null,
+    behavior: incident.behavior || null,
+    consequence: incident.consequence || null,
+    duration_min: incident.durationMin || null,
+    staff_response: incident.staffResponse || null,
+    follow_up: incident.followUp || null,
+  }, 'incidents row');
+  const { data, error } = await supabase.from('incidents').insert(row).select().single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function pushIntervention(teamId, userId, intervention) {
+  requireClient();
+  const row = sanitize({
+    team_id: teamId,
+    user_id: userId,
+    incident_id: intervention.incidentId || null,
+    student_id: intervention.studentDbId || null,
+    strategy: intervention.strategy,
+    notes: intervention.notes || null,
+    worked: intervention.worked || 'unknown',
+  }, 'interventions row');
+  const { data, error } = await supabase.from('interventions').insert(row).select().single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function pushOutcome(teamId, userId, outcome) {
+  requireClient();
+  const row = sanitize({
+    team_id: teamId,
+    user_id: userId,
+    intervention_id: outcome.interventionId || null,
+    student_id: outcome.studentDbId || null,
+    result: outcome.result,
+    notes: outcome.notes || null,
+  }, 'outcomes row');
+  const { data, error } = await supabase.from('outcomes').insert(row).select().single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function pullCaseMemory(teamId) {
+  requireClient();
+  const [inc, intv, out] = await Promise.all([
+    supabase.from('incidents').select('*').eq('team_id', teamId).order('created_at', { ascending: false }),
+    supabase.from('interventions').select('*').eq('team_id', teamId).order('created_at', { ascending: false }),
+    supabase.from('outcomes').select('*').eq('team_id', teamId).order('created_at', { ascending: false }),
+  ]);
+  if (inc.error) throw new Error(inc.error.message);
+  if (intv.error) throw new Error(intv.error.message);
+  if (out.error) throw new Error(out.error.message);
+  return {
+    incidents: inc.data || [],
+    interventions: intv.data || [],
+    outcomes: out.data || [],
+  };
+}
+
+export function subscribeCaseMemory(teamId, onChange) {
+  requireClient();
+  const channel = supabase
+    .channel(`case:${teamId}`)
+    .on('postgres_changes',
+      { event: '*', schema: 'public', table: 'incidents', filter: `team_id=eq.${teamId}` },
+      (p) => onChange('incident', p))
+    .on('postgres_changes',
+      { event: '*', schema: 'public', table: 'interventions', filter: `team_id=eq.${teamId}` },
+      (p) => onChange('intervention', p))
+    .on('postgres_changes',
+      { event: '*', schema: 'public', table: 'outcomes', filter: `team_id=eq.${teamId}` },
+      (p) => onChange('outcome', p))
+    .subscribe();
+  return () => supabase.removeChannel(channel);
+}

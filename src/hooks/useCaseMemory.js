@@ -1,17 +1,41 @@
 import { useCallback } from 'react';
 import { useLocalStorage } from './useLocalStorage';
 import { createIncident, createIntervention, createOutcome } from '../models';
+import { useTeamOptional } from '../context/TeamProvider';
+import { pushIncident, pushIntervention, pushOutcome } from '../services/teamSync';
 
 export function useCaseMemory() {
   const [incidents, setIncidents] = useLocalStorage('paraIncidentsV1', []);
   const [interventions, setInterventions] = useLocalStorage('paraInterventionsV1', []);
   const [outcomes, setOutcomes] = useLocalStorage('paraOutcomesV1', []);
 
+  const team = useTeamOptional();
+  const cloudCtx = team?.activeTeamId && team?.user?.id
+    ? { teamId: team.activeTeamId, userId: team.user.id, teamStudents: team.teamStudents || [] }
+    : null;
+
+  const resolveDbStudentId = (pseudonymOrStudentId) => {
+    if (!cloudCtx) return null;
+    const match = cloudCtx.teamStudents.find(
+      (s) => s.id === pseudonymOrStudentId || s.pseudonym === pseudonymOrStudentId
+    );
+    return match ? match.id : null;
+  };
+
   const addIncident = useCallback((data) => {
     const inc = createIncident(data);
     setIncidents(prev => [inc, ...prev]);
+    if (cloudCtx) {
+      pushIncident(cloudCtx.teamId, cloudCtx.userId, {
+        ...inc,
+        studentDbId: resolveDbStudentId(data.pseudonym || data.studentId),
+      }).catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('[cloud] pushIncident failed', err);
+      });
+    }
     return inc;
-  }, [setIncidents]);
+  }, [setIncidents, cloudCtx]);
 
   const addIntervention = useCallback((data) => {
     const intv = createIntervention(data);
@@ -22,8 +46,17 @@ export function useCaseMemory() {
         ? { ...inc, interventionIds: [...inc.interventionIds, intv.id] }
         : inc
     ));
+    if (cloudCtx) {
+      pushIntervention(cloudCtx.teamId, cloudCtx.userId, {
+        ...intv,
+        studentDbId: resolveDbStudentId(data.pseudonym || data.studentId),
+      }).catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('[cloud] pushIntervention failed', err);
+      });
+    }
     return intv;
-  }, [setInterventions, setIncidents]);
+  }, [setInterventions, setIncidents, cloudCtx]);
 
   const addOutcome = useCallback((data) => {
     const out = createOutcome(data);
@@ -36,8 +69,17 @@ export function useCaseMemory() {
           : inc
       ));
     }
+    if (cloudCtx) {
+      pushOutcome(cloudCtx.teamId, cloudCtx.userId, {
+        ...out,
+        studentDbId: resolveDbStudentId(data.pseudonym || data.studentId),
+      }).catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('[cloud] pushOutcome failed', err);
+      });
+    }
     return out;
-  }, [setOutcomes, setIncidents]);
+  }, [setOutcomes, setIncidents, cloudCtx]);
 
   const resolveIncident = useCallback((incidentId, status = "resolved") => {
     setIncidents(prev => prev.map(inc =>
