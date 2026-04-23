@@ -20,3 +20,4 @@ yarn-error.log*
 .superpowers/brainstorm/
 .vercel
 e2e/audit-output/
+supabase/.temp/
