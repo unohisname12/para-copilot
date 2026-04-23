@@ -3,7 +3,7 @@ import { useTeam } from '../context/TeamProvider';
 import { useEscape } from '../hooks/useEscape';
 
 export default function TeamOnboardingModal({ onClose, mustChoose = false }) {
-  const { user, createTeam, joinTeamByCode } = useTeam();
+  const { user, createTeam, joinTeamByCode, signOut } = useTeam();
   const [tab, setTab] = useState('create');
   const [teamName, setTeamName] = useState('');
   const [inviteCode, setInviteCode] = useState('');
@@ -38,7 +38,18 @@ export default function TeamOnboardingModal({ onClose, mustChoose = false }) {
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content" style={{ maxWidth: 480 }}>
+      <div className="modal-content" style={{ maxWidth: 480, position: 'relative' }}>
+        {/* Escape hatch — always visible. If mustChoose (no team yet), the
+            only way out is to sign out (because the cloud gate requires a
+            team selection). Otherwise, a normal close. */}
+        <button
+          type="button"
+          onClick={() => { if (mustChoose) signOut(); else if (onClose) onClose(); }}
+          title={mustChoose ? 'Sign out' : 'Close'}
+          className="close-btn"
+          style={{ position: 'absolute', top: 12, right: 12, zIndex: 3 }}
+          aria-label={mustChoose ? 'Sign out' : 'Close'}
+        >×</button>
         <div className="modal-header">
           <div>
             <h2 style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.01em' }}>
@@ -164,6 +175,26 @@ export default function TeamOnboardingModal({ onClose, mustChoose = false }) {
               border: '1px solid rgba(248,113,113,0.3)',
             }}>
               {err}
+            </div>
+          )}
+
+          {/* Footer escape hatch — always visible text link to sign out,
+              so it's impossible to get stuck on this modal. */}
+          {mustChoose && (
+            <div style={{
+              paddingTop: 'var(--space-3)',
+              borderTop: '1px solid var(--border)',
+              marginTop: 'var(--space-2)',
+              textAlign: 'center',
+            }}>
+              <button
+                type="button"
+                onClick={signOut}
+                className="btn btn-ghost"
+                style={{ fontSize: 12, color: 'var(--text-muted)' }}
+              >
+                ← Sign out and use a different account
+              </button>
             </div>
           )}
         </div>
