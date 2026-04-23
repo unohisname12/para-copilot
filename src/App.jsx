@@ -239,9 +239,76 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
     if (vaultTab === "goalProgress") filteredLogs = logs.filter(l => l.type === "Goal Progress");
     const vaultTabs = [{ id: "all", label: "All Logs" }, { id: "byStudent", label: "By Student" }, { id: "byPeriod", label: "By Period" }, { id: "flagged", label: `Flagged (${logs.filter(l => l.flagged).length})` }, { id: "handoffs", label: `Handoffs (${logs.filter(l => l.type === "Handoff Note").length})` }, { id: "goalProgress", label: `Goals (${logs.filter(l => l.type === "Goal Progress").length})` }, { id: "knowledge", label: `KB (${knowledgeBase.length})` }];
     return (<div>
-      <div className="header"><div><h1>Data Vault</h1><p className="teacher-subtitle">{logs.length} observations · {knowledgeBase.length} KB docs · FERPA-safe</p></div><div style={{ display: "flex", gap: "8px" }}><button className="btn btn-secondary" onClick={() => handleExportCSV(filteredLogs)}>Export Filtered</button><button className="btn btn-primary" onClick={() => handleExportCSV()}>Export All</button>{identityRegistry.length > 0 && <button className="btn btn-secondary" style={{ borderColor: "#854d0e", color: "#fbbf24" }} onClick={() => handleExportCSVPrivate(filteredLogs)}>Export with Names</button>}</div></div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "12px", marginBottom: "20px" }}>{[{ h: "green", label: "Logged today", color: "var(--green)", border: "#166534" }, { h: "yellow", label: "This week", color: "var(--yellow)", border: "#854d0e" }, { h: "red", label: "Needs attention", color: "var(--red)", border: "#7f1d1d" }].map(({ h, label, color, border }) => (<div key={h} className="panel" style={{ padding: "14px 16px", borderColor: border }}><div style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "4px" }}>{label}</div><div style={{ fontSize: "28px", fontWeight: "700", color }}>{counts[h]}</div><div style={{ fontSize: "12px", color: "var(--text-muted)" }}>student{counts[h] !== 1 ? "s" : ""}</div></div>))}</div>
-      <div style={{ display: "flex", gap: "4px", marginBottom: "16px", flexWrap: "wrap" }}>{vaultTabs.map(t => (<button key={t.id} onClick={() => { setVaultTab(t.id); setVaultFilter("all"); }} style={{ padding: "6px 14px", borderRadius: "6px", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: "500", background: vaultTab === t.id ? "#1d4ed8" : "var(--panel-bg)", color: vaultTab === t.id ? "#fff" : "var(--text-muted)" }}>{t.label}</button>))}</div>
+      <div className="header">
+        <div>
+          <h1>Data Vault</h1>
+          <p className="teacher-subtitle">
+            <span className="pill pill-accent" style={{ fontSize: 11, marginRight: 8 }}>
+              {logs.length} observations
+            </span>
+            <span className="pill pill-violet" style={{ fontSize: 11, marginRight: 8 }}>
+              {knowledgeBase.length} KB docs
+            </span>
+            <span className="pill pill-green" style={{ fontSize: 11 }}>
+              FERPA-safe
+            </span>
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: "var(--space-2)" }}>
+          <button className="btn btn-secondary" onClick={() => handleExportCSV(filteredLogs)}>Export Filtered</button>
+          <button className="btn btn-primary" onClick={() => handleExportCSV()}>Export All</button>
+          {identityRegistry.length > 0 && (
+            <button className="btn btn-secondary"
+              style={{ borderColor: "rgba(251,191,36,0.35)", color: "var(--yellow)" }}
+              onClick={() => handleExportCSVPrivate(filteredLogs)}>
+              Export with Names
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="metric-grid" style={{ marginBottom: "var(--space-6)" }}>
+        {[
+          { h: "green",  label: "Logged today",    tone: "tone-green"  },
+          { h: "yellow", label: "This week",       tone: "tone-yellow" },
+          { h: "red",    label: "Needs attention", tone: "tone-red"    },
+        ].map(({ h, label, tone }) => (
+          <div key={h} className="metric-card">
+            <div className="metric-label">{label}</div>
+            <div className={`metric-value ${tone}`}>{counts[h]}</div>
+            <div className="metric-sub">student{counts[h] !== 1 ? "s" : ""}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{
+        display: "flex", gap: 6, marginBottom: "var(--space-4)",
+        flexWrap: "wrap",
+        padding: 4,
+        background: "var(--bg-dark)",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius-md)",
+        width: "fit-content",
+        maxWidth: "100%",
+      }}>
+        {vaultTabs.map(t => (
+          <button key={t.id}
+            onClick={() => { setVaultTab(t.id); setVaultFilter("all"); }}
+            style={{
+              padding: "var(--space-2) var(--space-4)",
+              borderRadius: "var(--radius-sm)",
+              border: "none",
+              cursor: "pointer",
+              fontSize: 12, fontWeight: 600,
+              fontFamily: "inherit",
+              background: vaultTab === t.id ? "var(--grad-primary)" : "transparent",
+              color: vaultTab === t.id ? "#fff" : "var(--text-secondary)",
+              transition: "all 120ms cubic-bezier(0.16,1,0.3,1)",
+              minHeight: 36,
+              boxShadow: vaultTab === t.id ? "0 2px 8px rgba(100,136,255,0.3)" : "none",
+            }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
       {(vaultTab === "byStudent" || vaultTab === "byPeriod") && (<div style={{ marginBottom: "14px", display: "flex", gap: "8px", alignItems: "center" }}><span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Filter:</span><select value={vaultFilter} onChange={e => setVaultFilter(e.target.value)} className="period-select" style={{ maxWidth: "280px" }}><option value="all">All</option>{vaultTab === "byStudent" && Object.entries(allStudents).map(([id, s]) => (<option key={id} value={id}>{resolveLabel(s, "compact")} ({logs.filter(l => l.studentId === id).length})</option>))}{vaultTab === "byPeriod" && Object.entries(DB.periods).map(([id, p]) => (<option key={id} value={id}>{p.label}</option>))}</select></div>)}
       {vaultTab === "knowledge" && (<div>
         <div className="panel" style={{ padding: "16px", marginBottom: "16px" }}>
