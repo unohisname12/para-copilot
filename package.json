@@ -5,6 +5,7 @@
   "keywords": [],
   "main": "src/index.tsx",
   "dependencies": {
+    "@supabase/supabase-js": "^2.104.0",
     "ajv": "^8.18.0",
     "pdfjs-dist": "^3.11.174",
     "react": "^19.0.0",
