@@ -6,6 +6,8 @@ import { resolveLabel } from '../../privacy/nameResolver';
 import { matchCaseKeywords, isHelpWorthy } from '../../engine';
 import { createIncident, createIntervention, createOutcome } from '../../models';
 import { useEscape } from '../../hooks/useEscape';
+import { useTeamOptional } from '../../context/TeamProvider';
+import ParentNotesSection from '../ParentNotesSection';
 
 // ── Guided follow-up chip options ────────────────────────────
 const ANTECEDENT_OPTIONS = ["Work demand", "Loud room", "Transition", "Peer conflict", "Schedule change", "Unclear directions", "Other"];
@@ -162,6 +164,17 @@ function StudentProfileModalInner({ studentId, logs, currentDate, activePeriod, 
     onUpdateIdentity(studentId, { emoji: paletteDefault.emoji, codename: paletteDefault.codename });
   };
 
+  // Cloud team context — used to gate the Parent Notes tab (Sped-only).
+  const team = useTeamOptional();
+  const isAdmin = Boolean(team?.isAdmin);
+  // Map the local studentId to a team_students row id (uuid) via pseudonym
+  // match. Needed because parent_notes.student_id references team_students.id.
+  const studentDbId = useMemo(() => {
+    if (!team?.teamStudents || !s?.pseudonym) return null;
+    const row = team.teamStudents.find((r) => r.pseudonym === s.pseudonym);
+    return row?.id || null;
+  }, [team?.teamStudents, s?.pseudonym]);
+
   // Show "Support" tab only when student has v2 fields
   const hasV2 = (s.watchFors?.length > 0) || (s.doThisActions?.length > 0) || (s.healthNotes?.length > 0) || s.crossPeriodInfo?.note;
   const tabs = [
@@ -171,6 +184,8 @@ function StudentProfileModalInner({ studentId, logs, currentDate, activePeriod, 
     { id: "strategies",label: "Strategies" },
     ...(hasV2 ? [{ id: "support", label: "Support Info" }] : []),
     { id: "logs",      label: `Logs (${stuLogs.length})` },
+    // Parent notes tab — visible only to admins (server RLS also enforces).
+    ...(isAdmin ? [{ id: "parent",  label: "🔒 Parent Notes" }] : []),
   ];
   // Student color theming — only affects this modal's detail area
   const c = s.color;
@@ -205,11 +220,25 @@ function StudentProfileModalInner({ studentId, logs, currentDate, activePeriod, 
             <button className="close-btn" onClick={onClose}>×</button>
           </div>
         </div>
+        {/* IEP Summary banner — clarifies scope for paras + admins alike */}
+        <div style={{
+          padding: "6px 16px",
+          background: "var(--bg-dark)",
+          borderBottom: "1px solid var(--border)",
+          fontSize: 11, color: "var(--text-muted)",
+          display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+        }}>
+          <span className="pill pill-accent" style={{ fontSize: 10 }}>📋 IEP Summary</span>
+          <span>
+            Goals, accommodations, and strategies below are a working summary.
+            Full IEP documents stay with the Special Ed Teacher / case manager.
+          </span>
+        </div>
         {/* Color-themed tab bar */}
-        <div style={{ display: "flex", gap: "4px", padding: "8px 16px", borderBottom: `1px solid ${cBorder}`, flexShrink: 0, background: cFaint }}>
+        <div style={{ display: "flex", gap: "4px", padding: "8px 16px", borderBottom: `1px solid ${cBorder}`, flexShrink: 0, background: cFaint, flexWrap: "wrap" }}>
           {tabs.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
-              style={{ padding: "5px 12px", borderRadius: "6px", border: tab === t.id ? `1px solid ${cBorder}` : "1px solid transparent", cursor: "pointer", fontSize: "12px", fontWeight: "500", background: tab === t.id ? cBorder : "transparent", color: tab === t.id ? c : "var(--text-muted)" }}>
+              style={{ padding: "6px 12px", borderRadius: "6px", border: tab === t.id ? `1px solid ${cBorder}` : "1px solid transparent", cursor: "pointer", fontSize: "12px", fontWeight: "500", background: tab === t.id ? cBorder : "transparent", color: tab === t.id ? c : "var(--text-muted)", minHeight: 32 }}>
               {t.label}
             </button>
           ))}
@@ -398,6 +427,12 @@ function StudentProfileModalInner({ studentId, logs, currentDate, activePeriod, 
             </div>
           )}
           {tab === "logs" && (<div>{stuLogs.length === 0 ? (<div style={{ textAlign: "center", padding: "40px", color: "var(--text-muted)" }}>No logs yet.</div>) : (stuLogs.map(l => (<div key={l.id} style={{ background: "rgba(0,0,0,.2)", borderRadius: "8px", padding: "10px 12px", marginBottom: "8px", borderLeft: `2px solid ${c}30` }}><div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}><span style={{ fontSize: "11px", background: cBorder, color: c, padding: "2px 8px", borderRadius: "20px" }}>{l.type}</span><span style={{ fontSize: "11px", color: "var(--text-muted)" }}>{l.date}</span></div><div style={{ fontSize: "13px", lineHeight: "1.5" }}>{l.text || l.note}</div></div>)))}</div>)}
+          {tab === "parent" && (
+            <ParentNotesSection
+              studentDbId={studentDbId}
+              studentLabel={resolveLabel(s, "compact")}
+            />
+          )}
         </div>
       </div>
     </div>

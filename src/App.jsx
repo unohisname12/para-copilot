@@ -44,6 +44,7 @@ import HandoffInbox from './components/HandoffInbox';
 import OnboardingModal, { hasSeenOnboarding } from './components/OnboardingModal';
 import RealNamesControls from './components/RealNamesControls';
 import AdminDashboard from './components/AdminDashboard';
+import SubLockedScreen from './components/SubLockedScreen';
 import { VaultProvider, useVault, enrichStudentsWithNames } from './context/VaultProvider';
 import { useTeamOptional } from './context/TeamProvider';
 import { getSidebarVisibility } from './utils/sidebarVisibility';
@@ -69,7 +70,7 @@ export default function App() {
 }
 
 function CloudGate({ children }) {
-  const { authReady, session, teams, teamsLoading } = useTeam();
+  const { authReady, session, teams, teamsLoading, subLockedOut } = useTeam();
   if (!authReady) {
     return <div style={{ padding: 40, color: 'white', background: '#04080f', minHeight: '100vh' }}>Loading…</div>;
   }
@@ -78,6 +79,7 @@ function CloudGate({ children }) {
     return <div style={{ padding: 40, color: 'white', background: '#04080f', minHeight: '100vh' }}>Loading your teams…</div>;
   }
   if (teams.length === 0) return <TeamOnboardingModal mustChoose />;
+  if (subLockedOut) return <SubLockedScreen />;
   return children;
 }
 

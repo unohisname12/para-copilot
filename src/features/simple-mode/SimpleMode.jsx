@@ -544,7 +544,7 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                 marginBottom: 20,
               }}>
                 <div style={{ fontSize: 10, color: "var(--accent-hover)", fontWeight: 600, textTransform: "uppercase", letterSpacing: ".07em", marginBottom: 6 }}>
-                  Quick IEP Reminder
+                  📋 IEP Summary · Accommodations
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                   {s.accs.map(a => (

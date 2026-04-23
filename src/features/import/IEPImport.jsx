@@ -438,8 +438,11 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
         <div>
           <h1 style={{ fontSize: 28 }}>IEP Import</h1>
           <p className="teacher-subtitle" style={{ fontSize: 14, maxWidth: 720, lineHeight: 1.55 }}>
-            Bring student rosters and IEPs into SupaPara. Everything is parsed on this device —
-            real names never leave your browser unless you explicitly enable "Remember on this device."
+            Bring student rosters and IEP summaries into SupaPara. Only a working
+            summary lives in the app — goals, accommodations, strategies. Full IEP
+            documents stay with your Special Ed Teacher / case manager. Everything
+            is parsed on this device — real names never leave your browser unless
+            you explicitly enable "Remember on this device."
           </p>
         </div>
       </div>
