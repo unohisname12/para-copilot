@@ -19,3 +19,4 @@ yarn-error.log*
 # brainstorm sessions
 .superpowers/brainstorm/
 .vercel
+e2e/audit-output/

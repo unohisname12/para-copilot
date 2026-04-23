@@ -5,6 +5,7 @@ import { migrateIdentity, getDefaultIdentity, isIdentityCustomized } from '../..
 import { resolveLabel } from '../../privacy/nameResolver';
 import { matchCaseKeywords, isHelpWorthy } from '../../engine';
 import { createIncident, createIntervention, createOutcome } from '../../models';
+import { useEscape } from '../../hooks/useEscape';
 
 // ── Guided follow-up chip options ────────────────────────────
 const ANTECEDENT_OPTIONS = ["Work demand", "Loud room", "Transition", "Peer conflict", "Schedule change", "Unclear directions", "Other"];
@@ -37,7 +38,56 @@ function FieldText({ value, fallback = "\u2014" }) {
   return <span>{value}</span>;
 }
 
-export function StudentProfileModal({ studentId, logs, currentDate, activePeriod, onClose, onLog, onDraftEmail, studentData, onUpdateIdentity, caseMemory }) {
+// Top-level export: guard on studentData before mounting the heavy inner
+// modal (which calls many hooks and assumes a valid student).
+export function StudentProfileModal(props) {
+  if (!props.studentData) return <OrphanStudentModal {...props} />;
+  return <StudentProfileModalInner {...props} />;
+}
+
+function OrphanStudentModal({ studentId, logs, onClose }) {
+  const orphanLogs = (logs || []).filter(l => l.studentId === studentId);
+  useEscape(onClose);
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" style={{ maxWidth: 460, position: 'relative' }} onClick={e => e.stopPropagation()}>
+        <button
+          type="button"
+          onClick={onClose}
+          className="close-btn"
+          aria-label="Close"
+          style={{ position: 'absolute', top: 12, right: 12, zIndex: 2 }}
+        >×</button>
+        <div style={{ height: 3, background: 'linear-gradient(90deg, var(--yellow), var(--red))' }} />
+        <div className="modal-body" style={{ padding: 'var(--space-6)' }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: 'var(--radius-lg)',
+            background: 'var(--yellow-muted)', border: '1px solid rgba(251,191,36,0.35)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 28, marginBottom: 'var(--space-4)',
+          }}>❓</div>
+          <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 'var(--space-3)' }}>
+            Student not in roster
+          </h3>
+          <p style={{ fontSize: 13.5, color: 'var(--text-secondary)', lineHeight: 1.55, marginBottom: 'var(--space-4)' }}>
+            This log was written for student ID <code style={{ fontFamily: 'JetBrains Mono, monospace', color: 'var(--accent-hover)' }}>{studentId}</code>,
+            but that student isn't in the current period or imported roster.
+            The log still exists (you can see it in the table), but there's no profile to open.
+          </p>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            Likely cause: the roster was re-imported and this student was removed or re-keyed.
+            {orphanLogs.length > 1 && ` (${orphanLogs.length - 1} other log${orphanLogs.length > 2 ? 's' : ''} reference this same missing student.)`}
+          </p>
+          <button onClick={onClose} className="btn btn-secondary" style={{ width: '100%', marginTop: 'var(--space-5)' }}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StudentProfileModalInner({ studentId, logs, currentDate, activePeriod, onClose, onLog, onDraftEmail, studentData, onUpdateIdentity, caseMemory }) {
   const s = studentData;
   const stuLogs = logs.filter(l => l.studentId === studentId);
   const health = getHealth(studentId, logs, currentDate);

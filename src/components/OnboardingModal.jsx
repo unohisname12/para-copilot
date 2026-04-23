@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useEscape } from '../hooks/useEscape';
 
 // First-run onboarding. Re-openable from the sidebar "?" button any time.
 // Dismissal is stored in localStorage under a non-sensitive key — only a
@@ -86,6 +87,7 @@ export default function OnboardingModal({ onClose }) {
     markOnboarded();
     if (onClose) onClose();
   }
+  useEscape(finish);
 
   return (
     <div className="modal-overlay" onClick={finish}>

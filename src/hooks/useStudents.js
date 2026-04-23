@@ -66,6 +66,17 @@ export function useStudents({ activePeriod }) {
 
   const getStudentById = (id) => allStudents[id] || null;
 
+  // Wipe all imports + identity back to a fresh state. Used by the
+  // "Reset Local Data" action. Does NOT touch the real-name vault
+  // (that has its own purge control with its own user consent).
+  const resetImports = () => {
+    setImportedStudents({});
+    setImportedPeriodMap({});
+    setIdentityRegistry([]);
+    setIdentityOverrides({});
+    setDemoMode(true); // back to showing demo students
+  };
+
   return {
     allStudents, effectivePeriodStudents,
     importedStudents, importedPeriodMap,
@@ -73,5 +84,6 @@ export function useStudents({ activePeriod }) {
     identityOverrides, identityRegistry, setIdentityRegistry,
     handleImport, handleBundleImport, handleIdentityLoad, handleUpdateIdentity,
     getStudentById,
+    resetImports,
   };
 }

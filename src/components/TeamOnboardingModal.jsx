@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useTeam } from '../context/TeamProvider';
+import { useEscape } from '../hooks/useEscape';
 
 export default function TeamOnboardingModal({ onClose, mustChoose = false }) {
   const { user, createTeam, joinTeamByCode } = useTeam();
@@ -13,6 +14,7 @@ export default function TeamOnboardingModal({ onClose, mustChoose = false }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const [created, setCreated] = useState(null);
+  useEscape(() => { if (!mustChoose && onClose) onClose(); });
 
   async function handleCreate(e) {
     e.preventDefault();

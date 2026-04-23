@@ -365,7 +365,41 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
           </div>))}
         </div>)}
       </div>)}
-      {vaultTab !== "knowledge" && (filteredLogs.length === 0 ? (<div className="empty-doc">{vaultTab === "flagged" ? "No flagged entries." : "No logs match."}</div>) : (<div className="table-container"><table className="data-table"><thead><tr><th>Date</th><th>Period</th><th>Student</th><th>Type</th><th>Tags</th><th>Observation</th><th style={{ textAlign: "right" }}>Actions</th></tr></thead><tbody>{filteredLogs.map(l => { const s = allStudents[l.studentId] || { pseudonym: l.studentId, color: "#64748b" }; return (<tr key={l.id}><td style={{ whiteSpace: "nowrap", color: "var(--text-muted)" }}>{l.date}</td><td style={{ fontSize: "12px", color: "var(--text-muted)", whiteSpace: "nowrap" }}>{l.period}</td><td style={{ fontWeight: "600", color: s.color, whiteSpace: "nowrap", cursor: "pointer" }} onClick={() => setProfileStu(l.studentId)}>{s.pseudonym}</td><td><span style={{ fontSize: "11px", background: l.type === "Handoff Note" ? "#854d0e" : "#1e3a5f", color: l.type === "Handoff Note" ? "#fde68a" : "#93c5fd", padding: "2px 8px", borderRadius: "20px", whiteSpace: "nowrap" }}>{l.type}</span></td><td style={{ fontSize: "10px", color: "#4a6284" }}>{(l.tags || []).slice(0, 3).join(", ")}</td><td>{editingLog === l.id ? (<div style={{ display: "flex", gap: "6px" }}><input defaultValue={l.note || l.text} id={`edit_${l.id}`} style={{ flex: 1, padding: "4px 8px", background: "var(--bg-dark)", border: "1px solid var(--border)", borderRadius: "4px", color: "white", fontSize: "12px" }} /><button className="btn btn-primary" style={{ fontSize: "11px", padding: "4px 8px" }} onClick={() => saveEdit(l.id, document.getElementById(`edit_${l.id}`).value)}>Save</button><button className="btn btn-secondary" style={{ fontSize: "11px", padding: "4px 8px" }} onClick={() => setEditingLog(null)}>Cancel</button></div>) : <span style={{ fontSize: "13px" }}>{l.note || l.text}</span>}</td><td style={{ textAlign: "right", whiteSpace: "nowrap" }}><button onClick={() => toggleFlag(l.id)} title="Flag for IEP" style={{ background: "none", border: "none", cursor: "pointer", fontSize: "14px", color: l.flagged ? "#f59e0b" : "#334155" }}>⚑</button><button onClick={() => setEditingLog(l.id)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", color: "#60a5fa", marginLeft: "4px" }}>✏</button><button onClick={() => deleteLog(l.id)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", color: "#ef4444", marginLeft: "4px" }}>🗑</button></td></tr>); })}</tbody></table></div>))}
+      {vaultTab !== "knowledge" && (filteredLogs.length === 0 ? (<div className="empty-doc">{vaultTab === "flagged" ? "No flagged entries." : "No logs match."}</div>) : (<div className="table-container"><table className="data-table"><thead><tr><th>Date</th><th>Period</th><th>Student</th><th>Type</th><th>Tags</th><th>Observation</th><th style={{ textAlign: "right" }}>Actions</th></tr></thead><tbody>{filteredLogs.map(l => {
+        const rawStudent = allStudents[l.studentId];
+        const isOrphan = !rawStudent;
+        const s = rawStudent || { pseudonym: l.studentId, color: "var(--text-muted)" };
+        const label = isOrphan
+          ? `↯ ${(l.studentId || '').slice(0, 24)}${(l.studentId || '').length > 24 ? '…' : ''}`
+          : (s.realName || resolveLabel(s, "compact"));
+        return (
+          <tr key={l.id}>
+            <td style={{ whiteSpace: "nowrap", color: "var(--text-muted)" }}>{l.date}</td>
+            <td style={{ fontSize: "12px", color: "var(--text-muted)", whiteSpace: "nowrap" }}>{l.period}</td>
+            <td
+              onClick={() => setProfileStu(l.studentId)}
+              title={isOrphan ? "Student not in current roster — click for details" : ""}
+              style={{
+                fontWeight: isOrphan ? 400 : 600,
+                color: isOrphan ? "var(--text-muted)" : s.color,
+                whiteSpace: "nowrap",
+                cursor: "pointer",
+                fontStyle: isOrphan ? "italic" : "normal",
+              }}
+            >
+              {label}
+            </td>
+            <td><span style={{ fontSize: "11px", background: l.type === "Handoff Note" ? "#854d0e" : "#1e3a5f", color: l.type === "Handoff Note" ? "#fde68a" : "#93c5fd", padding: "2px 8px", borderRadius: "20px", whiteSpace: "nowrap" }}>{l.type}</span></td>
+            <td style={{ fontSize: "10px", color: "#4a6284" }}>{(l.tags || []).slice(0, 3).join(", ")}</td>
+            <td>{editingLog === l.id ? (<div style={{ display: "flex", gap: "6px" }}><input defaultValue={l.note || l.text} id={`edit_${l.id}`} style={{ flex: 1, padding: "4px 8px", background: "var(--bg-dark)", border: "1px solid var(--border)", borderRadius: "4px", color: "white", fontSize: "12px" }} /><button className="btn btn-primary" style={{ fontSize: "11px", padding: "4px 8px" }} onClick={() => saveEdit(l.id, document.getElementById(`edit_${l.id}`).value)}>Save</button><button className="btn btn-secondary" style={{ fontSize: "11px", padding: "4px 8px" }} onClick={() => setEditingLog(null)}>Cancel</button></div>) : <span style={{ fontSize: "13px" }}>{l.note || l.text}</span>}</td>
+            <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+              <button onClick={() => toggleFlag(l.id)} title="Flag for IEP" style={{ background: "none", border: "none", cursor: "pointer", fontSize: "14px", color: l.flagged ? "#f59e0b" : "#334155" }}>⚑</button>
+              <button onClick={() => setEditingLog(l.id)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", color: "#60a5fa", marginLeft: "4px" }}>✏</button>
+              <button onClick={() => deleteLog(l.id)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", color: "#ef4444", marginLeft: "4px" }}>🗑</button>
+            </td>
+          </tr>
+        );
+      })}</tbody></table></div>))}
     </div>);
   };
 
@@ -465,6 +499,40 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
                 }}
               >
                 ❓ How it works
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!window.confirm(
+                    'Reset all local data?\n\n' +
+                    'This clears:\n' +
+                    '  • All logs (paraLogsV1)\n' +
+                    '  • All imported students and rosters\n' +
+                    '  • Case memory (incidents, interventions, outcomes)\n' +
+                    '  • Knowledge base documents\n' +
+                    '  • Identity overrides\n\n' +
+                    'Does NOT touch: the real-name vault (purge separately above), ' +
+                    'cloud team data, or your Google sign-in.\n\n' +
+                    'Can\'t be undone.'
+                  )) return;
+                  logsBag.setLogs([]);
+                  students.resetImports();
+                  caseMemory.clearCaseMemory();
+                  kb.setKnowledgeBase([]);
+                  setTimeout(() => window.alert('Local data cleared.'), 50);
+                }}
+                title="Wipe logs, imports, case memory, and KB docs. Vault and cloud untouched."
+                style={{
+                  width: "100%", padding: "7px",
+                  borderRadius: "var(--radius-md)",
+                  border: "1px solid rgba(248,113,113,0.25)",
+                  background: "transparent",
+                  color: "var(--red)",
+                  cursor: "pointer", fontSize: 11, fontWeight: 600,
+                  marginTop: 6,
+                }}
+              >
+                🧹 Reset Local Data
               </button>
               <div style={{ fontSize: "11px", color: "#334155", textAlign: "center", lineHeight: "1.8", marginTop: 4 }}>FERPA-Safe — Pseudonyms only</div>
             </div>

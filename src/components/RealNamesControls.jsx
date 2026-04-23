@@ -1,5 +1,6 @@
 import React from 'react';
 import { useVault } from '../context/VaultProvider';
+import { useEscape } from '../hooks/useEscape';
 
 // Sidebar real-name controls. Renders nothing when the vault is empty
 // (nothing to show / persist).
@@ -11,6 +12,7 @@ export default function RealNamesControls() {
     requestEnablePersistence, confirmEnablePersistence, cancelEnablePersistence,
     purgeVault, dismissExpiredBanner,
   } = useVault();
+  useEscape(confirmPersistOpen ? cancelEnablePersistence : () => {});
 
   return (
     <>
