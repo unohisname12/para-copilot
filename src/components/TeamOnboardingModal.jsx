@@ -10,6 +10,7 @@ export default function TeamOnboardingModal({ onClose, mustChoose = false }) {
   const [teamName, setTeamName] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [switchTeamId, setSwitchTeamId] = useState(activeTeamId || (teams && teams[0]?.id) || '');
+  const [joinRole, setJoinRole] = useState('para'); // 'para' | 'sub'
   const defaultDisplay = user?.user_metadata?.given_name
     || user?.user_metadata?.name
     || (user?.email ? user.email.split('@')[0] : 'Para');
@@ -33,7 +34,7 @@ export default function TeamOnboardingModal({ onClose, mustChoose = false }) {
     e.preventDefault();
     setBusy(true); setErr(null);
     try {
-      await joinTeamByCode(inviteCode.trim().toUpperCase(), displayName.trim());
+      await joinTeamByCode(inviteCode.trim().toUpperCase(), displayName.trim(), joinRole);
       if (!mustChoose && onClose) onClose();
     } catch (e2) { setErr(e2.message || String(e2)); }
     finally { setBusy(false); }
@@ -206,8 +207,44 @@ export default function TeamOnboardingModal({ onClose, mustChoose = false }) {
                   required
                 />
               </Field>
+              <Field label="I'm joining as">
+                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                  {[
+                    { id: 'para', label: '👩‍🏫 Para', desc: 'Regular access' },
+                    { id: 'sub',  label: '🕒 Sub',  desc: 'Substitute / temp' },
+                  ].map((r) => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => setJoinRole(r.id)}
+                      className={joinRole === r.id ? 'btn btn-primary' : 'btn btn-secondary'}
+                      style={{
+                        flex: 1, flexDirection: 'column', height: 'auto',
+                        padding: 'var(--space-3)',
+                        alignItems: 'center', justifyContent: 'center',
+                        gap: 2,
+                      }}
+                    >
+                      <span style={{ fontSize: 14, fontWeight: 700 }}>{r.label}</span>
+                      <span style={{ fontSize: 11, opacity: 0.8 }}>{r.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </Field>
+              <div style={{
+                padding: 'var(--space-3)',
+                background: 'var(--bg-dark)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-md)',
+                fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.55,
+              }}>
+                <b style={{ color: 'var(--text-secondary)' }}>About access:</b>{' '}
+                Paras and Subs see student data, logs, and handoffs. Admin access
+                (Sped Teacher / Owner) can't be self-selected — a team admin has to
+                promote you after you join.
+              </div>
               <button type="submit" disabled={busy} className="btn btn-primary" style={{ width: '100%', marginTop: 'var(--space-2)' }}>
-                {busy ? 'Joining…' : 'Join team'}
+                {busy ? 'Joining…' : `Join as ${joinRole === 'sub' ? 'Sub' : 'Para'}`}
               </button>
             </form>
           )}

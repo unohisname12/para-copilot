@@ -52,11 +52,14 @@ export async function createTeam(name, displayName) {
   return data;
 }
 
-export async function joinTeamByCode(code, displayName) {
+export async function joinTeamByCode(code, displayName, requestedRole = 'para') {
   requireClient();
+  // requestedRole is validated server-side — only 'para' or 'sub' are
+  // honored. Admin roles must be granted by an existing admin.
   const { data, error } = await supabase.rpc('join_team_by_code', {
     code,
     display: displayName,
+    requested_role: requestedRole,
   });
   if (error) throw new Error(error.message);
   return data;

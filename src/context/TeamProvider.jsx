@@ -264,18 +264,15 @@ export function TeamProvider({ children }) {
       setActiveTeamId(t.id);
       return mapped;
     },
-    joinTeamByCode: async (code, display) => {
-      const t = await joinTeamByCode(code, display);
-      const mapped = {
-        id: t.id,
-        name: t.name,
-        inviteCode: t.invite_code,
-        role: 'member',
-        displayName: display,
-      };
-      setTeams((ts) => (ts.find((x) => x.id === t.id) ? ts : [...ts, mapped]));
+    joinTeamByCode: async (code, display, requestedRole = 'para') => {
+      const t = await joinTeamByCode(code, display, requestedRole);
+      // We don't know the final role without a reload (server validates and
+      // may coerce to 'para' if requestedRole was invalid). Reload instead
+      // of guessing.
+      const all = await getMyTeams();
+      setTeams(all);
       setActiveTeamId(t.id);
-      return mapped;
+      return all.find(x => x.id === t.id);
     },
     regenerateInviteCode: async () => {
       if (!activeTeamId) return null;
