@@ -433,11 +433,14 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
   const data = getActiveParsed();
 
   return (
-    <div style={{ padding: "24px", maxWidth: "860px" }}>
+    <div style={{ padding: "var(--space-6)", maxWidth: 1100, margin: "0 auto" }}>
       <div className="header">
         <div>
-          <h1>IEP Import</h1>
-          <p className="teacher-subtitle">Upload or paste student support documents — parsed locally by AI, converted to FERPA-safe profiles</p>
+          <h1 style={{ fontSize: 28 }}>IEP Import</h1>
+          <p className="teacher-subtitle" style={{ fontSize: 14, maxWidth: 720, lineHeight: 1.55 }}>
+            Bring student rosters and IEPs into SupaPara. Everything is parsed on this device —
+            real names never leave your browser unless you explicitly enable "Remember on this device."
+          </p>
         </div>
       </div>
 
@@ -469,40 +472,98 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
         </div>
       )}
 
-      {/* Mode tabs */}
-      <div style={{ display: "flex", gap: "4px", marginBottom: "20px", flexWrap: "wrap" }}>
-        {[["prepared", "🎯 Load Profiles"], ["rosterOnly", "👥 Names + Para #s"], ["paste", "📋 Paste Text"], ["upload", "📎 Upload File"], ["manual", "✏️ Manual Entry"], ["bundle", "📦 App Bundle JSON"], ["masterRoster", "🗂️ Master Roster JSON"]].map(([id, label]) => (
-          <button key={id} onClick={() => { setInputMode(id); setParsed(null); setParseError(""); setBundleError(""); setMasterRosterData(null); setMasterRosterError(""); setMasterRosterImported(false); setPreparedError(""); setPreparedData(null); setPreparedImported(false); }}
-            style={{
-              padding: "8px 16px",
-              borderRadius: "8px",
-              border: id === "prepared"      ? "1px solid #1d4ed8"
-                    : id === "bundle"        ? "1px solid #6d28d9"
-                    : id === "masterRoster"  ? "1px solid #166534"
-                    : id === "rosterOnly"    ? "1px solid var(--accent-border)"
-                    : "none",
-              cursor: "pointer",
-              fontSize: "13px",
-              fontWeight: "600",
-              background: inputMode === id ? (
-                  id === "prepared"      ? "#0c1a3d"
-                : id === "bundle"       ? "#1e1b4b"
-                : id === "masterRoster" ? "#0d2010"
-                : id === "rosterOnly"   ? "var(--accent-glow)"
-                : "#1d4ed8"
-              ) : "var(--panel-bg)",
-              color: inputMode === id ? (
-                  id === "prepared"      ? "#60a5fa"
-                : id === "bundle"       ? "#a78bfa"
-                : id === "masterRoster" ? "#4ade80"
-                : id === "rosterOnly"   ? "var(--accent-hover)"
-                : "#fff"
-              ) : "var(--text-muted)",
-            }}>
-            {label}
-          </button>
-        ))}
+      {/* Primary chooser — big cards for the three common workflows */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+        gap: "var(--space-4)",
+        marginBottom: "var(--space-5)",
+      }}>
+        <ImportModeCard
+          id="rosterOnly"
+          active={inputMode === "rosterOnly"}
+          icon="👥"
+          title="Names + Para #s"
+          subtitle="Seed this device with real names"
+          tone="#7a9cff"
+          body="You have a list of students and their 6-digit Para App Numbers. Accepts JSON, CSV, Markdown, TXT, or PDF. Names stay on this device. Future IEP uploads with matching Para App Numbers auto-resolve to the right kid."
+          when="Start here if you're the Sped teacher or admin setting things up for the first time."
+          onClick={() => setInputMode("rosterOnly")}
+        />
+        <ImportModeCard
+          id="bundle"
+          active={inputMode === "bundle"}
+          icon="📦"
+          title="App Bundle JSON"
+          subtitle="Full IEP profiles + optional private roster"
+          tone="#a78bfa"
+          body="A combined JSON with normalizedStudents + optional privateRosterMap. The richest import — students come in with full IEP data. If the private roster is included, you'll be prompted to download a separate Private Roster file for the vault."
+          when="Use this when you have a complete bundle exported by SupaPara or produced by your admin."
+          onClick={() => { setInputMode("bundle"); setParsed(null); setParseError(""); setMasterRosterData(null); setMasterRosterError(""); setMasterRosterImported(false); setPreparedData(null); setPreparedError(""); setPreparedImported(false); }}
+        />
+        <ImportModeCard
+          id="masterRoster"
+          active={inputMode === "masterRoster"}
+          icon="🗂️"
+          title="Master Roster"
+          subtitle="Class-by-class roster with IEPs embedded"
+          tone="#34d399"
+          body="A school/district export: top-level students + periods arrays, full IEP fields on each kid. Real names are read from fullName and flow through the vault if Para App Numbers are present."
+          when="Use this for the '…_fullName_fixed.json' style files from your admin."
+          onClick={() => { setInputMode("masterRoster"); setParsed(null); setParseError(""); setBundleError(""); setPreparedData(null); setPreparedError(""); setPreparedImported(false); }}
+        />
       </div>
+
+      {/* Advanced — collapsed by default; single-student / demo flows */}
+      <details style={{ marginBottom: "var(--space-5)" }}>
+        <summary style={{
+          cursor: "pointer", userSelect: "none",
+          fontSize: 13, fontWeight: 600,
+          color: "var(--text-secondary)",
+          padding: "var(--space-3) var(--space-4)",
+          background: "var(--panel-bg)",
+          border: "1px solid var(--border)",
+          borderRadius: "var(--radius-md)",
+        }}>
+          Advanced import options (single student, demo profiles, manual entry)
+        </summary>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gap: "var(--space-3)",
+          marginTop: "var(--space-3)",
+        }}>
+          {[
+            ["prepared",  "🎯", "Load Profiles",  "Prepared demo profiles"],
+            ["upload",    "📎", "Upload PDF",     "Single student IEP PDF"],
+            ["paste",     "📋", "Paste Text",     "Paste raw IEP text"],
+            ["manual",    "✏️", "Manual Entry",   "Type a student in by hand"],
+          ].map(([id, icon, title, sub]) => (
+            <button
+              key={id}
+              onClick={() => { setInputMode(id); setParsed(null); setParseError(""); setBundleError(""); setMasterRosterData(null); setMasterRosterError(""); setMasterRosterImported(false); setPreparedError(""); setPreparedData(null); setPreparedImported(false); }}
+              style={{
+                padding: "var(--space-3) var(--space-4)",
+                background: inputMode === id ? "var(--accent-glow)" : "var(--bg-dark)",
+                border: `1px solid ${inputMode === id ? "var(--accent-border)" : "var(--border)"}`,
+                borderRadius: "var(--radius-md)",
+                color: inputMode === id ? "var(--accent-hover)" : "var(--text-secondary)",
+                cursor: "pointer", textAlign: "left",
+                display: "flex", alignItems: "center", gap: "var(--space-3)",
+                minHeight: 56,
+                fontFamily: "inherit",
+                transition: "all 160ms cubic-bezier(0.16,1,0.3,1)",
+              }}
+            >
+              <span style={{ fontSize: 22, flexShrink: 0 }}>{icon}</span>
+              <span style={{ minWidth: 0 }}>
+                <span style={{ display: "block", fontSize: 13, fontWeight: 700 }}>{title}</span>
+                <span style={{ display: "block", fontSize: 11, color: "var(--text-muted)", marginTop: 1 }}>{sub}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </details>
 
       {/* ── ROSTER ONLY (Names + Para App Numbers; seeds the vault) ─── */}
       {inputMode === "rosterOnly" && <RosterOnlyImport />}
@@ -1086,5 +1147,101 @@ function Row({ label, value, color }) {
       <span style={{ color: "var(--text-muted)", flexShrink: 0, minWidth: "90px" }}>{label}:</span>
       <span style={{ color: color || "var(--text-primary)" }}>{value}</span>
     </div>
+  );
+}
+
+function ImportModeCard({ icon, title, subtitle, tone, body, when, active, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        display: "flex", flexDirection: "column", gap: "var(--space-3)",
+        padding: "var(--space-5)",
+        background: active
+          ? `linear-gradient(180deg, ${tone}14, var(--panel-bg))`
+          : "var(--panel-bg)",
+        border: `2px solid ${active ? tone : "var(--border)"}`,
+        borderRadius: "var(--radius-xl)",
+        cursor: "pointer",
+        textAlign: "left",
+        minHeight: 220,
+        fontFamily: "inherit",
+        transition: "all 200ms cubic-bezier(0.16,1,0.3,1)",
+        boxShadow: active
+          ? `0 10px 30px ${tone}22, 0 0 0 1px ${tone}44`
+          : "var(--shadow-sm)",
+        transform: active ? "translateY(-2px)" : "translateY(0)",
+        position: "relative",
+        overflow: "hidden",
+      }}
+      onMouseEnter={(e) => { if (!active) e.currentTarget.style.borderColor = tone + "66"; }}
+      onMouseLeave={(e) => { if (!active) e.currentTarget.style.borderColor = "var(--border)"; }}
+    >
+      {/* Accent stripe */}
+      <div style={{
+        position: "absolute", top: 0, left: 0, right: 0, height: 3,
+        background: tone, opacity: active ? 1 : 0.35,
+      }} />
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+        <div style={{
+          width: 52, height: 52,
+          borderRadius: "var(--radius-lg)",
+          background: `linear-gradient(135deg, ${tone}, ${tone}99)`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 26,
+          boxShadow: `0 4px 14px ${tone}55`,
+          flexShrink: 0,
+        }}>
+          {icon}
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <div style={{
+            fontSize: 17, fontWeight: 800, letterSpacing: "-0.01em",
+            color: "var(--text-primary)",
+          }}>
+            {title}
+          </div>
+          <div style={{ fontSize: 12, color: tone, fontWeight: 600, marginTop: 2 }}>
+            {subtitle}
+          </div>
+        </div>
+      </div>
+
+      <div style={{
+        fontSize: 13, color: "var(--text-secondary)",
+        lineHeight: 1.55, flex: 1,
+      }}>
+        {body}
+      </div>
+
+      <div style={{
+        fontSize: 11, fontWeight: 600,
+        color: active ? tone : "var(--text-muted)",
+        paddingTop: "var(--space-2)",
+        borderTop: `1px solid ${active ? tone + "33" : "var(--border)"}`,
+        lineHeight: 1.5,
+      }}>
+        <span style={{ textTransform: "uppercase", letterSpacing: "0.1em", marginRight: 4 }}>
+          When to use:
+        </span>
+        <span style={{ color: "var(--text-secondary)", fontWeight: 500 }}>{when}</span>
+      </div>
+
+      {active && (
+        <div style={{
+          position: "absolute", top: 14, right: 14,
+          fontSize: 10, fontWeight: 700,
+          textTransform: "uppercase", letterSpacing: "0.1em",
+          color: tone,
+          padding: "2px 8px",
+          background: tone + "22",
+          borderRadius: "var(--radius-pill)",
+          border: `1px solid ${tone}55`,
+        }}>
+          Active
+        </div>
+      )}
+    </button>
   );
 }
