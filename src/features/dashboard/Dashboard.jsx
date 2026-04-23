@@ -142,100 +142,216 @@ export function Dashboard({
   }, [noteDraft, noteTarget, caseMemory]);
 
   // ── Styles ────────────────────────────────────────────────
-  const card   = { borderRadius: "12px", overflow: "hidden" };
-  const panel  = { background: "#080f1e", border: "1px solid #1e293b", borderRadius: "12px", overflow: "hidden" };
-  const sectionHdr = { padding: "9px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", userSelect: "none" };
+  const card   = { borderRadius: "var(--radius-lg)", overflow: "hidden" };
+  const panel  = { background: "var(--panel-bg)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", overflow: "hidden" };
+  const sectionHdr = { padding: "var(--space-3) var(--space-4)", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", userSelect: "none" };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
 
-      {/* ══ HEADER BAR ══════════════════════════════════════ */}
-      <div style={{ padding: "10px 16px", background: "#050b18", borderBottom: "1px solid #141f33", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0, gap: "12px", flexWrap: "wrap" }}>
-        <div>
-          <div style={{ fontSize: "11px", color: "#4a6284", textTransform: "uppercase", letterSpacing: ".07em" }}>Now Supporting</div>
-          <div style={{ fontSize: "19px", fontWeight: "800", color: "#e2e8f0", lineHeight: 1.2 }}>{period.label}</div>
-          <div style={{ fontSize: "12px", color: "#4a6284", marginTop: "1px" }}>
-            <span style={{ color: "#93c5fd", fontWeight: "600" }}>{period.teacher}</span>
-            {" · "}
-            <span style={{ color: "#e2e8f0", fontWeight: "700" }}>{effectivePeriodStudents.length}</span> IEP students
+      {/* ══ HERO HEADER ═════════════════════════════════════ */}
+      <div style={{
+        margin: "var(--space-5) var(--space-6) var(--space-4)",
+        padding: "var(--space-5) var(--space-6)",
+        background: "linear-gradient(135deg, var(--panel-raised) 0%, var(--panel-bg) 100%)",
+        border: "1px solid var(--border-light)",
+        borderRadius: "var(--radius-xl)",
+        boxShadow: "var(--shadow-md)",
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        flexShrink: 0, gap: "var(--space-4)", flexWrap: "wrap",
+        position: "relative", overflow: "hidden",
+      }}>
+        {/* Accent gradient bar */}
+        <div style={{
+          position: "absolute", top: 0, left: 0, right: 0, height: 2,
+          background: "var(--grad-primary)", opacity: 0.85,
+        }} />
+        {/* Ambient glow */}
+        <div style={{
+          position: "absolute", inset: 0,
+          background: "radial-gradient(800px circle at 20% -40%, rgba(122,156,255,0.1), transparent 50%)",
+          pointerEvents: "none",
+        }} />
+
+        <div style={{ position: "relative", zIndex: 1, minWidth: 0 }}>
+          <div style={{
+            fontSize: 11, color: "var(--text-muted)",
+            textTransform: "uppercase", letterSpacing: "0.12em", fontWeight: 600,
+          }}>
+            Now Supporting
+          </div>
+          <div style={{
+            fontSize: 26, fontWeight: 800, letterSpacing: "-0.02em",
+            color: "var(--text-primary)", lineHeight: 1.15, marginTop: 4,
+          }}>
+            {period.label}
+          </div>
+          <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 6, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span className="pill pill-accent" style={{ fontSize: 11 }}>
+              {period.teacher}
+            </span>
+            <span>·</span>
+            <span style={{ color: "var(--text-primary)", fontWeight: 700 }}>
+              {effectivePeriodStudents.length}
+            </span>
+            <span>IEP students</span>
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{
+          position: "relative", zIndex: 1,
+          display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap",
+        }}>
           <OllamaStatusBadge online={ollamaOnline} modelName={ollamaModel} />
-          <div style={{ fontSize: "12px", color: "#4a6284", background: "#0f172a", padding: "4px 12px", borderRadius: "20px", border: "1px solid #1e293b" }}>
+          <span className="mono" style={{
+            fontSize: 11, color: "var(--text-secondary)",
+            background: "var(--bg-dark)",
+            padding: "6px 12px",
+            borderRadius: "var(--radius-pill)",
+            border: "1px solid var(--border)",
+            letterSpacing: "0.02em", fontWeight: 600,
+          }}>
             {new Date(currentDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-          </div>
+          </span>
           {/* Column selector */}
-          <div style={{ display: "flex", gap: "2px", background: "#0f172a", borderRadius: "8px", padding: "3px", border: "1px solid #1e293b" }} title="Student card columns">
+          <div
+            title="Student card columns"
+            style={{
+              display: "flex", gap: 2,
+              background: "var(--bg-dark)",
+              borderRadius: "var(--radius-md)",
+              padding: 3,
+              border: "1px solid var(--border)",
+            }}
+          >
             {[1,2,3].map(n => (
               <button key={n} onClick={() => setLayout(l => ({ ...l, cols: n }))}
                 title={`${n} column${n>1?"s":""}`}
-                style={{ width: "30px", height: "24px", borderRadius: "5px", border: "none", cursor: "pointer", background: layout.cols === n ? "#3b82f6" : "transparent", color: layout.cols === n ? "#fff" : "#475569", fontSize: "11px", fontWeight: "700", lineHeight: 1 }}>
+                style={{
+                  width: 32, height: 28,
+                  borderRadius: "var(--radius-sm)", border: "none", cursor: "pointer",
+                  background: layout.cols === n ? "var(--grad-primary)" : "transparent",
+                  color: layout.cols === n ? "#fff" : "var(--text-muted)",
+                  fontSize: 11, fontWeight: 700, lineHeight: 1,
+                  transition: "all 120ms cubic-bezier(0.16,1,0.3,1)",
+                }}>
                 {"▮".repeat(n)}
               </button>
             ))}
           </div>
-          {/* Chat toggle */}
-          <button onClick={() => setLayout(l => ({ ...l, chatOpen: !l.chatOpen }))}
-            style={{ padding: "5px 12px", borderRadius: "8px", border: `1px solid ${layout.chatOpen ? "#3b82f6" : "#1e293b"}`, background: layout.chatOpen ? "#0c1a2e" : "#0f172a", color: layout.chatOpen ? "#60a5fa" : "#475569", fontSize: "12px", cursor: "pointer", fontWeight: "600" }}>
+          <button
+            onClick={() => setLayout(l => ({ ...l, chatOpen: !l.chatOpen }))}
+            className={layout.chatOpen ? "btn btn-primary btn-sm" : "btn btn-secondary btn-sm"}
+            style={{ minHeight: 36 }}
+          >
             💬 Copilot
           </button>
         </div>
       </div>
 
       {/* ══ SCROLLABLE BODY ══════════════════════════════════ */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "12px 14px", display: "flex", flexDirection: "column", gap: "10px", minHeight: 0 }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "0 var(--space-6) var(--space-6)", display: "flex", flexDirection: "column", gap: "var(--space-4)", minHeight: 0 }}>
 
-        {/* ── TOPIC BAR ─────────────────────────────────── */}
-        <div style={{ ...panel, border: topic ? "1px solid #1d4ed8" : "1px solid #334155" }}>
-          <div style={{ ...sectionHdr, background: topic ? "#040c1a" : "#080f1e" }}
-            onClick={() => !topicEdit && setTopicEdit(true)}>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
-              <span style={{ fontSize: "18px", flexShrink: 0 }}>📚</span>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: "10px", color: "#60a5fa", fontWeight: "700", textTransform: "uppercase", letterSpacing: ".07em" }}>What are we doing today?</div>
+        {/* ── TOPIC CARD ─────────────────────────────────── */}
+        <div style={{
+          background: topic
+            ? "linear-gradient(135deg, rgba(122,156,255,0.1), var(--panel-bg))"
+            : "var(--panel-bg)",
+          border: `1px solid ${topic ? "var(--accent-border)" : "var(--border)"}`,
+          borderRadius: "var(--radius-xl)",
+          overflow: "hidden",
+          transition: "all 200ms cubic-bezier(0.16,1,0.3,1)",
+          boxShadow: topic ? "var(--shadow-glow)" : "var(--shadow-sm)",
+        }}>
+          <div
+            style={{
+              padding: "var(--space-4) var(--space-5)",
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              cursor: "pointer", userSelect: "none", gap: "var(--space-3)",
+            }}
+            onClick={() => !topicEdit && setTopicEdit(true)}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", flex: 1, minWidth: 0 }}>
+              <div style={{
+                width: 44, height: 44,
+                background: topic ? "var(--grad-primary)" : "var(--bg-dark)",
+                borderRadius: "var(--radius-md)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 20, flexShrink: 0,
+                boxShadow: topic ? "0 4px 14px rgba(122,156,255,0.4)" : "none",
+              }}>
+                📚
+              </div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{
+                  fontSize: 10, fontWeight: 700,
+                  textTransform: "uppercase", letterSpacing: "0.1em",
+                  color: topic ? "var(--accent-hover)" : "var(--text-muted)",
+                }}>
+                  What are we doing today?
+                </div>
                 {topic
-                  ? <div style={{ fontSize: "15px", fontWeight: "700", color: "#e2e8f0", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{topic}</div>
-                  : <div style={{ fontSize: "13px", color: "#334155", fontStyle: "italic", marginTop: "1px" }}>Tap to set today's lesson focus…</div>
+                  ? <div style={{
+                      fontSize: 17, fontWeight: 700,
+                      color: "var(--text-primary)", marginTop: 3,
+                      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                    }}>{topic}</div>
+                  : <div style={{
+                      fontSize: 13, color: "var(--text-dim)",
+                      fontStyle: "italic", marginTop: 2,
+                    }}>Tap to set today's lesson focus…</div>
                 }
               </div>
             </div>
-            <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+            <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
               {topic && !topicEdit && (
-                <button onClick={e => { e.stopPropagation(); logTopic(); }}
+                <button
+                  onClick={e => { e.stopPropagation(); logTopic(); }}
                   title="Log this topic to the session"
-                  style={{ fontSize: "11px", padding: "5px 10px", background: "#0d2010", color: "#4ade80", border: "1px solid #166534", borderRadius: "7px", cursor: "pointer" }}>
+                  className="btn btn-secondary btn-sm"
+                  style={{ color: "var(--green)", borderColor: "rgba(52,211,153,0.3)" }}
+                >
                   📋 Log
                 </button>
               )}
-              <button onClick={e => { e.stopPropagation(); setTopicEdit(true); setTopicDraft(topic); }}
-                style={{ fontSize: "12px", padding: "6px 14px", background: "#1d4ed8", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "700" }}>
+              <button
+                onClick={e => { e.stopPropagation(); setTopicEdit(true); setTopicDraft(topic); }}
+                className="btn btn-primary btn-sm"
+              >
                 {topic ? "✏ Edit" : "+ Set Topic"}
               </button>
             </div>
           </div>
 
           {topicEdit && (
-            <div style={{ padding: "10px 14px 14px", borderTop: "1px solid #1d3566" }} onClick={e => e.stopPropagation()}>
+            <div style={{
+              padding: "var(--space-3) var(--space-5) var(--space-4)",
+              borderTop: "1px solid var(--border)",
+            }} onClick={e => e.stopPropagation()}>
               <textarea autoFocus
                 value={topicDraft}
                 onChange={e => setTopicDraft(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveTopic(); } }}
                 placeholder={`e.g. "Decimals — converting fractions with manipulatives"\n\nPress Enter to save, Shift+Enter for new line`}
-                style={{ width: "100%", background: "#0a1120", border: "1px solid #3b82f6", borderRadius: "8px", color: "#e2e8f0", padding: "10px 12px", fontSize: "15px", resize: "none", height: "72px", fontFamily: "inherit", boxSizing: "border-box", outline: "none" }} />
-              <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
-                <button onClick={saveTopic}
-                  style={{ flex: 1, padding: "11px", background: "#1d4ed8", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontSize: "15px", fontWeight: "800" }}>
+                className="data-textarea"
+                style={{ height: 80 }}
+              />
+              <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
+                <button onClick={saveTopic} className="btn btn-primary" style={{ flex: 1 }}>
                   ✓ Save
                 </button>
-                <button onClick={() => { setTopicEdit(false); setTopicDraft(topic); }}
-                  style={{ padding: "11px 18px", background: "#1e293b", color: "#94a3b8", border: "none", borderRadius: "8px", cursor: "pointer", fontSize: "14px" }}>
+                <button
+                  onClick={() => { setTopicEdit(false); setTopicDraft(topic); }}
+                  className="btn btn-secondary"
+                >
                   Cancel
                 </button>
                 {topicDraft.trim() && (
-                  <button onClick={() => { setTopic(""); setTopicEdit(false); setTopicDraft(""); showToast("Topic cleared"); }}
-                    style={{ padding: "11px 14px", background: "#1a0505", color: "#f87171", border: "1px solid #7f1d1d", borderRadius: "8px", cursor: "pointer", fontSize: "13px" }}>
+                  <button
+                    onClick={() => { setTopic(""); setTopicEdit(false); setTopicDraft(""); showToast("Topic cleared"); }}
+                    className="btn btn-secondary"
+                    style={{ color: "var(--red)", borderColor: "rgba(248,113,113,0.3)" }}
+                  >
                     Clear
                   </button>
                 )}
@@ -245,42 +361,80 @@ export function Dashboard({
 
           {/* Doc snippet if loaded */}
           {docSnippet && !topicEdit && (
-            <div style={{ padding: "8px 14px 10px", borderTop: "1px solid #1d3566", background: "#040c1a" }}>
-              <span style={{ fontSize: "10px", color: "#3b82f6", fontWeight: "700", textTransform: "uppercase" }}>📄 Class Notes</span>
-              <div style={{ fontSize: "12px", color: "#5e7fa3", lineHeight: 1.5, marginTop: "3px" }}>{docSnippet.slice(0, 220)}{docSnippet.length > 220 ? "…" : ""}</div>
+            <div style={{
+              padding: "var(--space-3) var(--space-5)",
+              borderTop: "1px solid var(--border)",
+              background: "var(--bg-dark)",
+            }}>
+              <span className="pill pill-accent" style={{ fontSize: 10, marginBottom: 4 }}>
+                📄 Class Notes
+              </span>
+              <div style={{
+                fontSize: 12, color: "var(--text-secondary)",
+                lineHeight: 1.5, marginTop: 4,
+              }}>
+                {docSnippet.slice(0, 220)}{docSnippet.length > 220 ? "…" : ""}
+              </div>
             </div>
           )}
         </div>
 
         {/* ── CLASS-WIDE QUICK ACTION BAR ───────────────── */}
-        <div style={{ ...panel, padding: "10px 14px" }}>
-          <div style={{ fontSize: "10px", color: "#475569", fontWeight: "700", textTransform: "uppercase", letterSpacing: ".07em", marginBottom: "8px" }}>
-            {activeAction ? `▶ Tap a student card below to log "${activeAction.label}"` : "Quick Log — tap an action, then tap a student"}
+        <div className="panel" style={{ padding: "var(--space-4) var(--space-5)" }}>
+          <div style={{
+            fontSize: 11, fontWeight: 700,
+            textTransform: "uppercase", letterSpacing: "0.1em",
+            color: activeAction ? "var(--accent-hover)" : "var(--text-muted)",
+            marginBottom: "var(--space-3)",
+            display: "flex", alignItems: "center", gap: "var(--space-2)",
+          }}>
+            {activeAction ? (
+              <>
+                <span style={{ color: "var(--accent)" }}>▶</span>
+                Tap a student card below to log "{activeAction.label}"
+              </>
+            ) : "Quick Log — tap an action, then tap a student"}
           </div>
-          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
             {DASH_ACTIONS.map(action => {
               const active = activeAction?.id === action.id;
               return (
-                <button key={action.id}
+                <button
+                  key={action.id}
                   onClick={() => setActiveAction(prev => prev?.id === action.id ? null : action)}
                   style={{
-                    padding: "9px 15px", borderRadius: "9px",
-                    border: `1.5px solid ${active ? action.border : "#1e293b"}`,
-                    background: active ? action.bg : "#0f172a",
-                    color: active ? action.color : "#64748b",
-                    cursor: "pointer", fontSize: "13px", fontWeight: active ? "800" : "400",
-                    transition: "all 0.12s",
-                    transform: active ? "scale(1.06)" : "scale(1)",
-                    boxShadow: active ? `0 0 12px ${action.bg}` : "none",
-                  }}>
-                  {action.icon} {action.label}
+                    minHeight: 44,
+                    padding: "var(--space-2) var(--space-4)",
+                    borderRadius: "var(--radius-md)",
+                    border: `1.5px solid ${active ? action.border : "var(--border)"}`,
+                    background: active ? action.bg : "var(--bg-dark)",
+                    color: active ? action.color : "var(--text-secondary)",
+                    cursor: "pointer",
+                    fontSize: 13, fontWeight: active ? 700 : 500,
+                    fontFamily: "inherit",
+                    transition: "all 160ms cubic-bezier(0.16,1,0.3,1)",
+                    transform: active ? "translateY(-1px)" : "translateY(0)",
+                    boxShadow: active
+                      ? `0 6px 20px ${action.bg}, inset 0 1px 0 rgba(255,255,255,0.08)`
+                      : "var(--shadow-sm)",
+                    display: "inline-flex", alignItems: "center", gap: 6,
+                  }}
+                >
+                  <span style={{ fontSize: 15 }}>{action.icon}</span> {action.label}
                 </button>
               );
             })}
             {activeAction && (
-              <button onClick={() => setActiveAction(null)}
-                style={{ padding: "9px 13px", borderRadius: "9px", border: "1px solid #7f1d1d", background: "#1a0505", color: "#f87171", cursor: "pointer", fontSize: "13px" }}>
-                ✕
+              <button
+                onClick={() => setActiveAction(null)}
+                className="btn btn-secondary"
+                style={{
+                  minHeight: 44,
+                  color: "var(--red)",
+                  borderColor: "rgba(248,113,113,0.3)",
+                }}
+              >
+                ✕ Cancel
               </button>
             )}
           </div>
@@ -296,7 +450,11 @@ export function Dashboard({
         )}
 
         {/* ── STUDENT GRID ──────────────────────────────── */}
-        <div style={{ display: "grid", gridTemplateColumns: `repeat(${layout.cols}, 1fr)`, gap: "10px" }}>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${layout.cols}, 1fr)`,
+          gap: "var(--space-3)",
+        }}>
           {effectivePeriodStudents.map(id => {
             const s = allStudents[id];
             if (!s) return null;
@@ -308,79 +466,186 @@ export function Dashboard({
             const isTarget  = activeAction !== null;
 
             return (
-              <div key={id}
+              <div
+                key={id}
                 onClick={isTarget ? () => handleClassTap(id) : undefined}
                 style={{
-                  ...card,
-                  background: isTarget ? s.color + "16" : "#070e1c",
-                  border: `2px solid ${isTarget ? s.color : s.color + "50"}`,
+                  borderRadius: "var(--radius-lg)",
+                  overflow: "hidden",
+                  background: `linear-gradient(180deg, ${s.color}0a 0%, var(--panel-bg) 40%)`,
+                  border: `1px solid ${isTarget ? s.color : s.color + "30"}`,
                   cursor: isTarget ? "pointer" : "default",
-                  transition: "all 0.15s",
-                  boxShadow: isTarget ? `0 0 18px ${s.color}25` : "none",
-                  transform: isTarget ? "scale(1.015)" : "scale(1)",
-                }}>
+                  transition: "all 200ms cubic-bezier(0.16,1,0.3,1)",
+                  boxShadow: isTarget
+                    ? `0 12px 32px ${s.color}28, 0 0 0 1px ${s.color}60`
+                    : "var(--shadow-sm)",
+                  transform: isTarget ? "translateY(-2px)" : "translateY(0)",
+                  position: "relative",
+                }}
+              >
+                {/* Color-coded accent stripe */}
+                <div style={{
+                  position: "absolute", top: 0, left: 0, right: 0, height: 3,
+                  background: s.color, opacity: 0.9,
+                }} />
 
                 {/* Alert banner — v2 students with alertText or alert flag */}
                 {(s.alertText || s.flags?.alert) && (
-                  <div style={{ padding: "5px 10px", background: "#1a0505", borderBottom: `1px solid #7f1d1d`, fontSize: "10px", color: "#f87171", fontWeight: "700" }}>
+                  <div style={{
+                    padding: "var(--space-1) var(--space-3)",
+                    background: "var(--red-muted)",
+                    borderBottom: "1px solid rgba(248,113,113,0.3)",
+                    fontSize: 10, color: "var(--red)", fontWeight: 700,
+                    letterSpacing: "0.02em",
+                  }}>
                     ⚠ {s.alertText || "Alert flag set"}
                   </div>
                 )}
 
                 {/* Card header — tap to open profile */}
-                <div style={{ padding: "11px 13px 9px", background: s.color + "14", borderBottom: `1px solid ${s.color}28`, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}
-                  onClick={e => { if (!isTarget) { e.stopPropagation(); setProfileStu(id); } }}>
-                  <div style={{ cursor: isTarget ? "default" : "pointer" }}>
-                    <div style={{ fontSize: "16px", fontWeight: "800", color: s.color, lineHeight: 1.2 }}>{resolveLabel(s, "compact")}</div>
-                    <div style={{ display: "flex", gap: "4px", alignItems: "center", flexWrap: "wrap", marginTop: "2px" }}>
-                      <span style={{ fontSize: "11px", color: "#64748b" }}>{s.eligibility}</span>
-                      {s.flags?.iepNotYetOnFile && <span style={{ fontSize: "9px", background: "#1a1505", color: "#fbbf24", padding: "1px 5px", borderRadius: "20px", border: "1px solid #854d0e" }}>IEP Pending</span>}
-                      {s.flags?.crossPeriod && <span style={{ fontSize: "9px", background: "#0c1a2e", color: "#60a5fa", padding: "1px 5px", borderRadius: "20px", border: "1px solid #1d4ed8" }}>Multi-Period</span>}
+                <div
+                  onClick={e => { if (!isTarget) { e.stopPropagation(); setProfileStu(id); } }}
+                  style={{
+                    padding: "var(--space-4) var(--space-4) var(--space-3)",
+                    display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+                    gap: "var(--space-2)",
+                  }}
+                >
+                  <div style={{ cursor: isTarget ? "default" : "pointer", minWidth: 0, flex: 1 }}>
+                    <div style={{
+                      fontSize: 18, fontWeight: 800,
+                      color: s.color, lineHeight: 1.15,
+                      letterSpacing: "-0.01em",
+                    }}>
+                      {resolveLabel(s, "compact")}
+                    </div>
+                    <div style={{
+                      display: "flex", gap: 6, alignItems: "center",
+                      flexWrap: "wrap", marginTop: 4,
+                    }}>
+                      <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 500 }}>
+                        {s.eligibility}
+                      </span>
+                      {s.flags?.iepNotYetOnFile && (
+                        <span className="pill pill-yellow" style={{ fontSize: 9, padding: "1px 6px" }}>
+                          IEP Pending
+                        </span>
+                      )}
+                      {s.flags?.crossPeriod && (
+                        <span className="pill pill-accent" style={{ fontSize: 9, padding: "1px 6px" }}>
+                          Multi-Period
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
-                    <span style={{ fontSize: "16px" }}>{hdot(health)}</span>
-                    <span style={{ fontSize: "10px", color: hStyle.color, background: hStyle.bg, padding: "2px 7px", borderRadius: "20px", border: `1px solid ${hStyle.border}`, whiteSpace: "nowrap" }}>
+                  <div style={{
+                    display: "flex", flexDirection: "column",
+                    alignItems: "flex-end", gap: 4, flexShrink: 0,
+                  }}>
+                    <span style={{ fontSize: 18 }}>{hdot(health)}</span>
+                    <span style={{
+                      fontSize: 10, fontWeight: 600,
+                      color: hStyle.color, background: hStyle.bg,
+                      padding: "2px 8px", borderRadius: "var(--radius-pill)",
+                      border: `1px solid ${hStyle.border}`,
+                      whiteSpace: "nowrap",
+                    }}>
                       {todayLogs.length} today
                     </span>
                   </div>
                 </div>
 
                 {/* Accommodations pills */}
-                <div style={{ padding: "6px 10px 6px", display: "flex", flexWrap: "wrap", gap: "3px", borderBottom: `1px solid ${s.color}18`, minHeight: "30px", alignItems: "center" }}>
+                <div style={{
+                  padding: "var(--space-2) var(--space-4)",
+                  display: "flex", flexWrap: "wrap", gap: 4,
+                  minHeight: 34, alignItems: "center",
+                  borderTop: "1px solid var(--border)",
+                }}>
                   {(s.accs || []).slice(0, 3).map(a => (
-                    <span key={a} style={{ fontSize: "10px", background: "#102040", color: "#7baee0", padding: "2px 7px", borderRadius: "20px", border: "1px solid #1e3a5f" }}>{a}</span>
+                    <span key={a} style={{
+                      fontSize: 10,
+                      background: "var(--accent-glow)",
+                      color: "var(--accent-hover)",
+                      padding: "2px 8px",
+                      borderRadius: "var(--radius-pill)",
+                      border: "1px solid var(--accent-border)",
+                      fontWeight: 500,
+                    }}>
+                      {a}
+                    </span>
                   ))}
                   {(s.accs || []).length > 3 && (
-                    <span style={{ fontSize: "10px", color: "#334155" }}>+{s.accs.length - 3}</span>
+                    <span style={{ fontSize: 10, color: "var(--text-dim)", fontWeight: 600 }}>
+                      +{s.accs.length - 3}
+                    </span>
                   )}
                   {(!s.accs || s.accs.length === 0) && (
-                    <span style={{ fontSize: "10px", color: "#334155" }}>No accommodations listed</span>
+                    <span style={{ fontSize: 10, color: "var(--text-dim)", fontStyle: "italic" }}>
+                      No accommodations listed
+                    </span>
                   )}
                 </div>
 
                 {/* 1-click action buttons */}
-                <div style={{ padding: "8px 8px 6px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "5px" }}>
+                <div style={{
+                  padding: "var(--space-3) var(--space-3) var(--space-2)",
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 6,
+                  borderTop: "1px solid var(--border)",
+                }}>
                   {DASH_ACTIONS.slice(0, 6).map(action => (
-                    <button key={action.id}
+                    <button
+                      key={action.id}
                       onClick={e => handleCardAction(id, action, e)}
                       title={`Log: ${action.type} for ${resolveLabel(s, "compact")}`}
-                      style={{ padding: "8px 5px", borderRadius: "8px", border: `1px solid ${action.border}50`, background: action.bg, color: action.color, cursor: "pointer", fontSize: "12px", fontWeight: "700", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", whiteSpace: "nowrap", transition: "filter 0.1s" }}>
+                      style={{
+                        minHeight: 38,
+                        padding: "6px 8px",
+                        borderRadius: "var(--radius-md)",
+                        border: `1px solid ${action.border}55`,
+                        background: action.bg,
+                        color: action.color,
+                        cursor: "pointer",
+                        fontSize: 12, fontWeight: 700,
+                        fontFamily: "inherit",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 4,
+                        whiteSpace: "nowrap",
+                        transition: "all 120ms cubic-bezier(0.16,1,0.3,1)",
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.filter = "brightness(1.15)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.filter = "brightness(1)"; }}
+                    >
                       {action.icon} {action.label}
                     </button>
                   ))}
                 </div>
 
                 {/* Last log preview */}
-                {lastLog ? (
-                  <div style={{ padding: "4px 12px 8px", fontSize: "10px", color: "#334155", borderTop: `1px solid ${s.color}14` }}>
-                    Last: <span style={{ color: "#4a6284" }}>{lastLog.type}</span>
-                    {" · "}
-                    <span style={{ color: "#334155" }}>{lastLog.date === currentDate ? "today" : lastLog.date}</span>
-                  </div>
-                ) : (
-                  <div style={{ padding: "4px 12px 8px", fontSize: "10px", color: "#253045", borderTop: `1px solid ${s.color}14` }}>No logs yet this session</div>
-                )}
+                <div style={{
+                  padding: "var(--space-2) var(--space-4) var(--space-3)",
+                  fontSize: 11,
+                  color: lastLog ? "var(--text-muted)" : "var(--text-dim)",
+                }}>
+                  {lastLog ? (
+                    <>
+                      <span style={{ color: "var(--text-dim)" }}>Last: </span>
+                      <span style={{ color: "var(--text-secondary)", fontWeight: 500 }}>
+                        {lastLog.type}
+                      </span>
+                      <span style={{ color: "var(--text-dim)" }}>
+                        {" · "}
+                        {lastLog.date === currentDate ? "today" : lastLog.date}
+                      </span>
+                    </>
+                  ) : (
+                    <span style={{ fontStyle: "italic" }}>No logs yet this session</span>
+                  )}
+                </div>
               </div>
             );
           })}
