@@ -42,10 +42,23 @@ export function Tip({ text, children, pos = "top" }) {
   };
 
   return (
-    <div ref={triggerRef} style={{ position: "relative", display: "flex", alignItems: "center", gap: "2px" }}>
+    <div ref={triggerRef} style={{ position: "relative", display: "flex", alignItems: "center", gap: "4px" }}>
       <div style={{ flex: 1, minWidth: 0 }}>{children}</div>
-      <button onClick={handleToggle}
-        style={{ width: "16px", height: "16px", borderRadius: "50%", border: "1px solid #334155", background: show ? "#1d4ed8" : "#0f172a", color: show ? "#fff" : "#4a6284", fontSize: "9px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, lineHeight: 1, padding: 0 }}>?</button>
+      <button
+        onClick={handleToggle}
+        aria-label="Show info"
+        style={{
+          width: "22px", height: "22px",
+          borderRadius: "50%",
+          border: `1px solid ${show ? "#6488ff" : "var(--border, #1f2b4a)"}`,
+          background: show ? "var(--accent, #7a9cff)" : "transparent",
+          color: show ? "#fff" : "var(--text-muted, #6b7ea3)",
+          fontSize: "11px", fontWeight: 700, cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          flexShrink: 0, lineHeight: 1, padding: 0,
+          transition: "all 120ms cubic-bezier(0.16,1,0.3,1)",
+        }}
+      >?</button>
       {show && coords && ReactDOM.createPortal(
         <div style={getStyle()}>{text}</div>,
         document.body

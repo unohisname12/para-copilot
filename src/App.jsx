@@ -100,6 +100,7 @@ function AppCore() {
 function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, period }) {
   const [view, setView] = useState("dashboard");
   const [simpleMode, setSimpleMode] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // ── Context hooks ──────────────────────────────────────────
   const ollama = useOllamaContext();
@@ -297,7 +298,16 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
       )}
 
     <div className="app-layout" style={{ flex: 1, minWidth: 0 }}>
-      <aside className="sidebar">
+      <aside className={`sidebar${sidebarCollapsed ? ' collapsed' : ''}`} style={{ position: 'relative' }}>
+        <button
+          type="button"
+          className="sidebar-toggle"
+          onClick={() => setSidebarCollapsed(c => !c)}
+          aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {sidebarCollapsed ? '›' : '‹'}
+        </button>
         {(() => {
           const sb = getSidebarVisibility(simpleMode);
           return (<>
