@@ -114,10 +114,19 @@ export function useCaseMemory() {
     setOutcomes([]);
   }, [setIncidents, setInterventions, setOutcomes]);
 
+  // Surgical: remove ONLY the demo-seeded records (IDs prefixed inc_demo_ /
+  // intv_demo_ / out_demo_). Used when a real import happens so the showcase
+  // data disappears without touching anything the user actually produced.
+  const clearDemoOnly = useCallback(() => {
+    setIncidents(prev => prev.filter(i => !String(i.id || '').startsWith('inc_demo_')));
+    setInterventions(prev => prev.filter(i => !String(i.id || '').startsWith('intv_demo_')));
+    setOutcomes(prev => prev.filter(o => !String(o.id || '').startsWith('out_demo_')));
+  }, [setIncidents, setInterventions, setOutcomes]);
+
   return {
     incidents, interventions, outcomes,
     addIncident, addIntervention, addOutcome,
     resolveIncident, getStudentCaseHistory,
-    loadDemoCaseMemory, clearCaseMemory,
+    loadDemoCaseMemory, clearCaseMemory, clearDemoOnly,
   };
 }

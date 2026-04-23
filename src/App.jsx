@@ -121,6 +121,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
   const [simpleMode, setSimpleMode] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(() => !hasSeenOnboarding());
+  const [sampleDataClearedToast, setSampleDataClearedToast] = useState(false);
 
   // ── Context hooks ──────────────────────────────────────────
   const ollama = useOllamaContext();
@@ -154,6 +155,33 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
     () => enrichStudentsWithNames(allStudentsRaw, vaultCtx.vault, vaultCtx.showRealNames),
     [allStudentsRaw, vaultCtx.vault, vaultCtx.showRealNames]
   );
+
+  // Auto-clear sample data when real students come in. demoMode flips to
+  // false inside useStudents on any handleImport / handleBundleImport call.
+  // This watches that flip and wipes the seeded demo logs + case memory so
+  // the user doesn't see stale "Orange Student 1 covered ears" next to
+  // their real kids. Surgical — only touches records tagged as demo
+  // (IDs prefixed inc_demo_ / intv_demo_ / out_demo_, logs with
+  // source: "demo"). Does NOT touch anything the user produced.
+  const prevDemoModeRef = React.useRef(students.demoMode);
+  React.useEffect(() => {
+    if (prevDemoModeRef.current && !students.demoMode) {
+      const demoLogCount = (logsBag.logs || []).filter(l => l.source === 'demo').length;
+      const demoCaseCount =
+        (caseMemory.incidents || []).filter(i => String(i.id || '').startsWith('inc_demo_')).length +
+        (caseMemory.interventions || []).filter(i => String(i.id || '').startsWith('intv_demo_')).length +
+        (caseMemory.outcomes || []).filter(o => String(o.id || '').startsWith('out_demo_')).length;
+      logsBag.clearDemoLogs();
+      if (caseMemory.clearDemoOnly) caseMemory.clearDemoOnly();
+      if (demoLogCount + demoCaseCount > 0) {
+        setSampleDataClearedToast(true);
+        setTimeout(() => setSampleDataClearedToast(false), 4200);
+      }
+    }
+    prevDemoModeRef.current = students.demoMode;
+    // Intentionally only depend on demoMode — we want this to fire once
+    // on the transition, not every time logs or case memory update.
+  }, [students.demoMode]);
 
   // ── UI state ───────────────────────────────────────────────
   const [profileStu, setProfileStu] = useState(null);
@@ -604,6 +632,33 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
       {fullscreenTool && (<FullscreenTool tool={toolboxTools.find(t => t.id === fullscreenTool) || toolboxTools[0]} onClose={() => setFullscreenTool(null)} />)}
       {stealthMode && (<StealthScreen activeTool={stealthTool} toolboxTools={toolboxTools} onSelectTool={setStealthTool} onExit={() => setStealthMode(false)} />)}
       {onboardingOpen && <OnboardingModal onClose={() => setOnboardingOpen(false)} />}
+      {sampleDataClearedToast && (
+        <div style={{
+          position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 9999,
+          padding: '10px 18px',
+          background: 'linear-gradient(180deg, var(--panel-raised), var(--panel-bg))',
+          border: '1px solid rgba(52,211,153,0.5)',
+          borderRadius: 'var(--radius-lg)',
+          boxShadow: 'var(--shadow-lg)',
+          color: 'var(--text-primary)',
+          fontSize: 13, fontWeight: 600,
+          display: 'flex', alignItems: 'center', gap: 10,
+          animation: 'fadeIn 0.2s ease',
+        }}>
+          <span style={{ fontSize: 18 }}>✨</span>
+          Sample data cleared — your real students are front and center now.
+          <button
+            type="button"
+            onClick={() => setSampleDataClearedToast(false)}
+            style={{
+              background: 'transparent', border: 'none',
+              color: 'var(--text-muted)', cursor: 'pointer',
+              fontSize: 18, lineHeight: 1, padding: '0 4px',
+            }}
+          >×</button>
+        </div>
+      )}
     </div>
     </div>
     </div>
