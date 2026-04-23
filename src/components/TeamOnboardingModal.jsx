@@ -3,10 +3,13 @@ import { useTeam } from '../context/TeamProvider';
 import { useEscape } from '../hooks/useEscape';
 
 export default function TeamOnboardingModal({ onClose, mustChoose = false }) {
-  const { user, createTeam, joinTeamByCode, signOut } = useTeam();
-  const [tab, setTab] = useState('create');
+  const { user, teams, activeTeamId, setActiveTeamId, createTeam, joinTeamByCode, signOut } = useTeam();
+  const hasExistingTeams = (teams || []).length > 0;
+  // Default to "switch" if the user is already in teams; otherwise start on "create".
+  const [tab, setTab] = useState(hasExistingTeams ? 'switch' : 'create');
   const [teamName, setTeamName] = useState('');
   const [inviteCode, setInviteCode] = useState('');
+  const [switchTeamId, setSwitchTeamId] = useState(activeTeamId || (teams && teams[0]?.id) || '');
   const defaultDisplay = user?.user_metadata?.given_name
     || user?.user_metadata?.name
     || (user?.email ? user.email.split('@')[0] : 'Para');
@@ -62,10 +65,54 @@ export default function TeamOnboardingModal({ onClose, mustChoose = false }) {
         </div>
 
         <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+            {hasExistingTeams && (
+              <TabBtn active={tab === 'switch'} onClick={() => setTab('switch')}>
+                Switch team
+              </TabBtn>
+            )}
             <TabBtn active={tab === 'create'} onClick={() => setTab('create')}>Create a team</TabBtn>
             <TabBtn active={tab === 'join'} onClick={() => setTab('join')}>Join a team</TabBtn>
           </div>
+
+          {tab === 'switch' && hasExistingTeams && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!switchTeamId) return;
+                setActiveTeamId(switchTeamId);
+                if (onClose) onClose();
+              }}
+              style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}
+            >
+              <Field label={`You're in ${teams.length} team${teams.length !== 1 ? 's' : ''}`}>
+                <select
+                  value={switchTeamId}
+                  onChange={(e) => setSwitchTeamId(e.target.value)}
+                  className="period-select"
+                  autoFocus
+                  style={{ width: '100%', fontSize: 14, padding: 'var(--space-3)' }}
+                >
+                  {teams.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} · {t.inviteCode} · {t.role}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                style={{ width: '100%', marginTop: 'var(--space-2)' }}
+                disabled={!switchTeamId || switchTeamId === activeTeamId}
+              >
+                {switchTeamId === activeTeamId ? 'Already active' : 'Switch to this team'}
+              </button>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>
+                Switching updates what's shown — your data for each team stays separate.
+              </div>
+            </form>
+          )}
 
           {tab === 'create' && !created && (
             <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
