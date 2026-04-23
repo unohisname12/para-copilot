@@ -19,12 +19,34 @@ import {
 } from '../services/teamSync';
 
 const ROLE_META = {
-  owner:        { label: 'Owner',         tone: '#a78bfa', desc: 'Team creator. Full admin access.' },
-  sped_teacher: { label: 'Sped Teacher',  tone: '#7a9cff', desc: 'Full admin access. Parent notes visible.' },
-  para:         { label: 'Para',          tone: '#34d399', desc: 'Sees IEP summary + logs + handoffs.' },
-  sub:          { label: 'Sub',           tone: '#fbbf24', desc: 'Substitute. Can be toggled off at team level.' },
+  owner:        { label: 'Owner',         tone: '#a78bfa', desc: 'Full admin. Multiple owners allowed. Co-lead or transfer ownership by promoting someone else to Owner.' },
+  sped_teacher: { label: 'Sped Teacher',  tone: '#7a9cff', desc: 'Full admin access. Parent notes visible. Same powers as Owner.' },
+  para:         { label: 'Para',          tone: '#34d399', desc: 'Sees IEP summary + logs + handoffs. No admin access.' },
+  sub:          { label: 'Sub',           tone: '#fbbf24', desc: 'Substitute. Same as Para, but team admin can block all subs with one toggle.' },
   member:       { label: 'Member (legacy)', tone: '#64748b', desc: 'Pre-Phase-2 membership — promote to a real role.' },
 };
+
+// Confirmation required when promoting TO Owner or demoting FROM Owner.
+// These are high-impact changes (grants/removes full admin access + ability
+// to change anyone else's role) and deserve a deliberate click.
+function roleChangeConfirm(fromRole, toRole, displayName) {
+  if (toRole === 'owner' && fromRole !== 'owner') {
+    return `Grant full OWNER access to ${displayName}?\n\n` +
+           `Owners can:\n` +
+           `  • Change any member's role\n` +
+           `  • Pause or remove any member (including other owners)\n` +
+           `  • Read and write parent notes\n` +
+           `  • Regenerate the invite code\n\n` +
+           `Multiple owners are allowed. You'll both have the same power.\n\n` +
+           `Continue?`;
+  }
+  if (fromRole === 'owner' && toRole !== 'owner') {
+    return `Remove OWNER access from ${displayName}?\n\n` +
+           `They'll become a ${toRole}. They'll no longer be able to manage members or parent notes.\n\n` +
+           `Continue?`;
+  }
+  return null; // no confirm needed for para/sub/sped_teacher swaps
+}
 
 export default function AdminDashboard() {
   const team = useTeam();
@@ -165,10 +187,20 @@ export default function AdminDashboard() {
                     <select
                       value={m.role}
                       disabled={isBusy}
-                      onChange={(e) => handleAction(
-                        () => setMemberRole(activeTeamId, m.user_id, e.target.value),
-                        m.user_id
-                      )}
+                      onChange={(e) => {
+                        const newRole = e.target.value;
+                        if (newRole === m.role) return;
+                        const confirmMsg = roleChangeConfirm(m.role, newRole, m.display_name);
+                        if (confirmMsg && !window.confirm(confirmMsg)) {
+                          // revert the select
+                          e.target.value = m.role;
+                          return;
+                        }
+                        handleAction(
+                          () => setMemberRole(activeTeamId, m.user_id, newRole),
+                          m.user_id
+                        );
+                      }}
                       className="period-select"
                       style={{ fontSize: 12, minHeight: 36 }}
                     >
@@ -178,6 +210,49 @@ export default function AdminDashboard() {
                           <option key={id} value={id}>{v.label}</option>
                         ))}
                     </select>
+                    {/* One-click "Transfer ownership" for a clean handoff:
+                        promote them to owner, then demote self. */}
+                    {isSelf && m.role === 'owner' && (
+                      <button
+                        type="button"
+                        title="Transfer ownership"
+                        className="btn btn-ghost btn-sm"
+                        style={{ fontSize: 11, color: 'var(--text-muted)' }}
+                        disabled
+                      >
+                        (you)
+                      </button>
+                    )}
+                    {!isSelf && m.role !== 'owner' && (
+                      <button
+                        type="button"
+                        title="Transfer ownership — promotes them to Owner, demotes you to Sped Teacher"
+                        disabled={isBusy}
+                        onClick={async () => {
+                          if (!window.confirm(
+                            `Transfer ownership to ${m.display_name}?\n\n` +
+                            `• They become Owner (full admin).\n` +
+                            `• You become Sped Teacher (still full admin, just not the primary owner).\n` +
+                            `• Both of you will retain admin access.\n\n` +
+                            `This is safer than adding a second owner and then stepping down — no moment where only one admin exists.\n\n` +
+                            `Continue?`
+                          )) return;
+                          setWorking(m.user_id); setErr(null);
+                          try {
+                            // Promote target to owner first (so we don't trip the "last-admin" guard when demoting ourselves)
+                            await setMemberRole(activeTeamId, m.user_id, 'owner');
+                            await setMemberRole(activeTeamId, user.id, 'sped_teacher');
+                            await refresh();
+                            await reloadTeams();
+                          } catch (e) { setErr(e.message || String(e)); }
+                          setWorking(null);
+                        }}
+                        className="btn btn-secondary btn-sm"
+                        style={{ color: 'var(--violet)', borderColor: 'rgba(167,139,250,0.35)' }}
+                      >
+                        🪄 Transfer ownership
+                      </button>
+                    )}
                     <button
                       type="button"
                       disabled={isBusy}
