@@ -66,16 +66,89 @@ export async function getMyTeams() {
   requireClient();
   const { data, error } = await supabase
     .from('team_members')
-    .select('team_id, role, display_name, teams(id, name, invite_code)')
+    .select('team_id, role, display_name, active, teams(id, name, invite_code, allow_subs)')
+    .eq('active', true)
     .order('joined_at', { ascending: true });
   if (error) throw new Error(error.message);
   return (data || []).map((row) => ({
     id: row.teams.id,
     name: row.teams.name,
     inviteCode: row.teams.invite_code,
+    allowSubs: row.teams.allow_subs,
     role: row.role,
     displayName: row.display_name,
+    active: row.active,
   }));
+}
+
+// ---------- Admin (owner / sped_teacher) ----------
+
+export async function listTeamMembers(teamId) {
+  requireClient();
+  const { data, error } = await supabase
+    .from('team_members')
+    .select('team_id, user_id, role, display_name, active, joined_at')
+    .eq('team_id', teamId)
+    .order('joined_at', { ascending: true });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function setMemberRole(teamId, userId, newRole) {
+  requireClient();
+  const { error } = await supabase.rpc('set_member_role', {
+    tid: teamId, uid: userId, new_role: newRole,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function setMemberActive(teamId, userId, isActive) {
+  requireClient();
+  const { error } = await supabase.rpc('set_member_active', {
+    tid: teamId, uid: userId, is_active: isActive,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function removeMember(teamId, userId) {
+  requireClient();
+  const { error } = await supabase.rpc('remove_member', { tid: teamId, uid: userId });
+  if (error) throw new Error(error.message);
+}
+
+export async function setTeamAllowSubs(teamId, allow) {
+  requireClient();
+  const { error } = await supabase.rpc('set_team_allow_subs', { tid: teamId, allow });
+  if (error) throw new Error(error.message);
+}
+
+// ---------- Parent notes (admin-only reads + writes) ----------
+
+export async function listParentNotes(teamId, studentId) {
+  requireClient();
+  const { data, error } = await supabase
+    .from('parent_notes')
+    .select('*')
+    .eq('team_id', teamId)
+    .eq('student_id', studentId)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function addParentNote(teamId, studentId, body) {
+  requireClient();
+  const { data, error } = await supabase.rpc('add_parent_note', {
+    tid: teamId, sid: studentId, note_body: body,
+  });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function deleteParentNote(noteId) {
+  requireClient();
+  const { error } = await supabase.from('parent_notes').delete().eq('id', noteId);
+  if (error) throw new Error(error.message);
 }
 
 export async function regenerateInviteCode(teamId) {

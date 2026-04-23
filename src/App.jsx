@@ -43,7 +43,9 @@ import TeamSwitcher from './components/TeamSwitcher';
 import HandoffInbox from './components/HandoffInbox';
 import OnboardingModal, { hasSeenOnboarding } from './components/OnboardingModal';
 import RealNamesControls from './components/RealNamesControls';
+import AdminDashboard from './components/AdminDashboard';
 import { VaultProvider, useVault, enrichStudentsWithNames } from './context/VaultProvider';
+import { useTeamOptional } from './context/TeamProvider';
 import { getSidebarVisibility } from './utils/sidebarVisibility';
 
 // Cloud layer — runs only when Supabase is configured. Offline install works unchanged.
@@ -151,6 +153,9 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
   // a match on paraAppNumber, each student gets a `realName` field that
   // getStudentLabel / resolveLabel prefer. No changes needed at call sites.
   const vaultCtx = useVault();
+  // Team context (optional — null in offline-only mode). Used to gate the
+  // admin nav + the sub-locked-out screen.
+  const teamCtx = useTeamOptional();
   const allStudents = React.useMemo(
     () => enrichStudentsWithNames(allStudentsRaw, vaultCtx.vault, vaultCtx.showRealNames),
     [allStudentsRaw, vaultCtx.vault, vaultCtx.showRealNames]
@@ -483,7 +488,14 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
             {sb.showNav && (
               <div style={{ marginTop: "8px" }}>
                 <div style={{ fontSize: "10px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: "6px", padding: "0 4px" }}>Navigation</div>
-                {[{ id: "dashboard", label: "📊 Dashboard", tip: "Main copilot view" }, { id: "vault", label: "🗄️ Data Vault", tip: "All logs, flagged items, knowledge base" }, { id: "import", label: "📥 IEP Import", tip: "Upload IEPs or paste student documents — converted to FERPA-safe structured student profiles automatically" }, { id: "analytics", label: "📈 Analytics", tip: "Visual data dashboard with custom date ranges and groups" }].map(({ id, label, tip }) => (
+                {[
+                  { id: "dashboard", label: "📊 Dashboard", tip: "Main copilot view" },
+                  { id: "vault",     label: "🗄️ Data Vault", tip: "All logs, flagged items, knowledge base" },
+                  { id: "import",    label: "📥 IEP Import",  tip: "Upload IEPs or paste student documents — converted to FERPA-safe structured student profiles automatically" },
+                  { id: "analytics", label: "📈 Analytics",   tip: "Visual data dashboard with custom date ranges and groups" },
+                  // Admin-only tab: shown to owners + sped_teachers.
+                  ...(teamCtx?.isAdmin ? [{ id: "admin", label: "🎓 Admin", tip: "Manage team members, roles, sub access, and team settings." }] : []),
+                ].map(({ id, label, tip }) => (
                   <Tip key={id} text={tip} pos="right"><button className={`nav-btn${view === id ? " active" : ""}`} onClick={() => setView(id)}>{label}</button></Tip>
                 ))}
               </div>
@@ -580,6 +592,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
               setActivePeriod={setActivePeriod}
               logs={logs}
               addLog={addLog}
+              deleteLog={deleteLog}
               currentDate={currentDate}
               allStudents={allStudents}
               effectivePeriodStudents={effectivePeriodStudents}
@@ -606,6 +619,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
               {view === "vault" && renderVault()}
               {view === "import" && <IEPImport onImport={students.handleImport} onBulkImport={students.handleBundleImport} onIdentityLoad={students.handleIdentityLoad} importedCount={Object.keys(students.importedStudents).length} onLoadDemo={handleLoadDemo} />}
               {view === "analytics" && <AnalyticsDashboard logs={logs} groups={groups} setGroups={setGroups} onOpenProfile={setProfileStu} ollamaOnline={ollama.ollamaOnline} ollamaLoading={ollama.ollamaLoading} onOllamaPatternSummary={insights.handleOllamaPatternSummary} allStudents={allStudents} />}
+              {view === "admin" && teamCtx?.isAdmin && <AdminDashboard />}
             </>
         }
       </main>

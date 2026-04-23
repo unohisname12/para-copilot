@@ -1,7 +1,7 @@
 // React context for auth + team membership. Later phases extend it with
 // teamStudents, sharedLogs, handoffs, caseMemory subscriptions.
 
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import {
   onAuthStateChange,
   getSession,
@@ -76,6 +76,12 @@ export function TeamProvider({ children }) {
     () => teams.find((t) => t.id === activeTeamId) || null,
     [teams, activeTeamId]
   );
+
+  // Current user's role in the active team, plus derived admin flag.
+  const currentRole = activeTeam?.role || null;
+  const isAdmin = currentRole === 'owner' || currentRole === 'sped_teacher';
+  const isSub = currentRole === 'sub';
+  const subLockedOut = isSub && activeTeam && activeTeam.allowSubs === false;
 
   const [teamStudents, setTeamStudents] = useState([]);
 
@@ -213,6 +219,13 @@ export function TeamProvider({ children }) {
     return () => { cancelled = true; if (off) off(); };
   }, [activeTeamId]);
 
+  // Reload teams list — used after admin actions (promotion, pause, etc.)
+  const reloadTeams = useCallback(async () => {
+    if (!session) return;
+    const t = await getMyTeams();
+    setTeams(t);
+  }, [session]);
+
   const value = useMemo(() => ({
     session,
     user: session?.user || null,
@@ -221,11 +234,16 @@ export function TeamProvider({ children }) {
     activeTeam,
     activeTeamId,
     teamsLoading,
+    currentRole,
+    isAdmin,
+    isSub,
+    subLockedOut,
     teamStudents,
     sharedLogs,
     handoffs,
     caseMemoryCloud,
     setActiveTeamId,
+    reloadTeams,
     signInWithGoogle,
     signOut: async () => {
       await signOut();
@@ -267,7 +285,8 @@ export function TeamProvider({ children }) {
     },
   }), [
     session, authReady, teams, activeTeam, activeTeamId, teamsLoading,
-    teamStudents, sharedLogs, handoffs, caseMemoryCloud,
+    currentRole, isAdmin, isSub, subLockedOut,
+    teamStudents, sharedLogs, handoffs, caseMemoryCloud, reloadTeams,
   ]);
 
   return <TeamContext.Provider value={value}>{children}</TeamContext.Provider>;

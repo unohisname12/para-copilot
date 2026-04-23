@@ -24,8 +24,12 @@ export function useLogs({ currentDate, periodLabel, activePeriod, onLogCreated }
   const toggleFlag = id =>
     setLogs(prev => prev.map(l => l.id === id ? { ...l, flagged: !l.flagged } : l));
 
-  const deleteLog = id => {
-    if (window.confirm("Delete this log entry?")) setLogs(prev => prev.filter(l => l.id !== id));
+  const deleteLog = (id, opts = {}) => {
+    // { silent: true } skips the confirm — used by Undo flows where the user
+    // has already indicated they want the entry gone.
+    if (opts.silent || window.confirm("Delete this log entry?")) {
+      setLogs(prev => prev.filter(l => l.id !== id));
+    }
   };
 
   const updateLogText = (id, newText) =>

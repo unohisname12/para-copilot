@@ -1,27 +1,26 @@
 // ══════════════════════════════════════════════════════════════
-// SIMPLE MODE — Para Note Entry
-// Large buttons, minimal choices, background engine processing.
-// The user types what happened; the app does the rest.
+// SIMPLE MODE — Para Note Entry (v2)
+// The para should never have to type unless they want to. Every
+// category is a one-tap action on every student. If they DO want
+// to write something, the "+note" button opens a full note screen.
 // ══════════════════════════════════════════════════════════════
-import React, { useState } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { DB, SUPPORT_CARDS } from '../../data';
 import { runLocalEngine } from '../../engine';
 import { getHealth, hdot } from '../../models';
 import { resolveLabel } from '../../privacy/nameResolver';
 import { VisualTimer, BreathingExercise } from '../../components/tools';
 
+// Category order matters: arranged left-to-right from most-positive to most-critical.
 const CATEGORIES = [
-  { id: "behavior",  label: "Behavior",       icon: "🔴", color: "#ef4444", logType: "Behavior Note",       tag: "behavior" },
-  { id: "refusal",   label: "Work Refusal",   icon: "✋", color: "#f97316", logType: "Behavior Note",       tag: "refusal" },
-  { id: "transition",label: "Transition",     icon: "🔔", color: "#f59e0b", logType: "Accommodation Used",  tag: "transition" },
-  { id: "positive",  label: "Positive!",      icon: "⭐", color: "#4ade80", logType: "Positive Note",       tag: "positive" },
-  { id: "break",     label: "Needed Break",   icon: "🚶", color: "#60a5fa", logType: "Accommodation Used",  tag: "break" },
-  { id: "academic",  label: "Academic Help",  icon: "📚", color: "#a78bfa", logType: "Academic Support",    tag: "academic" },
+  { id: "positive",  label: "Positive!",      icon: "⭐", color: "#34d399", logType: "Positive Note",       tag: "positive"  },
+  { id: "academic",  label: "Academic Help",  icon: "📚", color: "#a78bfa", logType: "Academic Support",    tag: "academic"  },
+  { id: "break",     label: "Needed Break",   icon: "☕", color: "#60a5fa", logType: "Accommodation Used",  tag: "break"     },
+  { id: "transition",label: "Transition",     icon: "🔔", color: "#fbbf24", logType: "Accommodation Used",  tag: "transition"},
+  { id: "refusal",   label: "Work Refusal",   icon: "✋", color: "#fb923c", logType: "Behavior Note",       tag: "refusal"   },
+  { id: "behavior",  label: "Behavior",       icon: "🔴", color: "#f87171", logType: "Behavior Note",       tag: "behavior"  },
 ];
 
-// ── CATEGORY → SUPPORT CARD mapping ──────────────────────────
-// Maps each CATEGORIES id to the most relevant SUPPORT_CARDS id.
-// "positive" has no card — it's a celebration, not a support situation.
 const CATEGORY_CARD_MAP = {
   behavior:   "sc_escal",
   refusal:    "sc_refusal",
@@ -30,70 +29,73 @@ const CATEGORY_CARD_MAP = {
   academic:   "sc_write",
 };
 
-// ── getHintForCategory ────────────────────────────────────────
-// Returns a slim { title, whenToUse, whatToSay } hint for the
-// selected category, drawn from the matching SUPPORT_CARD.
-// whatToSay is capped at 2 items to keep the hint fast to read.
-// Returns null if no card maps to the category (e.g. "positive").
+// Same hint helper as v1.
 export function getHintForCategory(categoryId, supportCards) {
   const cardId = CATEGORY_CARD_MAP[categoryId];
   if (!cardId) return null;
   const card = supportCards.find(c => c.id === cardId);
   if (!card) return null;
-  return {
-    title:      card.title,
-    whenToUse:  card.whenToUse,
-    whatToSay:  card.whatToSay.slice(0, 2),
-  };
+  return { title: card.title, whenToUse: card.whenToUse, whatToSay: card.whatToSay.slice(0, 2) };
 }
 
-// ── buildQuickLogParams ───────────────────────────────────────
-// Returns the note/logType/tag for a 1-tap action, derived from the
-// same CATEGORIES array used by handleSave. Produces an identical
-// note to what handleSave writes when a category is selected but no
-// free text is entered — keeps the log format consistent.
-// Returns null if the categoryId is not found.
 export function buildQuickLogParams(categoryId) {
   const cat = CATEGORIES.find(c => c.id === categoryId);
   if (!cat) return null;
-  return {
-    note: `${cat.label} — support provided.`,
-    logType: cat.logType,
-    tag: cat.tag,
-  };
+  return { note: `${cat.label} — support provided.`, logType: cat.logType, tag: cat.tag };
 }
 
-// ── buildStudentRows ───────────────────────────────────────────
-// Pure helper — builds display rows from the merged allStudents map.
-// Exported so it can be unit-tested without rendering the component.
+// Returns rows with computed today-count-by-category so the UI can show
+// a mini breakdown without recomputing on every render.
 export function buildStudentRows(effectivePeriodStudents, allStudents, logs, currentDate) {
   return effectivePeriodStudents.reduce((acc, id) => {
     const student = allStudents[id];
-    if (!student) return acc; // skip IDs not found (null guard)
+    if (!student) return acc;
     const health = getHealth(id, logs, currentDate);
-    const todayCount = logs.filter(l => l.studentId === id && l.date === currentDate).length;
+    const todaysLogs = logs.filter(l => l.studentId === id && l.date === currentDate);
+    const todayCount = todaysLogs.length;
+    const byCat = {};
+    todaysLogs.forEach(l => {
+      const c = l.category || 'general';
+      byCat[c] = (byCat[c] || 0) + 1;
+    });
     const hasAlert = !!(student.alertText || student.flags?.alert);
     const alertText = student.alertText || (student.flags?.alert ? "Alert flag set" : "");
-    acc.push({ id, student, health, todayCount, hasAlert, alertText });
+    acc.push({ id, student, health, todayCount, byCat, hasAlert, alertText });
     return acc;
   }, []);
 }
 
-export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, currentDate, allStudents, effectivePeriodStudents }) {
+// Default sort: red first, yellow next, green last. Secondary: alphabetical.
+function sortRows(rows, mode) {
+  const sorted = [...rows];
+  if (mode === "needs") {
+    const order = { red: 0, yellow: 1, green: 2 };
+    sorted.sort((a, b) => {
+      const d = (order[a.health] ?? 3) - (order[b.health] ?? 3);
+      if (d !== 0) return d;
+      return resolveLabel(a.student, "compact").localeCompare(resolveLabel(b.student, "compact"));
+    });
+  } else {
+    sorted.sort((a, b) => resolveLabel(a.student, "compact").localeCompare(resolveLabel(b.student, "compact")));
+  }
+  return sorted;
+}
+
+export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, deleteLog, currentDate, allStudents, effectivePeriodStudents }) {
   const [step, setStep] = useState("students"); // "students" | "note" | "tool"
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [noteText, setNoteText] = useState("");
   const [selectedCat, setSelectedCat] = useState(null);
   const [saved, setSaved] = useState(false);
-  const [activeTool, setActiveTool] = useState(null); // "timer" | "breathing"
-  // quickFlash: studentId that just received a 1-tap log, cleared after 1.2s
-  const [quickFlash, setQuickFlash] = useState(null);
+  const [activeTool, setActiveTool] = useState(null);
+  const [flashState, setFlashState] = useState(null); // { id, category } — row highlight
+  const [search, setSearch] = useState("");
+  const [sortMode, setSortMode] = useState("needs"); // "needs" | "name"
+  const [undoEntry, setUndoEntry] = useState(null); // { logId, studentId, categoryLabel, deadlineTs }
+  const undoTimer = useRef();
 
-  // Period label/teacher still come from DB (static config) — not changing roster architecture
   const period = DB.periods[activePeriod];
-
   const studentsMap = allStudents || {};
-  // Use effectivePeriodStudents if provided, fall back to DB period list for safety
   const periodStudentIds = effectivePeriodStudents || period.students;
 
   const reset = () => {
@@ -104,20 +106,36 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, curren
     setSaved(false);
   };
 
-  // ── 1-tap quick log (no second screen needed) ────────────────
-  // Calls addLog directly — same path as handleSave, same log format.
-  // No engine run needed: these are the simplest possible support logs.
+  // Undo window: 5 seconds after any quick-log.
+  function showUndo(logId, studentId, categoryLabel) {
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    const entry = { logId, studentId, categoryLabel, deadlineTs: Date.now() + 5000 };
+    setUndoEntry(entry);
+    undoTimer.current = setTimeout(() => setUndoEntry((u) => (u === entry ? null : u)), 5100);
+  }
+
+  function handleUndo() {
+    if (!undoEntry) return;
+    if (deleteLog) deleteLog(undoEntry.logId, { silent: true });
+    setUndoEntry(null);
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+  }
+
+  // ── 1-tap quick log — same log format handleSave writes, no note ─
   const handleQuickLog = (e, studentId, categoryId) => {
-    e.stopPropagation(); // prevent the card's "go to note step" click from firing
+    e.stopPropagation();
     const params = buildQuickLogParams(categoryId);
     if (!params) return;
-    addLog(studentId, params.note, params.logType, {
+    const cat = CATEGORIES.find(c => c.id === categoryId);
+    const newLog = addLog(studentId, params.note, params.logType, {
       source: "simple_mode",
       category: categoryId,
       tags: [params.tag],
+      pseudonym: studentsMap[studentId]?.pseudonym,
     });
-    setQuickFlash(studentId);
-    setTimeout(() => setQuickFlash(null), 1200);
+    setFlashState({ id: studentId, category: categoryId });
+    setTimeout(() => setFlashState((f) => (f?.id === studentId ? null : f)), 900);
+    if (newLog?.id) showUndo(newLog.id, studentId, cat?.label || 'entry');
   };
 
   const handleSave = () => {
@@ -126,47 +144,44 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, curren
     const note = noteText.trim() || (cat ? `${cat.label} — support provided.` : "Observation noted.");
     const engineQuery = (cat ? cat.label + " " : "") + note;
 
-    // Background engine processing — user never sees this complexity
-    const result = runLocalEngine(
-      engineQuery,
-      [selectedStudent],
-      [],
-      activePeriod,
-      null,
-      period.label,
-      logs
-    );
+    const result = runLocalEngine(engineQuery, [selectedStudent], [], activePeriod, null, period.label, logs);
 
-    addLog(selectedStudent, note, logType, {
+    const newLog = addLog(selectedStudent, note, logType, {
       source: "simple_mode",
       category: result.topic !== "unknown" ? result.topic : (cat ? selectedCat : "general"),
-      tags: result.situations.length > 0
-        ? result.situations[0].tags
-        : (cat ? [cat.tag] : []),
+      tags: result.situations.length > 0 ? result.situations[0].tags : (cat ? [cat.tag] : []),
       situationId: result.situations[0]?.id || null,
+      pseudonym: studentsMap[selectedStudent]?.pseudonym,
     });
 
+    if (newLog?.id) showUndo(newLog.id, selectedStudent, cat?.label || 'note');
     setSaved(true);
-    setTimeout(reset, 1600);
+    setTimeout(reset, 1400);
   };
 
   const canSave = noteText.trim() || selectedCat;
 
-  // ── Tool overlay ──────────────────────────────────────────
+  const rows = useMemo(() => {
+    let r = buildStudentRows(periodStudentIds, studentsMap, logs, currentDate);
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      r = r.filter(row => resolveLabel(row.student, "compact").toLowerCase().includes(q));
+    }
+    return sortRows(r, sortMode);
+  }, [periodStudentIds, studentsMap, logs, currentDate, search, sortMode]);
+
+  // ── Tool overlay ──
   if (activeTool) {
     return (
       <div style={{ minHeight: "100vh", background: "var(--bg-deep)", display: "flex", flexDirection: "column" }}>
-        <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--bg-dark)" }}>
-          <span style={{ fontSize: "16px", fontWeight: "700", color: "var(--text-primary)" }}>
+        <div style={toolHeaderStyle}>
+          <span style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>
             {activeTool === "timer" ? "⏱️ Visual Timer" : "🫁 Breathing Exercise"}
           </span>
-          <button onClick={() => setActiveTool(null)}
-            style={{ padding: "10px 18px", borderRadius: "10px", border: "1px solid var(--border)", background: "var(--bg-surface)", color: "var(--text-secondary)", fontSize: "15px", cursor: "pointer", fontWeight: "600" }}>
-            ← Back
-          </button>
+          <button onClick={() => setActiveTool(null)} className="btn btn-secondary">← Back</button>
         </div>
-        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
-          <div style={{ width: "100%", maxWidth: "480px" }}>
+        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div style={{ width: "100%", maxWidth: 480 }}>
             {activeTool === "timer" ? <VisualTimer /> : <BreathingExercise />}
           </div>
         </div>
@@ -178,94 +193,239 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, curren
     <div style={{ minHeight: "100vh", background: "var(--bg-deep)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
       {/* ── Top bar ── */}
-      <div style={{ background: "var(--bg-dark)", borderBottom: "2px solid var(--border-light)", padding: "14px 20px", flexShrink: 0 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+      <div style={{
+        background: "linear-gradient(180deg, var(--bg-dark), var(--bg-deep))",
+        borderBottom: "1px solid var(--border)",
+        padding: "var(--space-4) var(--space-5)",
+        flexShrink: 0,
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
           <div>
-            <div style={{ fontSize: "10px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: ".1em", marginBottom: "2px" }}>Para Notes — Simple Mode</div>
-            <div style={{ fontSize: "19px", fontWeight: "700", color: "var(--text-primary)" }}>{period.label}</div>
-            <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "2px" }}>Teacher: {period.teacher} · {periodStudentIds.length} students</div>
+            <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: ".1em" }}>
+              Simple Mode · one-tap logging
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: "var(--text-primary)", letterSpacing: "-0.01em", marginTop: 2 }}>
+              {period.label}
+            </div>
+            <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
+              {period.teacher} · {rows.length} / {periodStudentIds.length} students
+            </div>
           </div>
-          <div style={{ display: "flex", gap: "8px" }}>
-            <button onClick={() => setActiveTool("timer")}
-              style={{ padding: "9px 14px", borderRadius: "10px", border: "1px solid var(--border)", background: "var(--bg-surface)", color: "var(--text-secondary)", fontSize: "14px", cursor: "pointer" }} title="Visual Timer">
-              ⏱️
-            </button>
-            <button onClick={() => setActiveTool("breathing")}
-              style={{ padding: "9px 14px", borderRadius: "10px", border: "1px solid var(--border)", background: "var(--bg-surface)", color: "var(--text-secondary)", fontSize: "14px", cursor: "pointer" }} title="Breathing Exercise">
-              🫁
-            </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => setActiveTool("timer")} title="Visual Timer" className="btn btn-secondary" style={{ fontSize: 16, padding: "8px 14px" }}>⏱️</button>
+            <button onClick={() => setActiveTool("breathing")} title="Breathing Exercise" className="btn btn-secondary" style={{ fontSize: 16, padding: "8px 14px" }}>🫁</button>
           </div>
         </div>
 
-        {/* Period picker — DB.periods is the correct source for period labels */}
-        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+        {/* Period picker */}
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
           {Object.entries(DB.periods).map(([id, p]) => (
             <button key={id} onClick={() => { setActivePeriod(id); reset(); }}
-              style={{ padding: "7px 13px", borderRadius: "20px", border: `2px solid ${activePeriod === id ? "#3b82f6" : "var(--border)"}`, background: activePeriod === id ? "#1e3a5f" : "var(--bg-surface)", color: activePeriod === id ? "#93c5fd" : "var(--text-muted)", fontSize: "12px", fontWeight: "600", cursor: "pointer", transition: "all .15s" }}>
+              style={{
+                padding: "7px 13px", borderRadius: "var(--radius-pill)",
+                border: `2px solid ${activePeriod === id ? "var(--accent)" : "var(--border)"}`,
+                background: activePeriod === id ? "var(--accent-glow)" : "var(--bg-surface)",
+                color: activePeriod === id ? "var(--accent-hover)" : "var(--text-muted)",
+                fontSize: 12, fontWeight: 600, cursor: "pointer",
+                fontFamily: "inherit",
+                transition: "all 120ms cubic-bezier(0.16,1,0.3,1)",
+              }}>
               {p.label.split("—")[0].trim()}
             </button>
           ))}
+        </div>
+
+        {/* Search + sort */}
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          {periodStudentIds.length > 8 && (
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="🔎 Find a student…"
+              className="chat-input"
+              style={{ flex: "1 1 220px", minWidth: 180, fontSize: 13 }}
+            />
+          )}
+          <div style={{
+            display: "flex", gap: 2, padding: 3,
+            background: "var(--bg-dark)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius-md)",
+          }}>
+            {[
+              ["needs", "⚠ Needs first"],
+              ["name",  "A → Z"],
+            ].map(([id, label]) => (
+              <button key={id} onClick={() => setSortMode(id)} style={{
+                padding: "6px 12px", borderRadius: "var(--radius-sm)", border: "none", cursor: "pointer",
+                fontSize: 11, fontWeight: 600, fontFamily: "inherit",
+                background: sortMode === id ? "var(--grad-primary)" : "transparent",
+                color: sortMode === id ? "#fff" : "var(--text-secondary)",
+              }}>{label}</button>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* ── Step: Students ── */}
       {step === "students" && (
-        <div style={{ flex: 1, overflowY: "auto", padding: "20px" }}>
-          <div style={{ fontSize: "14px", color: "var(--text-secondary)", marginBottom: "16px", fontWeight: "500" }}>
-            ⭐ ☕ = log instantly · tap name to write a note
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-            {buildStudentRows(periodStudentIds, studentsMap, logs, currentDate).map(({ id, student: s, health, todayCount, hasAlert, alertText }) => {
-              const isFlashing = quickFlash === id;
-              return (
-                // Outer div instead of button — allows real <button> elements inside for quick actions
-                <div key={id} role="button" tabIndex={0}
-                  onClick={() => { setSelectedStudent(id); setStep("note"); }}
-                  onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { setSelectedStudent(id); setStep("note"); } }}
-                  style={{ borderRadius: "14px", border: `2px solid ${s.color}30`, background: "var(--bg-surface)", color: "var(--text-primary)", textAlign: "left", cursor: "pointer", display: "flex", flexDirection: "column", transition: "border-color .15s", overflow: "hidden" }}
-                  onMouseEnter={e => e.currentTarget.style.borderColor = s.color + "80"}
-                  onMouseLeave={e => e.currentTarget.style.borderColor = s.color + "30"}>
+        <div style={{ flex: 1, overflowY: "auto", padding: "var(--space-4) var(--space-5) 120px" }}>
 
-                  {/* Alert banner — shown for BIP/active alert students */}
+          {/* Legend */}
+          <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {CATEGORIES.map(c => (
+              <span key={c.id} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <span style={{ fontSize: 15 }}>{c.icon}</span>
+                <span style={{ color: "var(--text-muted)", fontSize: 11 }}>{c.label}</span>
+              </span>
+            ))}
+          </div>
+
+          {rows.length === 0 && (
+            <div style={{
+              padding: "var(--space-6)", textAlign: "center",
+              background: "var(--bg-surface)", border: "1px dashed var(--border)",
+              borderRadius: "var(--radius-lg)", color: "var(--text-muted)",
+            }}>
+              {search ? `No students match "${search}"` : "No students in this period yet."}
+            </div>
+          )}
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {rows.map(({ id, student: s, health, todayCount, byCat, hasAlert, alertText }) => {
+              const isFlashing = flashState?.id === id;
+              const label = resolveLabel(s, "compact");
+              const flashCat = isFlashing ? CATEGORIES.find(c => c.id === flashState.category) : null;
+              return (
+                <div key={id}
+                  style={{
+                    borderRadius: "var(--radius-lg)",
+                    border: `2px solid ${isFlashing && flashCat ? flashCat.color : (health === 'red' ? '#7f1d1d' : s.color + '30')}`,
+                    background: isFlashing && flashCat
+                      ? `linear-gradient(90deg, ${flashCat.color}20, var(--bg-surface) 40%)`
+                      : "var(--bg-surface)",
+                    overflow: "hidden",
+                    transition: "all 200ms cubic-bezier(0.16,1,0.3,1)",
+                    boxShadow: isFlashing ? `0 0 24px ${flashCat.color}40` : "none",
+                  }}
+                >
+                  {/* Alert banner (BIP / active alert) */}
                   {hasAlert && (
-                    <div style={{ padding: "5px 14px", background: "#1a0505", borderBottom: "1px solid #7f1d1d", fontSize: "11px", color: "#f87171", fontWeight: "700" }}>
+                    <div style={{
+                      padding: "4px 14px",
+                      background: "rgba(248,113,113,0.12)",
+                      borderBottom: "1px solid rgba(248,113,113,0.28)",
+                      fontSize: 11, color: "var(--red)", fontWeight: 700,
+                    }}>
                       ⚠ {alertText}
                     </div>
                   )}
 
-                  {/* Main card body */}
-                  <div style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: "14px" }}>
-                    <div style={{ width: "16px", height: "16px", borderRadius: "50%", background: s.color, flexShrink: 0, boxShadow: `0 0 8px ${s.color}60` }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: "17px", fontWeight: "700", color: s.color, marginBottom: "2px" }}>
-                        {hdot(health)} {resolveLabel(s, "compact")}
+                  {/* Main row */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", flexWrap: "wrap" }}>
+                    {/* Name + eligibility + health */}
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => { setSelectedStudent(id); setStep("note"); }}
+                      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { setSelectedStudent(id); setStep("note"); } }}
+                      style={{ flex: "1 1 220px", minWidth: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}
+                    >
+                      <div style={{
+                        width: 18, height: 18, borderRadius: "50%",
+                        background: s.color,
+                        boxShadow: `0 0 10px ${s.color}70`,
+                        flexShrink: 0,
+                      }} />
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: 17, fontWeight: 700, color: s.color, lineHeight: 1.15 }}>
+                          {hdot(health)} {label}
+                        </div>
+                        <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 1 }}>
+                          {s.eligibility}
+                          {todayCount > 0 && (
+                            <span style={{ color: "var(--green)", fontWeight: 600, marginLeft: 8 }}>
+                              · {todayCount} logged today
+                            </span>
+                          )}
+                        </div>
+                        {/* Accommodation pills (first 2) */}
+                        {Array.isArray(s.accs) && s.accs.length > 0 && (
+                          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
+                            {s.accs.slice(0, 3).map(a => (
+                              <span key={a} className="pill pill-accent" style={{ fontSize: 10 }}>{a}</span>
+                            ))}
+                            {s.accs.length > 3 && (
+                              <span style={{ fontSize: 10, color: "var(--text-muted)" }}>+{s.accs.length - 3}</span>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>{s.eligibility}</div>
                     </div>
 
-                    {/* 1-tap quick actions — stop propagation so card tap still goes to note step */}
-                    <div style={{ display: "flex", gap: "6px", flexShrink: 0, alignItems: "center" }} onClick={e => e.stopPropagation()}>
-                      {isFlashing ? (
-                        <div style={{ fontSize: "13px", color: "#4ade80", fontWeight: "700", padding: "6px 10px", borderRadius: "8px", background: "#0d2010", border: "1px solid #166534", minWidth: "60px", textAlign: "center" }}>
-                          ✓ Logged
-                        </div>
-                      ) : (<>
-                        <button
-                          onClick={e => handleQuickLog(e, id, "positive")}
-                          title="Log: Positive!"
-                          style={{ padding: "8px 12px", borderRadius: "8px", border: "1px solid #166534", background: "#0d2010", color: "#4ade80", cursor: "pointer", fontSize: "16px", lineHeight: 1 }}>
-                          ⭐
-                        </button>
-                        <button
-                          onClick={e => handleQuickLog(e, id, "break")}
-                          title="Log: Needed Break"
-                          style={{ padding: "8px 12px", borderRadius: "8px", border: "1px solid #1d4ed8", background: "#0c1a2e", color: "#60a5fa", cursor: "pointer", fontSize: "16px", lineHeight: 1 }}>
-                          ☕
-                        </button>
-                        <div style={{ textAlign: "right", fontSize: "11px", color: todayCount > 0 ? "#4ade80" : "var(--text-muted)", fontWeight: todayCount > 0 ? "600" : "400" }}>
-                          {todayCount > 0 ? `${todayCount}✓` : "—"}
-                        </div>
-                      </>)}
+                    {/* ALL 6 CATEGORY QUICK-TAPS + note */}
+                    <div
+                      style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}
+                      onClick={e => e.stopPropagation()}
+                    >
+                      {CATEGORIES.map(cat => {
+                        const count = byCat[cat.id] || 0;
+                        return (
+                          <button
+                            key={cat.id}
+                            onClick={e => handleQuickLog(e, id, cat.id)}
+                            title={`Log: ${cat.label}${count > 0 ? ` (${count} today)` : ''}`}
+                            style={{
+                              position: "relative",
+                              width: 48, height: 48,
+                              minWidth: 48, minHeight: 48,
+                              borderRadius: "var(--radius-md)",
+                              border: `1px solid ${cat.color}40`,
+                              background: count > 0 ? cat.color + "20" : "var(--bg-dark)",
+                              color: cat.color,
+                              cursor: "pointer",
+                              fontSize: 22, lineHeight: 1,
+                              fontFamily: "inherit",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              transition: "all 120ms cubic-bezier(0.16,1,0.3,1)",
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = cat.color; e.currentTarget.style.background = cat.color + '30'; }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor = cat.color + '40'; e.currentTarget.style.background = count > 0 ? cat.color + '20' : 'var(--bg-dark)'; }}
+                          >
+                            {cat.icon}
+                            {count > 0 && (
+                              <span style={{
+                                position: "absolute", top: -4, right: -4,
+                                minWidth: 16, height: 16,
+                                borderRadius: 8,
+                                background: cat.color, color: "#000",
+                                fontSize: 9, fontWeight: 800,
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                padding: "0 4px",
+                              }}>{count}</span>
+                            )}
+                          </button>
+                        );
+                      })}
+
+                      {/* +note opens the full note-entry screen */}
+                      <button
+                        onClick={() => { setSelectedStudent(id); setStep("note"); }}
+                        title="Write a longer note"
+                        style={{
+                          height: 48, minHeight: 48,
+                          padding: "0 14px",
+                          borderRadius: "var(--radius-md)",
+                          border: "1px solid var(--border-light)",
+                          background: "var(--bg-dark)",
+                          color: "var(--text-secondary)",
+                          cursor: "pointer", fontSize: 13, fontWeight: 600,
+                          fontFamily: "inherit",
+                          display: "flex", alignItems: "center", gap: 6,
+                        }}
+                      >
+                        📝 Note
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -281,62 +441,83 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, curren
         if (!s) return null;
         const noteAlertText = s.alertText || (s.flags?.alert ? "Alert flag set" : null);
         return (
-          <div style={{ flex: 1, overflowY: "auto", padding: "20px" }}>
-
-            {/* Alert warning on note screen */}
+          <div style={{ flex: 1, overflowY: "auto", padding: "var(--space-5)" }}>
             {noteAlertText && (
-              <div style={{ padding: "10px 14px", borderRadius: "10px", background: "#1a0505", border: "1px solid #7f1d1d", marginBottom: "14px", fontSize: "12px", color: "#f87171", fontWeight: "600" }}>
+              <div style={{
+                padding: "10px 14px", borderRadius: "var(--radius-md)",
+                background: "rgba(248,113,113,0.12)",
+                border: "1px solid rgba(248,113,113,0.35)",
+                marginBottom: 14, fontSize: 12, color: "var(--red)", fontWeight: 700,
+              }}>
                 ⚠ {noteAlertText}
               </div>
             )}
 
-            {/* Back + student header */}
-            <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "20px" }}>
-              <button onClick={reset}
-                style={{ padding: "9px 16px", borderRadius: "10px", border: "1px solid var(--border)", background: "var(--bg-surface)", color: "var(--text-secondary)", fontSize: "14px", cursor: "pointer", fontWeight: "600", flexShrink: 0 }}>
-                ← Back
-              </button>
-              <div style={{ flex: 1, padding: "14px 18px", borderRadius: "12px", background: "var(--bg-surface)", border: `2px solid ${s.color}`, display: "flex", alignItems: "center", gap: "12px" }}>
-                <div style={{ width: "14px", height: "14px", borderRadius: "50%", background: s.color, flexShrink: 0 }} />
+            <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 20 }}>
+              <button onClick={reset} className="btn btn-secondary">← Back</button>
+              <div style={{
+                flex: 1, padding: "14px 18px", borderRadius: "var(--radius-lg)",
+                background: "var(--bg-surface)", border: `2px solid ${s.color}`,
+                display: "flex", alignItems: "center", gap: 12,
+              }}>
+                <div style={{ width: 14, height: 14, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
                 <div>
-                  <div style={{ fontSize: "17px", fontWeight: "700", color: s.color }}>{resolveLabel(s, "compact")}</div>
-                  <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "1px" }}>{s.eligibility}</div>
+                  <div style={{ fontSize: 17, fontWeight: 700, color: s.color }}>{resolveLabel(s, "compact")}</div>
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 1 }}>{s.eligibility}</div>
                 </div>
               </div>
             </div>
 
-            {/* Category buttons */}
-            <div style={{ marginBottom: "20px" }}>
-              <div style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "10px", fontWeight: "600" }}>
-                What's happening? <span style={{ color: "var(--text-muted)", fontWeight: "400" }}>(tap one or skip)</span>
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 10, fontWeight: 600 }}>
+                What's happening? <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(tap one or skip)</span>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                 {CATEGORIES.map(cat => (
                   <button key={cat.id} onClick={() => setSelectedCat(selectedCat === cat.id ? null : cat.id)}
-                    style={{ padding: "14px 12px", borderRadius: "12px", border: `2px solid ${selectedCat === cat.id ? cat.color : "var(--border)"}`, background: selectedCat === cat.id ? cat.color + "18" : "var(--bg-surface)", color: selectedCat === cat.id ? cat.color : "var(--text-muted)", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: "10px", fontSize: "14px", fontWeight: "600", transition: "all .15s" }}>
-                    <span style={{ fontSize: "20px" }}>{cat.icon}</span>
+                    style={{
+                      minHeight: 56,
+                      padding: "12px 14px", borderRadius: "var(--radius-md)",
+                      border: `2px solid ${selectedCat === cat.id ? cat.color : "var(--border)"}`,
+                      background: selectedCat === cat.id ? cat.color + "20" : "var(--bg-surface)",
+                      color: selectedCat === cat.id ? cat.color : "var(--text-muted)",
+                      cursor: "pointer", textAlign: "left",
+                      display: "flex", alignItems: "center", gap: 10,
+                      fontSize: 14, fontWeight: 600, fontFamily: "inherit",
+                      transition: "all 120ms cubic-bezier(0.16,1,0.3,1)",
+                    }}>
+                    <span style={{ fontSize: 20 }}>{cat.icon}</span>
                     {cat.label}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Situation hint — appears when a category with a matching support card is selected */}
             {(() => {
               const hint = selectedCat ? getHintForCategory(selectedCat, SUPPORT_CARDS) : null;
-              const cat  = CATEGORIES.find(c => c.id === selectedCat);
+              const cat = CATEGORIES.find(c => c.id === selectedCat);
               if (!hint || !cat) return null;
               return (
-                <div style={{ marginBottom: "20px", padding: "12px 14px", borderRadius: "12px", background: cat.color + "0e", border: `1px solid ${cat.color}40` }}>
-                  <div style={{ fontSize: "10px", fontWeight: "700", textTransform: "uppercase", letterSpacing: ".08em", color: cat.color, marginBottom: "6px" }}>
+                <div style={{
+                  marginBottom: 20, padding: "12px 14px",
+                  borderRadius: "var(--radius-md)",
+                  background: cat.color + "10",
+                  border: `1px solid ${cat.color}40`,
+                }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: cat.color, marginBottom: 6 }}>
                     {cat.icon} {hint.title}
                   </div>
-                  <div style={{ fontSize: "12px", color: "var(--text-muted)", fontStyle: "italic", marginBottom: "10px", lineHeight: "1.5" }}>
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", fontStyle: "italic", marginBottom: 10, lineHeight: 1.5 }}>
                     {hint.whenToUse}
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     {hint.whatToSay.map((line, i) => (
-                      <div key={i} style={{ fontSize: "13px", color: "var(--text-secondary)", padding: "7px 10px", borderRadius: "8px", background: "var(--bg-surface)", borderLeft: `3px solid ${cat.color}` }}>
+                      <div key={i} style={{
+                        fontSize: 13, color: "var(--text-secondary)",
+                        padding: "8px 12px", borderRadius: "var(--radius-sm)",
+                        background: "var(--bg-surface)",
+                        borderLeft: `3px solid ${cat.color}`,
+                      }}>
                         💬 {line}
                       </div>
                     ))}
@@ -345,36 +526,48 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, curren
               );
             })()}
 
-            {/* Text note */}
-            <div style={{ marginBottom: "20px" }}>
-              <div style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "10px", fontWeight: "600" }}>
-                Write a short note: <span style={{ color: "var(--text-muted)", fontWeight: "400" }}>(or just tap Save above)</span>
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 10, fontWeight: 600 }}>
+                Write a short note: <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(or just hit Save)</span>
               </div>
               <textarea value={noteText} onChange={e => setNoteText(e.target.value)}
                 placeholder={`What happened with ${resolveLabel(s, "compact")}?\n\nJust describe what you saw — keep it simple.`}
-                style={{ width: "100%", minHeight: "130px", padding: "14px", background: "var(--bg-surface)", border: "2px solid var(--border-light)", borderRadius: "12px", color: "var(--text-primary)", fontSize: "16px", lineHeight: "1.6", resize: "none", fontFamily: "inherit" }} />
+                className="data-textarea"
+                style={{ minHeight: 130, fontSize: 16, lineHeight: 1.6 }} />
             </div>
 
-            {/* IEP quick-ref strip */}
             {s.accs && s.accs.length > 0 && (
-              <div style={{ padding: "10px 14px", borderRadius: "10px", background: "#0c1a2e", border: "1px solid #1d4ed8", marginBottom: "20px" }}>
-                <div style={{ fontSize: "10px", color: "#60a5fa", fontWeight: "600", textTransform: "uppercase", letterSpacing: ".07em", marginBottom: "6px" }}>Quick IEP Reminder</div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+              <div style={{
+                padding: "10px 14px", borderRadius: "var(--radius-md)",
+                background: "var(--accent-glow)",
+                border: "1px solid var(--accent-border)",
+                marginBottom: 20,
+              }}>
+                <div style={{ fontSize: 10, color: "var(--accent-hover)", fontWeight: 600, textTransform: "uppercase", letterSpacing: ".07em", marginBottom: 6 }}>
+                  Quick IEP Reminder
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                   {s.accs.map(a => (
-                    <span key={a} style={{ fontSize: "11px", background: "#1e3a5f", color: "#93c5fd", padding: "3px 8px", borderRadius: "20px" }}>{a}</span>
+                    <span key={a} className="pill pill-accent" style={{ fontSize: 11 }}>{a}</span>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Save button */}
             {saved ? (
-              <div style={{ padding: "20px", borderRadius: "14px", background: "#14532d", border: "2px solid #166534", color: "#4ade80", textAlign: "center", fontSize: "20px", fontWeight: "700" }}>
+              <div style={{
+                padding: 20, borderRadius: "var(--radius-lg)",
+                background: "var(--green-muted)",
+                border: "2px solid rgba(52,211,153,0.4)",
+                color: "var(--green)", textAlign: "center",
+                fontSize: 20, fontWeight: 700,
+              }}>
                 ✓ Saved!
               </div>
             ) : (
               <button onClick={handleSave} disabled={!canSave}
-                style={{ width: "100%", padding: "20px", borderRadius: "14px", border: "none", background: canSave ? "#1d4ed8" : "var(--bg-surface)", color: canSave ? "#fff" : "var(--text-muted)", fontSize: "18px", fontWeight: "700", cursor: canSave ? "pointer" : "not-allowed", transition: "all .15s" }}>
+                className={canSave ? "btn btn-primary" : "btn btn-secondary"}
+                style={{ width: "100%", padding: "20px", fontSize: 18, fontWeight: 700 }}>
                 Save Note
               </button>
             )}
@@ -382,6 +575,46 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, curren
         );
       })()}
 
+      {/* ── Undo bar (floating, bottom-center) ── */}
+      {undoEntry && step === "students" && (
+        <div style={{
+          position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)",
+          zIndex: 9999,
+          padding: "12px 16px",
+          background: "linear-gradient(180deg, var(--panel-raised), var(--panel-bg))",
+          border: "1px solid var(--border-light)",
+          borderRadius: "var(--radius-lg)",
+          boxShadow: "var(--shadow-lg)",
+          display: "flex", alignItems: "center", gap: 12,
+          animation: "fadeIn 200ms ease",
+        }}>
+          <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+            ✓ Logged <b style={{ color: "var(--text-primary)" }}>{undoEntry.categoryLabel}</b>
+          </span>
+          <button
+            type="button"
+            onClick={handleUndo}
+            className="btn btn-primary btn-sm"
+            style={{ fontSize: 12 }}
+          >
+            ↶ Undo
+          </button>
+          <button
+            type="button"
+            onClick={() => setUndoEntry(null)}
+            className="btn btn-ghost btn-sm"
+            style={{ fontSize: 16, padding: "0 8px", color: "var(--text-muted)" }}
+            aria-label="Dismiss"
+          >×</button>
+        </div>
+      )}
     </div>
   );
 }
+
+const toolHeaderStyle = {
+  padding: "14px 20px",
+  borderBottom: "1px solid var(--border)",
+  display: "flex", justifyContent: "space-between", alignItems: "center",
+  background: "var(--bg-dark)",
+};
