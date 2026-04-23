@@ -91,3 +91,66 @@ export function sanitize(payload, label) {
   assertSafe(payload, label);
   return stripUnsafeKeys(payload);
 }
+
+// ---------- team_students ----------
+
+// Map app-shape student → DB row. Intentionally drops any realName field.
+// (stripUnsafeKeys is the backstop; this function is the explicit contract.)
+function toTeamStudentRow(teamId, s, userId) {
+  return {
+    team_id: teamId,
+    pseudonym: s.pseudonym,
+    color: s.color,
+    period_id: s.periodId || s.period_id || null,
+    class_label: s.classLabel || s.class_label || null,
+    eligibility: s.eligibility || null,
+    accs: s.accs || [],
+    goals: s.goals || [],
+    case_manager: s.caseManager || s.case_manager || null,
+    grade_level: s.gradeLevel || s.grade_level || null,
+    tags: s.tags || [],
+    flags: s.flags || {},
+    watch_fors: s.watchFors || s.watch_fors || [],
+    do_this_actions: s.doThisActions || s.do_this_actions || [],
+    health_notes: s.healthNotes || s.health_notes || [],
+    cross_period: s.crossPeriodInfo || s.cross_period || {},
+    source_meta: s.sourceMeta || s.source_meta || {},
+    external_key: s.externalStudentKey || s.external_key || null,
+    created_by: userId,
+  };
+}
+
+export async function pushStudents(teamId, students, userId) {
+  requireClient();
+  if (!teamId || !students || students.length === 0) return [];
+  const rows = students.map((s) =>
+    sanitize(toTeamStudentRow(teamId, s, userId), 'team_students row')
+  );
+  const { data, error } = await supabase.from('team_students').insert(rows).select();
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function getTeamStudents(teamId) {
+  requireClient();
+  const { data, error } = await supabase
+    .from('team_students')
+    .select('*')
+    .eq('team_id', teamId)
+    .order('period_id', { ascending: true });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export function subscribeTeamStudents(teamId, onChange) {
+  requireClient();
+  const channel = supabase
+    .channel(`team_students:${teamId}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'team_students', filter: `team_id=eq.${teamId}` },
+      (payload) => onChange(payload)
+    )
+    .subscribe();
+  return () => supabase.removeChannel(channel);
+}

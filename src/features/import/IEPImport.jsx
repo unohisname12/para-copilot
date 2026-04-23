@@ -7,6 +7,8 @@ import React, { useState, useRef } from "react";
 import { DB } from '../../data';
 import { ollamaParseIEP } from '../../engine/ollama';
 import { normalizeImportedStudent, buildIdentityRegistry, buildIdentityRegistryFromMasterRoster } from '../../models';
+import { useTeamOptional } from '../../context/TeamProvider';
+import { pushStudents } from '../../services/teamSync';
 import { assignIdentity, IDENTITY_PALETTE } from '../../identity';
 import { DEMO_INCIDENTS, DEMO_INTERVENTIONS, DEMO_OUTCOMES, DEMO_LOGS } from '../../data/demoSeedData';
 
@@ -84,6 +86,19 @@ async function extractPDFText(file) {
 export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCount, onLoadDemo }) {
   const [inputMode, setInputMode] = useState("prepared"); // "prepared" | "paste" | "upload" | "manual" | "bundle" | "masterRoster"
 
+  // Cloud team context — null when app is offline-only (no Supabase env configured).
+  const team = useTeamOptional();
+
+  // After any bulk import, push the pseudonymous students to the team cloud roster.
+  // Fire-and-forget: local import already succeeded; cloud is best-effort.
+  const syncStudentsToCloud = (students) => {
+    if (!team?.activeTeamId || !team?.user?.id) return;
+    pushStudents(team.activeTeamId, students, team.user.id).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('[cloud] pushStudents failed', err);
+    });
+  };
+
   // ── Prepared import state ───────────────────────────────────
   const [preparedData, setPreparedData] = useState(null);
   const [preparedError, setPreparedError] = useState("");
@@ -125,7 +140,9 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
     if (bundleData.privateRosterMap?.privateRosterMap?.length > 0) {
       // Combined JSON with real names — build identity registry
       const { registry, importStudents, periodMap } = buildIdentityRegistry(bundleData);
-      onBulkImport(Object.values(importStudents), periodMap);
+      const studentList = Object.values(importStudents);
+      onBulkImport(studentList, periodMap);
+      syncStudentsToCloud(studentList);
       if (registry.length > 0) onIdentityLoad?.(registry);
       setBundleImported(true);
       setTimeout(() => { setBundleImported(false); setBundleData(null); }, 3500);
@@ -146,6 +163,7 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
         periodMapUpdates[s.periodId].push(s.id);
       });
       onBulkImport(normalized, periodMapUpdates);
+      syncStudentsToCloud(normalized);
       setBundleImported(true);
       setTimeout(() => { setBundleImported(false); setBundleData(null); }, 3500);
       setShowMissingNamesModal(true);
@@ -167,7 +185,9 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
   const doMasterRosterImport = () => {
     if (!masterRosterData || !onBulkImport) return;
     const { registry, importStudents, periodMap } = buildIdentityRegistryFromMasterRoster(masterRosterData);
-    onBulkImport(Object.values(importStudents), periodMap);
+    const studentList = Object.values(importStudents);
+    onBulkImport(studentList, periodMap);
+    syncStudentsToCloud(studentList);
     if (registry.length > 0) onIdentityLoad?.(registry);
     setMrImportedStudentCount(Object.keys(importStudents).length);
     setMasterRosterImported(true);
@@ -196,7 +216,9 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
     // Reuse the same logic as bundle import
     if (preparedData.privateRosterMap?.privateRosterMap?.length > 0) {
       const { registry, importStudents, periodMap } = buildIdentityRegistry(preparedData);
-      onBulkImport(Object.values(importStudents), periodMap);
+      const studentList = Object.values(importStudents);
+      onBulkImport(studentList, periodMap);
+      syncStudentsToCloud(studentList);
       if (registry.length > 0) onIdentityLoad?.(registry);
       setPreparedImported(true);
       if (registry.length > 0) {
@@ -213,6 +235,7 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
         periodMapUpdates[s.periodId].push(s.id);
       });
       onBulkImport(normalized, periodMapUpdates);
+      syncStudentsToCloud(normalized);
       setPreparedImported(true);
     }
   };

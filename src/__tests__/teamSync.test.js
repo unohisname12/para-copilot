@@ -17,6 +17,7 @@ import {
   signOut,
   createTeam,
   joinTeamByCode,
+  pushStudents,
 } from '../services/teamSync';
 import { supabase } from '../services/supabaseClient';
 
@@ -68,5 +69,51 @@ describe('teamSync auth + teams', () => {
     });
     const t = await joinTeamByCode('ABC123', 'Alice');
     expect(t.id).toBe('t1');
+  });
+});
+
+describe('pushStudents', () => {
+  test('maps app-shape student to DB row with correct field names', async () => {
+    const insertMock = jest.fn(() => ({
+      select: jest.fn().mockResolvedValue({ data: [], error: null }),
+    }));
+    supabase.from.mockReturnValueOnce({ insert: insertMock });
+
+    const students = [{
+      pseudonym: 'Red 1',
+      color: '#ef4444',
+      periodId: 'p1',
+      classLabel: 'Period 1 — Language Arts 7',
+      goals: [{ id: 'g1', text: 'reading' }],
+      accs: ['Extended time'],
+      caseManager: 'Smith',
+    }];
+    await pushStudents('t1', students, 'u1');
+
+    const rows = insertMock.mock.calls[0][0];
+    expect(rows[0]).toMatchObject({
+      team_id: 't1',
+      pseudonym: 'Red 1',
+      color: '#ef4444',
+      period_id: 'p1',
+      class_label: 'Period 1 — Language Arts 7',
+      accs: ['Extended time'],
+      case_manager: 'Smith',
+      created_by: 'u1',
+    });
+  });
+
+  test('FERPA guard throws in dev when realName leaks into input', async () => {
+    const students = [{
+      pseudonym: 'Red 1',
+      color: '#ef4444',
+      goals: [{ id: 'g1', realName: 'Jane Doe', text: 'reading' }],
+    }];
+    await expect(pushStudents('t1', students, 'u1')).rejects.toThrow(/FERPA/);
+  });
+
+  test('returns empty array when no students', async () => {
+    const result = await pushStudents('t1', [], 'u1');
+    expect(result).toEqual([]);
   });
 });

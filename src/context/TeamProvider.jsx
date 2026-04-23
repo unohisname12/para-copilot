@@ -11,6 +11,8 @@ import {
   createTeam,
   joinTeamByCode,
   regenerateInviteCode,
+  getTeamStudents,
+  subscribeTeamStudents,
 } from '../services/teamSync';
 import { supabaseConfigured } from '../services/supabaseClient';
 
@@ -20,6 +22,12 @@ export function useTeam() {
   const v = useContext(TeamContext);
   if (!v) throw new Error('useTeam must be used inside <TeamProvider>');
   return v;
+}
+
+// Same as useTeam but returns null instead of throwing when no provider.
+// Use from components that can render in both cloud and offline-only mode.
+export function useTeamOptional() {
+  return useContext(TeamContext);
 }
 
 export function TeamProvider({ children }) {
@@ -63,6 +71,41 @@ export function TeamProvider({ children }) {
     [teams, activeTeamId]
   );
 
+  const [teamStudents, setTeamStudents] = useState([]);
+
+  useEffect(() => {
+    if (!activeTeamId) { setTeamStudents([]); return; }
+    let cancelled = false;
+    let off;
+    (async () => {
+      try {
+        const initial = await getTeamStudents(activeTeamId);
+        if (cancelled) return;
+        setTeamStudents(initial);
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error('[teamStudents] initial load failed', e);
+      }
+      if (cancelled) return;
+      off = subscribeTeamStudents(activeTeamId, (payload) => {
+        setTeamStudents((prev) => {
+          if (payload.eventType === 'INSERT') {
+            if (prev.find((s) => s.id === payload.new.id)) return prev;
+            return [...prev, payload.new];
+          }
+          if (payload.eventType === 'UPDATE') {
+            return prev.map((s) => (s.id === payload.new.id ? payload.new : s));
+          }
+          if (payload.eventType === 'DELETE') {
+            return prev.filter((s) => s.id !== payload.old.id);
+          }
+          return prev;
+        });
+      });
+    })();
+    return () => { cancelled = true; if (off) off(); };
+  }, [activeTeamId]);
+
   const value = useMemo(() => ({
     session,
     user: session?.user || null,
@@ -71,6 +114,7 @@ export function TeamProvider({ children }) {
     activeTeam,
     activeTeamId,
     teamsLoading,
+    teamStudents,
     setActiveTeamId,
     signInWithGoogle,
     signOut: async () => {
@@ -111,7 +155,7 @@ export function TeamProvider({ children }) {
       setTeams((ts) => ts.map((t) => (t.id === activeTeamId ? { ...t, inviteCode: code } : t)));
       return code;
     },
-  }), [session, authReady, teams, activeTeam, activeTeamId, teamsLoading]);
+  }), [session, authReady, teams, activeTeam, activeTeamId, teamsLoading, teamStudents]);
 
   return <TeamContext.Provider value={value}>{children}</TeamContext.Provider>;
 }
