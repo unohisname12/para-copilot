@@ -455,13 +455,42 @@ export function buildIdentityRegistryFromMasterRoster(masterRosterData) {
       studentId = `${studentId}_${suffix}`;
     }
 
+    // Preserve IEP fields from the raw student entry when present. Legacy
+    // master-roster files were name-only; newer exports embed IEPs. Keeping
+    // them avoids a secondary import step. firstName/lastName/fullName/
+    // displayName are stripped by normalizeImportedStudent (FERPA — never
+    // ride onto the student object).
+    const hasIepData = Boolean(
+      student.eligibility || (student.goals && student.goals.length) ||
+      (student.accs && student.accs.length) || student.caseManager
+    );
+    const paraAppNumber = student.paraAppNumber
+      ?? student.externalKey
+      ?? student.externalStudentKey
+      ?? null;
+
     const normalized = migrateIdentity(normalizeImportedStudent({
       id:         studentId,
       pseudonym,
       color,
       periodId:   primaryPeriod,
       classLabel: periodLabelMap[primaryPeriod] || "",
-      flags:      { profileMissing: true },
+      // Carry through IEP data if embedded
+      eligibility:      student.eligibility,
+      caseManager:      student.caseManager,
+      gradeLevel:       student.grade || student.gradeLevel,
+      goals:            student.goals,
+      accs:             student.accs,
+      behaviorNotes:    student.behaviorNotes,
+      strengths:        student.strengths,
+      healthNotes:      student.healthNotes,
+      triggers:         student.triggers,
+      strategies:       student.strategies,
+      watchFors:        student.watchFors,
+      doThisActions:    student.doThisActions,
+      tags:             student.tags,
+      flags:            hasIepData ? (student.flags || {}) : { profileMissing: true },
+      paraAppNumber,
       sourceMeta: { importType: "master_roster", schemaVersion: "1.0" },
     }));
 
@@ -480,6 +509,7 @@ export function buildIdentityRegistryFromMasterRoster(masterRosterData) {
       periodIds,
       classLabels,
       identity: entry.identity,
+      paraAppNumber,
     });
   });
 
