@@ -23,6 +23,7 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test --env=jsdom",
+    "test:e2e": "playwright test e2e/",
     "eject": "react-scripts eject",
     "postinstall": "rm -rf node_modules/canvas"
   },
