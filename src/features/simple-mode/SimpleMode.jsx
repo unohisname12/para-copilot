@@ -149,13 +149,25 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
     setTimeout(() => setFlashState((f) => (f?.id === studentId ? null : f)), 900);
     if (newLog?.id) {
       showUndo(newLog.id, studentId, cat?.label || 'entry');
-      // v3: open the inline quick-note bar for this row for 5 seconds.
+      // v3: open the inline quick-note bar for this row. Auto-dismisses
+      // after 12s IF THE USER NEVER ENGAGES. As soon as they focus the
+      // input, the timer is cancelled and the bar stays open until they
+      // explicitly save (Enter), skip, or hit Escape.
       if (quickNoteTimer.current) clearTimeout(quickNoteTimer.current);
       setQuickNoteDraft("");
       setQuickNoteFor({ logId: newLog.id, studentId, categoryLabel: cat?.label, tone: cat?.color });
       quickNoteTimer.current = setTimeout(() => {
         setQuickNoteFor((q) => (q?.logId === newLog.id ? null : q));
-      }, 5000);
+      }, 12000);
+    }
+  };
+
+  // Called when the user focuses the quick-note input — kills the
+  // auto-dismiss timer so the bar stays open as long as they need.
+  const freezeQuickNoteTimer = () => {
+    if (quickNoteTimer.current) {
+      clearTimeout(quickNoteTimer.current);
+      quickNoteTimer.current = null;
     }
   };
 
@@ -582,20 +594,24 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                       <input
                         autoFocus
                         value={quickNoteDraft}
-                        onChange={e => setQuickNoteDraft(e.target.value)}
+                        onChange={e => { freezeQuickNoteTimer(); setQuickNoteDraft(e.target.value); }}
+                        onFocus={freezeQuickNoteTimer}
+                        onClick={freezeQuickNoteTimer}
                         onKeyDown={e => {
+                          freezeQuickNoteTimer();
                           if (e.key === "Enter") { e.preventDefault(); commitQuickNote(); }
                           if (e.key === "Escape") { e.preventDefault(); cancelQuickNote(); }
                         }}
-                        placeholder="e.g. 'used chunking strategy, finished 3 problems'"
+                        placeholder="Type detail and press Enter — this stays open while you type"
                         style={{
                           flex: 1,
-                          padding: "6px 10px",
+                          padding: "8px 12px",
                           background: "var(--bg-dark)",
-                          border: "1px solid var(--border)",
+                          border: `1px solid ${quickNoteFor.tone}60`,
                           borderRadius: "var(--radius-sm)",
                           color: "var(--text-primary)",
                           fontSize: 13, fontFamily: "inherit",
+                          minHeight: 36,
                         }}
                       />
                       <button
