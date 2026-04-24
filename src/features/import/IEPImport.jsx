@@ -476,24 +476,13 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
         </div>
       )}
 
-      {/* Primary chooser — flagship + fallback workflows */}
+      {/* Row 1 — three fallback workflows. Smart Import is below, full-width. */}
       <div style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+        gridTemplateColumns: "repeat(3, 1fr)",
         gap: "var(--space-4)",
-        marginBottom: "var(--space-5)",
+        marginBottom: "var(--space-4)",
       }}>
-        <ImportModeCard
-          id="smart"
-          active={inputMode === "smart"}
-          icon="🎯"
-          title="Smart Import (AI)"
-          subtitle="⭐ Primary path — roster + IEP doc, one step"
-          tone="#f97316"
-          body="Upload TWO files at once: a roster (names + Para App Numbers) and a document containing every student's IEP summary. Local AI splits the doc by name, extracts each kid's IEP, matches by name, and builds the data for you. Admin never writes JSON."
-          when="Use this every time. If it fails, fall back to the options below."
-          onClick={() => setInputMode("smart")}
-        />
         <ImportModeCard
           id="rosterOnly"
           active={inputMode === "rosterOnly"}
@@ -512,7 +501,7 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
           title="App Bundle JSON"
           subtitle="Full IEP profiles + optional private roster"
           tone="#a78bfa"
-          body="A combined JSON with normalizedStudents + optional privateRosterMap. The richest import — students come in with full IEP data. If the private roster is included, you'll be prompted to download a separate Private Roster file for the vault."
+          body="A combined JSON with normalizedStudents + optional privateRosterMap. The richest import — students come in with full IEP data."
           when="Use this when you have a complete bundle exported by SupaPara or produced by your admin."
           onClick={() => { setInputMode("bundle"); setParsed(null); setParseError(""); setMasterRosterData(null); setMasterRosterError(""); setMasterRosterImported(false); setPreparedData(null); setPreparedError(""); setPreparedImported(false); }}
         />
@@ -528,6 +517,12 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
           onClick={() => { setInputMode("masterRoster"); setParsed(null); setParseError(""); setBundleError(""); setPreparedData(null); setPreparedError(""); setPreparedImported(false); }}
         />
       </div>
+
+      {/* Row 2 — Smart Import as the big wide hero banner. Same width as the 3 cards above. */}
+      <SmartImportBanner
+        active={inputMode === "smart"}
+        onClick={() => setInputMode("smart")}
+      />
 
       {/* Advanced — collapsed by default; single-student / demo flows */}
       <details style={{ marginBottom: "var(--space-5)" }}>
@@ -1268,3 +1263,125 @@ function ImportModeCard({ icon, title, subtitle, tone, body, when, active, onCli
     </button>
   );
 }
+
+
+function SmartImportBanner({ active, onClick }) {
+  // Primary import path — hero banner spanning the full width of the three
+  // cards above. Gradient, larger type, animated glow on hover. If the user
+
+  // knows where they are, this is the one button they should click.
+  const tone = "#f97316";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        width: "100%",
+        display: "flex", alignItems: "center", gap: "var(--space-5)",
+        padding: "var(--space-5) var(--space-6)",
+        background: active
+          ? `linear-gradient(120deg, ${tone}20 0%, rgba(167,139,250,0.12) 40%, var(--panel-raised) 100%)`
+          : `linear-gradient(120deg, ${tone}14 0%, rgba(167,139,250,0.08) 40%, var(--panel-bg) 100%)`,
+        border: `2px solid ${active ? tone : tone + "55"}`,
+        borderRadius: "var(--radius-xl)",
+        cursor: "pointer",
+        textAlign: "left",
+        fontFamily: "inherit",
+        position: "relative",
+        overflow: "hidden",
+        transition: "all 200ms cubic-bezier(0.16,1,0.3,1)",
+        boxShadow: active
+          ? `0 16px 48px ${tone}33, 0 0 0 1px ${tone}80`
+          : "var(--shadow-md)",
+        transform: active ? "translateY(-2px)" : "translateY(0)",
+        marginBottom: "var(--space-5)",
+      }}
+      onMouseEnter={(e) => { if (!active) e.currentTarget.style.boxShadow = `0 12px 36px ${tone}28, var(--shadow-md)`; }}
+      onMouseLeave={(e) => { if (!active) e.currentTarget.style.boxShadow = "var(--shadow-md)"; }}
+    >
+      {/* Decorative accent ribbon */}
+      <div style={{
+        position: "absolute", top: 0, left: 0, right: 0, height: 4,
+        background: `linear-gradient(90deg, ${tone}, #a78bfa, #7a9cff)`,
+      }} />
+      {/* Left: icon tile */}
+      <div style={{
+        width: 88, height: 88, flexShrink: 0,
+        borderRadius: "var(--radius-xl)",
+        background: `linear-gradient(135deg, ${tone}, #a78bfa)`,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 44,
+        boxShadow: `0 10px 32px ${tone}55`,
+      }}>
+        🎯
+      </div>
+      {/* Middle: title + description */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          display: "flex", alignItems: "center", gap: "var(--space-2)",
+          marginBottom: 4,
+        }}>
+          <span className="pill" style={{
+            fontSize: 10, fontWeight: 800,
+            background: tone, color: "#000",
+            padding: "3px 10px",
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+          }}>
+            ⭐ Start Here
+          </span>
+          {active && (
+            <span className="pill" style={{
+              fontSize: 10, fontWeight: 700,
+              color: tone,
+              background: `${tone}22`,
+              border: `1px solid ${tone}55`,
+              padding: "2px 8px",
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+            }}>
+              Active
+            </span>
+          )}
+        </div>
+        <h2 style={{
+          fontSize: 26, fontWeight: 800,
+          letterSpacing: "-0.02em",
+          color: "var(--text-primary)",
+          lineHeight: 1.1,
+          marginBottom: 6,
+        }}>
+          Smart Import (AI) — the one-step import
+        </h2>
+        <p style={{
+          fontSize: 14, color: "var(--text-secondary)",
+          lineHeight: 1.55, margin: 0, maxWidth: 720,
+        }}>
+          Upload <b style={{ color: "var(--text-primary)" }}>two files at once</b> — a roster
+          (names + Para App Numbers) and a document with every student's IEP summary.
+          Local AI or Google Gemini splits the doc by name, extracts each kid's IEP, matches
+          by name, and builds the data for you. Admin never writes JSON. Backup files save
+          to your Downloads or a folder you pick.
+        </p>
+      </div>
+      {/* Right: chevron / CTA */}
+      <div style={{
+        flexShrink: 0, display: "flex", flexDirection: "column",
+        alignItems: "center", gap: 4,
+      }}>
+        <div style={{
+          padding: "var(--space-3) var(--space-5)",
+          borderRadius: "var(--radius-pill)",
+          background: active ? tone : `${tone}22`,
+          color: active ? "#000" : tone,
+          fontWeight: 700, fontSize: 14,
+          border: `1px solid ${tone}`,
+          whiteSpace: "nowrap",
+        }}>
+          {active ? "Open below ↓" : "Use this →"}
+        </div>
+      </div>
+    </button>
+  );
+}
+
