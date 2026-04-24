@@ -10,6 +10,7 @@ import { normalizeImportedStudent, buildIdentityRegistry, buildIdentityRegistryF
 import { useTeamOptional } from '../../context/TeamProvider';
 import { pushStudents } from '../../services/teamSync';
 import RosterOnlyImport from './RosterOnlyImport';
+import SmartImport from './SmartImport';
 import { assignIdentity, IDENTITY_PALETTE } from '../../identity';
 import { DEMO_INCIDENTS, DEMO_INTERVENTIONS, DEMO_OUTCOMES, DEMO_LOGS } from '../../data/demoSeedData';
 
@@ -475,7 +476,7 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
         </div>
       )}
 
-      {/* Primary chooser — big cards for the three common workflows */}
+      {/* Primary chooser — flagship + fallback workflows */}
       <div style={{
         display: "grid",
         gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
@@ -483,14 +484,25 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
         marginBottom: "var(--space-5)",
       }}>
         <ImportModeCard
+          id="smart"
+          active={inputMode === "smart"}
+          icon="🎯"
+          title="Smart Import (AI)"
+          subtitle="⭐ Primary path — roster + IEP doc, one step"
+          tone="#f97316"
+          body="Upload TWO files at once: a roster (names + Para App Numbers) and a document containing every student's IEP summary. Local AI splits the doc by name, extracts each kid's IEP, matches by name, and builds the data for you. Admin never writes JSON."
+          when="Use this every time. If it fails, fall back to the options below."
+          onClick={() => setInputMode("smart")}
+        />
+        <ImportModeCard
           id="rosterOnly"
           active={inputMode === "rosterOnly"}
           icon="👥"
-          title="Names + Para #s"
-          subtitle="Seed this device with real names"
+          title="Names + Para #s only"
+          subtitle="Seed names without IEPs"
           tone="#7a9cff"
-          body="You have a list of students and their 6-digit Para App Numbers. Accepts JSON, CSV, Markdown, TXT, or PDF. Names stay on this device. Future IEP uploads with matching Para App Numbers auto-resolve to the right kid."
-          when="Start here if you're the Sped teacher or admin setting things up for the first time."
+          body="Just the name-to-Para-App-Number map. No IEP data. Useful if you want to get real names into the vault first and import IEPs separately later."
+          when="Use when IEPs aren't ready yet but you want the roster in."
           onClick={() => setInputMode("rosterOnly")}
         />
         <ImportModeCard
@@ -567,6 +579,14 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
           ))}
         </div>
       </details>
+
+      {/* ── SMART IMPORT (flagship: roster + IEP doc, AI-driven) ─── */}
+      {inputMode === "smart" && (
+        <SmartImport
+          onBulkImport={onBulkImport}
+          onIdentityLoad={onIdentityLoad}
+        />
+      )}
 
       {/* ── ROSTER ONLY (Names + Para App Numbers; seeds the vault) ─── */}
       {inputMode === "rosterOnly" && <RosterOnlyImport />}
