@@ -10,6 +10,8 @@ import { OllamaStatusBadge } from '../../components/OllamaStatusBadge';
 import { HelpButton } from '../help';
 import { ShowcaseBanner } from '../showcase';
 import { DEMO_INCIDENTS, DEMO_INTERVENTIONS, DEMO_OUTCOMES, DEMO_LOGS } from '../../data/demoSeedData';
+import { getStudentPatterns } from '../analytics/getStudentPatterns';
+import PatternsCard from '../analytics/PatternsCard';
 
 // ── Constants ────────────────────────────────────────────────
 const LAYOUT_KEY  = "dashLayoutV3";
@@ -113,11 +115,14 @@ export function Dashboard({
     setNoteDraft("");
   }, [allStudents, topic, addLog, showToast]);
 
+  // Per-card action taps always open the detail sheet. Paras using the
+  // dashboard (vs. Simple Mode) want room to write — the sheet has a
+  // "Save without note" fast-path for the rare 1-click case.
   const handleCardAction = useCallback((studentId, action, e) => {
     e.stopPropagation();
-    if (action.needsNote) { setNoteTarget({ studentId, action }); setNoteDraft(""); }
-    else quickLog(studentId, action);
-  }, [quickLog]);
+    setNoteTarget({ studentId, action });
+    setNoteDraft("");
+  }, []);
 
   const handleClassTap = useCallback((studentId) => {
     if (!activeAction) return;
@@ -869,51 +874,233 @@ export function Dashboard({
         </div>
       )}
 
-      {/* ══ NOTE ENTRY MODAL ════════════════════════════════ */}
-      {noteTarget && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.75)", zIndex: 800, display: "flex", alignItems: "center", justifyContent: "center" }}
-          onClick={() => { setNoteTarget(null); setNoteDraft(""); }}>
-          <div style={{ background: "#080f1e", border: `2px solid ${noteTarget.action.border}`, borderRadius: "16px", padding: "22px", width: "380px", maxWidth: "92vw" }}
-            onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: "17px", fontWeight: "800", color: noteTarget.action.color, marginBottom: "4px" }}>
-              {noteTarget.action.icon} {noteTarget.action.label}
-            </div>
-            <div style={{ fontSize: "13px", color: allStudents[noteTarget.studentId]?.color || "#e2e8f0", fontWeight: "600", marginBottom: "14px" }}>
-              {resolveLabel(allStudents[noteTarget.studentId], "compact") || noteTarget.studentId}
-            </div>
-            <textarea autoFocus
-              value={noteDraft}
-              onChange={e => setNoteDraft(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter" && e.ctrlKey) quickLog(noteTarget.studentId, noteTarget.action, noteDraft); }}
-              placeholder="What happened? Add detail (optional) — Ctrl+Enter to log"
-              style={{ width: "100%", background: "#0a1120", border: `1px solid ${noteTarget.action.border}`, borderRadius: "8px", color: "#e2e8f0", padding: "10px 12px", fontSize: "14px", resize: "none", height: "90px", fontFamily: "inherit", boxSizing: "border-box", outline: "none" }} />
-            {caseSuggestions.length > 0 && (
-              <div style={{ marginTop: '8px', padding: '10px 12px', background: '#0a1628', border: '1px solid #1e3a5f', borderRadius: '8px', maxHeight: '180px', overflow: 'auto' }}>
-                <div style={{ fontSize: '11px', fontWeight: '700', color: '#60a5fa', marginBottom: '8px' }}>
-                  🧠 Previous Similar Situations
+      {/* ══ NOTE ENTRY SHEET — Apple-style ═══════════════════ */}
+      {noteTarget && (() => {
+        const student = allStudents[noteTarget.studentId] || {};
+        const studentLabel = resolveLabel(student, "compact") || noteTarget.studentId;
+        const patterns = getStudentPatterns(noteTarget.studentId, logs);
+        const hasDetail = noteDraft.trim().length > 0;
+        const onCancel = () => { setNoteTarget(null); setNoteDraft(""); };
+        const onSave = () => quickLog(noteTarget.studentId, noteTarget.action, noteDraft);
+
+        return (
+          <div
+            onClick={onCancel}
+            onKeyDown={e => {
+              if (e.key === "Escape") onCancel();
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) onSave();
+            }}
+            style={{
+              position: "fixed", inset: 0,
+              background: "rgba(3,6,13,0.72)",
+              backdropFilter: "blur(10px)",
+              WebkitBackdropFilter: "blur(10px)",
+              zIndex: 800,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              padding: "var(--space-4)",
+              animation: "fadeIn 180ms var(--ease-out)",
+            }}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
+                background: "var(--panel-raised)",
+                border: "1px solid var(--border-light)",
+                borderRadius: "var(--radius-xl)",
+                boxShadow: "var(--shadow-lg)",
+                width: "100%",
+                maxWidth: 520,
+                maxHeight: "88vh",
+                display: "flex",
+                flexDirection: "column",
+                animation: "modalSlide 220ms var(--ease-out)",
+                overflow: "hidden",
+              }}
+            >
+              {/* Header — action + student */}
+              <div style={{
+                padding: "var(--space-5) var(--space-6) var(--space-4)",
+                borderBottom: "1px solid var(--border)",
+                display: "flex", alignItems: "flex-start", gap: "var(--space-3)",
+              }}>
+                <div style={{
+                  width: 48, height: 48,
+                  borderRadius: "var(--radius-md)",
+                  background: noteTarget.action.bg,
+                  border: `1px solid ${noteTarget.action.border}`,
+                  color: noteTarget.action.color,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 22, flexShrink: 0,
+                }}>
+                  {noteTarget.action.icon}
                 </div>
-                {caseSuggestions.map((s, i) => (
-                  <div key={i} style={{ padding: '8px 0', borderTop: i > 0 ? '1px solid #1e293b' : 'none', fontSize: '12px', lineHeight: '1.5' }}>
-                    <div style={{ color: '#e2e8f0' }}><strong>Behavior:</strong> {s.behavior}</div>
-                    {s.intervention && <div style={{ color: '#4ade80' }}><strong>Tried:</strong> {s.intervention}</div>}
-                    {s.outcome && <div style={{ color: '#60a5fa' }}><strong>Result:</strong> {s.outcome}</div>}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    fontSize: 10, fontWeight: 700,
+                    color: "var(--text-muted)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.12em",
+                  }}>
+                    Log entry
                   </div>
-                ))}
+                  <div style={{
+                    fontSize: 22, fontWeight: 700,
+                    letterSpacing: "-0.01em",
+                    color: "var(--text-primary)",
+                    marginTop: 2,
+                  }}>
+                    {noteTarget.action.label}
+                  </div>
+                  <div style={{
+                    marginTop: 6, display: "flex", alignItems: "center", gap: 6,
+                    fontSize: 13, color: "var(--text-secondary)",
+                  }}>
+                    <span style={{
+                      width: 8, height: 8, borderRadius: "50%",
+                      background: student.color || "var(--accent)",
+                      flexShrink: 0,
+                    }} />
+                    {studentLabel}
+                  </div>
+                </div>
+                <button
+                  onClick={onCancel}
+                  aria-label="Close"
+                  className="close-btn"
+                  style={{ width: 32, height: 32, fontSize: 16 }}
+                >×</button>
               </div>
-            )}
-            <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
-              <button onClick={() => quickLog(noteTarget.studentId, noteTarget.action, noteDraft)}
-                style={{ flex: 1, padding: "13px", background: noteTarget.action.bg, color: noteTarget.action.color, border: `1.5px solid ${noteTarget.action.border}`, borderRadius: "10px", cursor: "pointer", fontSize: "16px", fontWeight: "800" }}>
-                ✓ Log It
-              </button>
-              <button onClick={() => { setNoteTarget(null); setNoteDraft(""); }}
-                style={{ padding: "13px 18px", background: "#1e293b", color: "#94a3b8", border: "none", borderRadius: "10px", cursor: "pointer", fontSize: "14px" }}>
-                Cancel
-              </button>
+
+              {/* Scrollable body */}
+              <div style={{
+                padding: "var(--space-5) var(--space-6)",
+                overflowY: "auto",
+                display: "flex", flexDirection: "column",
+                gap: "var(--space-3)",
+              }}>
+                {/* Textarea — real room to write */}
+                <div>
+                  <label style={{
+                    display: "block",
+                    fontSize: 11, fontWeight: 600,
+                    color: "var(--text-muted)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.1em",
+                    marginBottom: "var(--space-2)",
+                  }}>
+                    What happened?
+                  </label>
+                  <textarea
+                    autoFocus
+                    value={noteDraft}
+                    onChange={e => setNoteDraft(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); onSave(); }
+                    }}
+                    placeholder="Add as much detail as you want. Cmd/Ctrl+Enter to save."
+                    style={{
+                      width: "100%",
+                      minHeight: 140,
+                      padding: "var(--space-3) var(--space-4)",
+                      background: "var(--bg-dark)",
+                      color: "var(--text-primary)",
+                      border: "1px solid var(--border)",
+                      borderRadius: "var(--radius-md)",
+                      fontFamily: "inherit",
+                      fontSize: 14,
+                      lineHeight: 1.55,
+                      resize: "vertical",
+                      outline: "none",
+                      boxSizing: "border-box",
+                      transition: "border-color 120ms var(--ease-out)",
+                    }}
+                    onFocus={e => e.target.style.borderColor = "var(--accent)"}
+                    onBlur={e => e.target.style.borderColor = "var(--border)"}
+                  />
+                </div>
+
+                {/* What worked before — only if there's history */}
+                {(patterns.successfulSupports.length > 0 ||
+                  patterns.failedSupports.length > 0 ||
+                  patterns.commonBehaviors.length > 0) && (
+                  <PatternsCard
+                    patterns={patterns}
+                    studentLabel={studentLabel}
+                    onTry={(s) => setNoteDraft(d => d ? `${d}\n\nTried: ${s.label}` : `Tried: ${s.label}`)}
+                  />
+                )}
+
+                {/* Case-memory match (existing feature) */}
+                {caseSuggestions.length > 0 && (
+                  <div style={{
+                    padding: "var(--space-3) var(--space-4)",
+                    background: "var(--bg-surface)",
+                    border: "1px solid var(--border)",
+                    borderRadius: "var(--radius-md)",
+                  }}>
+                    <div style={{
+                      fontSize: 10, fontWeight: 700,
+                      color: "var(--text-muted)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.1em",
+                      marginBottom: "var(--space-2)",
+                    }}>
+                      Similar past situations
+                    </div>
+                    {caseSuggestions.map((s, i) => (
+                      <div key={i} style={{
+                        padding: "var(--space-2) 0",
+                        borderTop: i > 0 ? "1px solid var(--border)" : "none",
+                        fontSize: 12, lineHeight: 1.55,
+                      }}>
+                        <div style={{ color: "var(--text-primary)" }}><strong>Behavior:</strong> {s.behavior}</div>
+                        {s.intervention && <div style={{ color: "var(--green)" }}><strong>Tried:</strong> {s.intervention}</div>}
+                        {s.outcome && <div style={{ color: "var(--accent-hover)" }}><strong>Result:</strong> {s.outcome}</div>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer — buttons */}
+              <div style={{
+                padding: "var(--space-4) var(--space-6)",
+                borderTop: "1px solid var(--border)",
+                background: "var(--bg-surface)",
+                display: "flex", gap: "var(--space-2)",
+                alignItems: "center",
+              }}>
+                <button
+                  onClick={onCancel}
+                  className="btn btn-ghost"
+                  style={{ minHeight: 44 }}
+                >
+                  Cancel
+                </button>
+                <div style={{ flex: 1 }} />
+                <button
+                  onClick={onSave}
+                  className="btn btn-secondary"
+                  style={{ minHeight: 44 }}
+                  disabled={hasDetail}
+                  title={hasDetail ? "You've written detail — use 'Save note' instead" : "Log with no extra detail"}
+                >
+                  Save without note
+                </button>
+                <button
+                  onClick={onSave}
+                  className="btn btn-primary"
+                  style={{ minHeight: 44, minWidth: 140 }}
+                  disabled={!hasDetail}
+                  title="Save with your note"
+                >
+                  Save note
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ══ HELP BUTTON ══════════════════════════════════════ */}
       {caseMemory && effectivePeriodStudents.length > 0 && (() => {
