@@ -55,6 +55,35 @@ import { TeamProvider, useTeam } from './context/TeamProvider';
 import SignInScreen from './components/SignInScreen';
 import TeamOnboardingModal from './components/TeamOnboardingModal';
 
+// ── Vault helpers (presentational, reusable) ─────────────────────────
+function SortableHeader({ col, label, sort, onSort }) {
+  const active = sort.col === col;
+  const arrow = active ? (sort.dir === "asc" ? " ↑" : " ↓") : "";
+  return (
+    <th
+      onClick={() => onSort({
+        col,
+        dir: active && sort.dir === "desc" ? "asc" : "desc",
+      })}
+      style={{ cursor: "pointer", userSelect: "none", color: active ? "var(--accent-hover)" : undefined }}
+      title={`Sort by ${label.toLowerCase()}`}
+    >
+      {label}{arrow}
+    </th>
+  );
+}
+function LogDetailCell({ label, children }) {
+  return (
+    <div>
+      <div style={{
+        fontSize: 10, fontWeight: 700, textTransform: "uppercase",
+        letterSpacing: "0.1em", color: "var(--text-muted)", marginBottom: 3,
+      }}>{label}</div>
+      <div>{children}</div>
+    </div>
+  );
+}
+
 export default function App() {
   if (!supabaseConfigured) {
     // No cloud env — skip auth, run fully local as before.
@@ -227,6 +256,13 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
 
   // ── Vault state ────────────────────────────────────────────
   const [vaultTab, setVaultTab] = useState("all"), [vaultFilter, setVaultFilter] = useState("all"), [editingLog, setEditingLog] = useState(null);
+  // Interactive vault state
+  const [vaultSearch, setVaultSearch] = useState("");
+  const [vaultRange, setVaultRange] = useState("all"); // all | today | week | month
+  const [vaultSort, setVaultSort] = useState({ col: "date", dir: "desc" });
+  const [vaultExpandedId, setVaultExpandedId] = useState(null);
+  const [vaultTagFilter, setVaultTagFilter] = useState(null);
+  const [vaultTypeFilter, setVaultTypeFilter] = useState(null);
 
   // ── saveEdit wires updateLogText + vault UI ────────────────
   const saveEdit = (id, newText) => { updateLogText(id, newText); setEditingLog(null); };
@@ -296,11 +332,66 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
     const allStu = Object.entries(allStudents);
     const counts = { green: allStu.filter(([id]) => getHealth(id, logs, currentDate) === "green").length, yellow: allStu.filter(([id]) => getHealth(id, logs, currentDate) === "yellow").length, red: allStu.filter(([id]) => getHealth(id, logs, currentDate) === "red").length };
     let filteredLogs = logs;
-    if (vaultTab === "byStudent" && vaultFilter !== "all") filteredLogs = logs.filter(l => l.studentId === vaultFilter);
-    if (vaultTab === "byPeriod" && vaultFilter !== "all") filteredLogs = logs.filter(l => l.periodId === vaultFilter);
-    if (vaultTab === "flagged") filteredLogs = logs.filter(l => l.flagged);
-    if (vaultTab === "handoffs") filteredLogs = logs.filter(l => l.type === "Handoff Note");
-    if (vaultTab === "goalProgress") filteredLogs = logs.filter(l => l.type === "Goal Progress");
+    // Tab-based filters
+    if (vaultTab === "byStudent" && vaultFilter !== "all") filteredLogs = filteredLogs.filter(l => l.studentId === vaultFilter);
+    if (vaultTab === "byPeriod" && vaultFilter !== "all") filteredLogs = filteredLogs.filter(l => l.periodId === vaultFilter);
+    if (vaultTab === "flagged") filteredLogs = filteredLogs.filter(l => l.flagged);
+    if (vaultTab === "handoffs") filteredLogs = filteredLogs.filter(l => l.type === "Handoff Note");
+    if (vaultTab === "goalProgress") filteredLogs = filteredLogs.filter(l => l.type === "Goal Progress");
+
+    // Date range filter
+    if (vaultRange !== "all" && vaultRange !== "knowledge") {
+      const today = new Date(currentDate + "T00:00:00");
+      let threshold = null;
+      if (vaultRange === "today") threshold = today;
+      else if (vaultRange === "week") { threshold = new Date(today); threshold.setDate(threshold.getDate() - 7); }
+      else if (vaultRange === "month") { threshold = new Date(today); threshold.setMonth(threshold.getMonth() - 1); }
+      if (threshold) {
+        const ts = threshold.getTime();
+        filteredLogs = filteredLogs.filter(l => {
+          if (!l.date) return false;
+          return new Date(l.date + "T12:00:00").getTime() >= ts;
+        });
+      }
+    }
+
+    // Active type/tag chip filters
+    if (vaultTypeFilter) filteredLogs = filteredLogs.filter(l => l.type === vaultTypeFilter);
+    if (vaultTagFilter) filteredLogs = filteredLogs.filter(l => (l.tags || []).includes(vaultTagFilter));
+
+    // Text search across note / student name / tags / type
+    if (vaultSearch.trim()) {
+      const q = vaultSearch.trim().toLowerCase();
+      filteredLogs = filteredLogs.filter(l => {
+        const stu = allStudents[l.studentId];
+        const name = (stu?.realName || stu?.pseudonym || l.studentId || '').toLowerCase();
+        const note = (l.note || l.text || '').toLowerCase();
+        const type = (l.type || '').toLowerCase();
+        const tags = (l.tags || []).join(' ').toLowerCase();
+        return name.includes(q) || note.includes(q) || type.includes(q) || tags.includes(q);
+      });
+    }
+
+    // Sort
+    filteredLogs = [...filteredLogs].sort((a, b) => {
+      const dir = vaultSort.dir === "asc" ? 1 : -1;
+      if (vaultSort.col === "date") {
+        const at = (a.timestamp || a.date || '');
+        const bt = (b.timestamp || b.date || '');
+        return at > bt ? dir : at < bt ? -dir : 0;
+      }
+      if (vaultSort.col === "student") {
+        const as = allStudents[a.studentId];
+        const bs = allStudents[b.studentId];
+        const an = (as?.realName || as?.pseudonym || a.studentId || '').toLowerCase();
+        const bn = (bs?.realName || bs?.pseudonym || b.studentId || '').toLowerCase();
+        return an > bn ? dir : an < bn ? -dir : 0;
+      }
+      if (vaultSort.col === "type") {
+        return (a.type || '') > (b.type || '') ? dir : (a.type || '') < (b.type || '') ? -dir : 0;
+      }
+      return 0;
+    });
     const vaultTabs = [{ id: "all", label: "All Logs" }, { id: "byStudent", label: "By Student" }, { id: "byPeriod", label: "By Period" }, { id: "flagged", label: `Flagged (${logs.filter(l => l.flagged).length})` }, { id: "handoffs", label: `Handoffs (${logs.filter(l => l.type === "Handoff Note").length})` }, { id: "goalProgress", label: `Goals (${logs.filter(l => l.type === "Goal Progress").length})` }, { id: "knowledge", label: `KB (${knowledgeBase.length})` }];
     return (<div>
       <div className="header">
@@ -374,6 +465,75 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
         ))}
       </div>
       {(vaultTab === "byStudent" || vaultTab === "byPeriod") && (<div style={{ marginBottom: "14px", display: "flex", gap: "8px", alignItems: "center" }}><span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Filter:</span><select value={vaultFilter} onChange={e => setVaultFilter(e.target.value)} className="period-select" style={{ maxWidth: "280px" }}><option value="all">All</option>{vaultTab === "byStudent" && Object.entries(allStudents).map(([id, s]) => (<option key={id} value={id}>{resolveLabel(s, "compact")} ({logs.filter(l => l.studentId === id).length})</option>))}{vaultTab === "byPeriod" && Object.entries(DB.periods).map(([id, p]) => (<option key={id} value={id}>{p.label}</option>))}</select></div>)}
+
+      {/* Interactive filter + search bar (hidden on KB tab) */}
+      {vaultTab !== "knowledge" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", marginBottom: "var(--space-4)" }}>
+          <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", flexWrap: "wrap" }}>
+            <input
+              value={vaultSearch}
+              onChange={e => setVaultSearch(e.target.value)}
+              placeholder="🔎 Search notes, students, types, tags…"
+              className="chat-input"
+              style={{ flex: "1 1 260px", minWidth: 240, fontSize: 13 }}
+            />
+            <div style={{
+              display: "flex", gap: 2, padding: 3,
+              background: "var(--bg-dark)", border: "1px solid var(--border)",
+              borderRadius: "var(--radius-md)",
+            }}>
+              {[
+                ["all", "All time"],
+                ["today", "Today"],
+                ["week", "Week"],
+                ["month", "Month"],
+              ].map(([id, label]) => (
+                <button key={id} onClick={() => setVaultRange(id)} style={{
+                  padding: "6px 12px", borderRadius: "var(--radius-sm)",
+                  border: "none", cursor: "pointer",
+                  fontSize: 11, fontWeight: 600, fontFamily: "inherit",
+                  background: vaultRange === id ? "var(--grad-primary)" : "transparent",
+                  color: vaultRange === id ? "#fff" : "var(--text-secondary)",
+                }}>{label}</button>
+              ))}
+            </div>
+          </div>
+          {/* Active-filter chips (clear-as-you-go) */}
+          {(vaultTypeFilter || vaultTagFilter || vaultSearch || vaultRange !== "all") && (
+            <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", fontSize: 11, color: "var(--text-muted)" }}>
+              <span>Filters:</span>
+              {vaultTypeFilter && (
+                <button onClick={() => setVaultTypeFilter(null)} className="pill pill-accent" style={{ fontSize: 10, cursor: "pointer", border: "none" }}>
+                  Type: {vaultTypeFilter} ×
+                </button>
+              )}
+              {vaultTagFilter && (
+                <button onClick={() => setVaultTagFilter(null)} className="pill pill-violet" style={{ fontSize: 10, cursor: "pointer", border: "none" }}>
+                  Tag: {vaultTagFilter} ×
+                </button>
+              )}
+              {vaultRange !== "all" && (
+                <button onClick={() => setVaultRange("all")} className="pill pill-yellow" style={{ fontSize: 10, cursor: "pointer", border: "none" }}>
+                  Range: {vaultRange} ×
+                </button>
+              )}
+              {vaultSearch && (
+                <button onClick={() => setVaultSearch("")} className="pill pill-green" style={{ fontSize: 10, cursor: "pointer", border: "none" }}>
+                  "{vaultSearch.slice(0, 20)}{vaultSearch.length > 20 ? '…' : ''}" ×
+                </button>
+              )}
+              <button
+                onClick={() => { setVaultTypeFilter(null); setVaultTagFilter(null); setVaultRange("all"); setVaultSearch(""); }}
+                className="btn btn-ghost btn-sm"
+                style={{ fontSize: 11, marginLeft: "auto" }}
+              >Clear all</button>
+            </div>
+          )}
+          <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+            Showing <b style={{ color: "var(--text-primary)" }}>{filteredLogs.length}</b> of {logs.length} logs
+          </div>
+        </div>
+      )}
       {vaultTab === "knowledge" && (<div>
         <div className="panel" style={{ padding: "16px", marginBottom: "16px" }}>
           <h3 style={{ margin: "0 0 4px", fontSize: "14px", color: "var(--accent)" }}>Add to Knowledge Base</h3>
@@ -400,39 +560,134 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
           </div>))}
         </div>)}
       </div>)}
-      {vaultTab !== "knowledge" && (filteredLogs.length === 0 ? (<div className="empty-doc">{vaultTab === "flagged" ? "No flagged entries." : "No logs match."}</div>) : (<div className="table-container"><table className="data-table"><thead><tr><th>Date</th><th>Period</th><th>Student</th><th>Type</th><th>Tags</th><th>Observation</th><th style={{ textAlign: "right" }}>Actions</th></tr></thead><tbody>{filteredLogs.map(l => {
+      {vaultTab !== "knowledge" && (filteredLogs.length === 0 ? (
+        <div className="empty-doc">
+          {vaultTab === "flagged" ? "No flagged entries." :
+           (vaultSearch || vaultTypeFilter || vaultTagFilter || vaultRange !== "all")
+             ? "No logs match your filters."
+             : "No logs yet."}
+        </div>
+      ) : (<div className="table-container"><table className="data-table">
+        <thead><tr>
+          <th style={{ width: 28 }}></th>
+          <SortableHeader col="date" label="Date" sort={vaultSort} onSort={setVaultSort} />
+          <th>Period</th>
+          <SortableHeader col="student" label="Student" sort={vaultSort} onSort={setVaultSort} />
+          <SortableHeader col="type" label="Type" sort={vaultSort} onSort={setVaultSort} />
+          <th>Tags</th>
+          <th>Observation</th>
+          <th style={{ textAlign: "right" }}>Actions</th>
+        </tr></thead>
+        <tbody>{filteredLogs.map(l => {
         const rawStudent = allStudents[l.studentId];
         const isOrphan = !rawStudent;
         const s = rawStudent || { pseudonym: l.studentId, color: "var(--text-muted)" };
         const label = isOrphan
           ? `↯ ${(l.studentId || '').slice(0, 24)}${(l.studentId || '').length > 24 ? '…' : ''}`
           : (s.realName || resolveLabel(s, "compact"));
+        const isExpanded = vaultExpandedId === l.id;
         return (
-          <tr key={l.id}>
-            <td style={{ whiteSpace: "nowrap", color: "var(--text-muted)" }}>{l.date}</td>
-            <td style={{ fontSize: "12px", color: "var(--text-muted)", whiteSpace: "nowrap" }}>{l.period}</td>
-            <td
-              onClick={() => setProfileStu(l.studentId)}
-              title={isOrphan ? "Student not in current roster — click for details" : ""}
-              style={{
-                fontWeight: isOrphan ? 400 : 600,
-                color: isOrphan ? "var(--text-muted)" : s.color,
-                whiteSpace: "nowrap",
-                cursor: "pointer",
-                fontStyle: isOrphan ? "italic" : "normal",
-              }}
-            >
-              {label}
-            </td>
-            <td><span style={{ fontSize: "11px", background: l.type === "Handoff Note" ? "#854d0e" : "#1e3a5f", color: l.type === "Handoff Note" ? "#fde68a" : "#93c5fd", padding: "2px 8px", borderRadius: "20px", whiteSpace: "nowrap" }}>{l.type}</span></td>
-            <td style={{ fontSize: "10px", color: "#4a6284" }}>{(l.tags || []).slice(0, 3).join(", ")}</td>
-            <td>{editingLog === l.id ? (<div style={{ display: "flex", gap: "6px" }}><input defaultValue={l.note || l.text} id={`edit_${l.id}`} style={{ flex: 1, padding: "4px 8px", background: "var(--bg-dark)", border: "1px solid var(--border)", borderRadius: "4px", color: "white", fontSize: "12px" }} /><button className="btn btn-primary" style={{ fontSize: "11px", padding: "4px 8px" }} onClick={() => saveEdit(l.id, document.getElementById(`edit_${l.id}`).value)}>Save</button><button className="btn btn-secondary" style={{ fontSize: "11px", padding: "4px 8px" }} onClick={() => setEditingLog(null)}>Cancel</button></div>) : <span style={{ fontSize: "13px" }}>{l.note || l.text}</span>}</td>
-            <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-              <button onClick={() => toggleFlag(l.id)} title="Flag for IEP" style={{ background: "none", border: "none", cursor: "pointer", fontSize: "14px", color: l.flagged ? "#f59e0b" : "#334155" }}>⚑</button>
-              <button onClick={() => setEditingLog(l.id)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", color: "#60a5fa", marginLeft: "4px" }}>✏</button>
-              <button onClick={() => deleteLog(l.id)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", color: "#ef4444", marginLeft: "4px" }}>🗑</button>
-            </td>
-          </tr>
+          <React.Fragment key={l.id}>
+            <tr style={isExpanded ? { background: "var(--panel-hover)" } : undefined}>
+              <td style={{ textAlign: "center", padding: 0 }}>
+                <button
+                  onClick={() => setVaultExpandedId(isExpanded ? null : l.id)}
+                  title={isExpanded ? "Collapse" : "Expand"}
+                  style={{
+                    background: "transparent", border: "none", cursor: "pointer",
+                    color: "var(--text-muted)", fontSize: 12,
+                    padding: "4px 6px", borderRadius: 4,
+                    transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
+                    transition: "transform 120ms ease",
+                  }}
+                >▶</button>
+              </td>
+              <td style={{ whiteSpace: "nowrap", color: "var(--text-muted)" }}>{l.date}</td>
+              <td style={{ fontSize: "12px", color: "var(--text-muted)", whiteSpace: "nowrap" }}>{l.period}</td>
+              <td
+                onClick={() => setProfileStu(l.studentId)}
+                title={isOrphan ? "Student not in current roster — click for details" : "Open profile"}
+                style={{
+                  fontWeight: isOrphan ? 400 : 600,
+                  color: isOrphan ? "var(--text-muted)" : s.color,
+                  whiteSpace: "nowrap",
+                  cursor: "pointer",
+                  fontStyle: isOrphan ? "italic" : "normal",
+                }}
+              >{label}</td>
+              <td>
+                <button
+                  onClick={() => setVaultTypeFilter(vaultTypeFilter === l.type ? null : l.type)}
+                  title={`Filter by "${l.type}"`}
+                  style={{
+                    fontSize: "11px",
+                    background: l.type === "Handoff Note" ? "#854d0e" : "#1e3a5f",
+                    color: l.type === "Handoff Note" ? "#fde68a" : "#93c5fd",
+                    padding: "3px 10px", borderRadius: "20px", whiteSpace: "nowrap",
+                    border: vaultTypeFilter === l.type ? "1px solid currentColor" : "1px solid transparent",
+                    cursor: "pointer", fontFamily: "inherit",
+                  }}
+                >{l.type}</button>
+              </td>
+              <td style={{ fontSize: "10px" }}>
+                {(l.tags || []).slice(0, 4).map(tag => (
+                  <button
+                    key={tag}
+                    onClick={() => setVaultTagFilter(vaultTagFilter === tag ? null : tag)}
+                    title={`Filter by tag "${tag}"`}
+                    style={{
+                      fontSize: 10, marginRight: 3, marginBottom: 2,
+                      padding: "1px 6px", borderRadius: 10,
+                      background: vaultTagFilter === tag ? "var(--violet-muted)" : "transparent",
+                      color: vaultTagFilter === tag ? "var(--violet)" : "#4a6284",
+                      border: `1px solid ${vaultTagFilter === tag ? "var(--violet)" : "var(--border)"}`,
+                      cursor: "pointer", fontFamily: "inherit",
+                    }}
+                  >{tag}</button>
+                ))}
+              </td>
+              <td>{editingLog === l.id ? (<div style={{ display: "flex", gap: "6px" }}><input defaultValue={l.note || l.text} id={`edit_${l.id}`} style={{ flex: 1, padding: "4px 8px", background: "var(--bg-dark)", border: "1px solid var(--border)", borderRadius: "4px", color: "white", fontSize: "12px" }} /><button className="btn btn-primary" style={{ fontSize: "11px", padding: "4px 8px" }} onClick={() => saveEdit(l.id, document.getElementById(`edit_${l.id}`).value)}>Save</button><button className="btn btn-secondary" style={{ fontSize: "11px", padding: "4px 8px" }} onClick={() => setEditingLog(null)}>Cancel</button></div>) : <span style={{ fontSize: "13px" }}>{l.note || l.text}</span>}</td>
+              <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                <button onClick={() => toggleFlag(l.id)} title="Flag for IEP" style={{ background: "none", border: "none", cursor: "pointer", fontSize: "14px", color: l.flagged ? "#f59e0b" : "#334155" }}>⚑</button>
+                <button onClick={() => setEditingLog(l.id)} title="Edit" style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", color: "#60a5fa", marginLeft: "4px" }}>✏</button>
+                <button onClick={() => deleteLog(l.id)} title="Delete" style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", color: "#ef4444", marginLeft: "4px" }}>🗑</button>
+              </td>
+            </tr>
+            {isExpanded && (
+              <tr>
+                <td colSpan={8} style={{
+                  padding: "var(--space-4) var(--space-5)",
+                  background: "var(--bg-dark)",
+                  borderTop: "none",
+                }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "var(--space-3)", fontSize: 12 }}>
+                    <LogDetailCell label="Full observation">
+                      <div style={{ color: "var(--text-primary)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+                        {l.note || l.text || <i>(no note)</i>}
+                      </div>
+                    </LogDetailCell>
+                    <LogDetailCell label="Timestamp">
+                      <code style={{ fontFamily: "JetBrains Mono, monospace" }}>{l.timestamp || l.date || '—'}</code>
+                    </LogDetailCell>
+                    <LogDetailCell label="Source">{l.source || '—'}</LogDetailCell>
+                    <LogDetailCell label="Category">{l.category || '—'}</LogDetailCell>
+                    <LogDetailCell label="Situation ID">{l.situationId || '—'}</LogDetailCell>
+                    <LogDetailCell label="Strategy used">{l.strategyUsed || '—'}</LogDetailCell>
+                    <LogDetailCell label="Goal ID">{l.goalId || '—'}</LogDetailCell>
+                    <LogDetailCell label="All tags">
+                      {(l.tags || []).length > 0 ? (l.tags || []).join(', ') : '—'}
+                    </LogDetailCell>
+                    <LogDetailCell label="Log ID">
+                      <code style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 10 }}>{l.id}</code>
+                    </LogDetailCell>
+                    <LogDetailCell label="Shared">
+                      {l.shared ? <span style={{ color: "var(--green)" }}>✓ Team-visible</span> : <span style={{ color: "var(--text-muted)" }}>Private (yours only)</span>}
+                    </LogDetailCell>
+                  </div>
+                </td>
+              </tr>
+            )}
+          </React.Fragment>
         );
       })}</tbody></table></div>))}
     </div>);
