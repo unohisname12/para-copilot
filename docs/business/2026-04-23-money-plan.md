@@ -1,336 +1,569 @@
-# SupaPara — Business & Money Plan
+# SupaPara — Money Plan (Revised)
 
-**Drafted:** 2026-04-23
-**Context:** Fairview Middle (WA) pilot April–June 2026 → district pitch → state expansion
-**For:** Deandre (Mr. Dre) — solo founder, current role: special-ed paraprofessional
-
----
-
-## Read this first — honest framing
-
-This is the plan I'd actually make if I were you. It's not hype. Education sales are slow, budget cycles are rigid, and paraprofessionals are usually the *least* empowered to authorize software purchases — yet they're the users. That shapes every choice below.
-
-You have three legitimate paths from Fairview pilot to real revenue. The plan below covers the highest-probability one (district → state), but flags where it would pivot if your principal's boss rejects the pitch.
+**Drafted:** 2026-04-23 (v2 — rewritten to focus on HOW to sell, not just what to charge)
+**Context:** Fairview Middle (WA) pilot April–June 2026 → district → WA districts
+**For:** Deandre (Mr. Dre) — special-ed paraprofessional, solo founder
 
 ---
 
-## Where you are today (the honest snapshot)
+## Read this first
 
-| Thing | Status |
-|---|---|
-| Product | Live at https://supapara.vercel.app · roughly 70/100 on a real-use scale |
-| Backend | Supabase free tier, 1 team, FERPA-sound architecture |
-| Users | 0 real paras using it in a classroom yet |
-| Pilot confirmed | Fairview says yes to April–June 2026 |
-| Legal entity | None (operating as an individual) |
-| Insurance | None |
-| Privacy certifications | None (architecture is FERPA-aligned, but no attestation doc) |
-| Contracts / NDAs with the school | None yet |
-| Money spent so far | ~$0 (Supabase + Vercel free tiers, your own domain not yet bought) |
-| Money earned so far | $0 |
+Making money from education software is 80% selling and 20% product. This doc is now mostly about selling — the pitch, the people, the objections, the packaging, the contract. Pricing is one small section inside.
 
-**Key asset you already have:** a principal who wants to use it. That's the rarest and most valuable thing in K-12 sales. Everything else is execution.
+**Important correction from v1:** keep Fairview free through June as you promised. Then you propose paid starting the 2026-27 school year. See "Fairview Next Year" below.
 
 ---
 
-## The path you described, broken into four phases
+## 1. Who actually buys this (so you know who to talk to)
 
-### Phase 1 — Fairview Pilot (April–June 2026)
-**Goal:** prove paras actually use it daily and log real incidents. Get quotes and data.
-**Duration:** 10 weeks of school (roughly 40 school days, ending around June 15).
-**Cost to run:** ~$0. Supabase + Vercel free tiers, your time.
-**Revenue:** $0 — pilot is free.
-**What "success" looks like at the end:**
-- 3+ paras using it weekly
-- 100+ logs in the cloud
-- 1 compelling anecdote ("kid threw chair 1st period, I caught it in 2nd period thanks to SupaPara") — this is the story you'll retell 50 times during district pitches
-- Written letter of support from your principal
+This is the single most confused part of K-12 sales. Most first-time founders pitch the wrong person and wonder why nothing happens. Here's the real hierarchy for your product:
 
-### Phase 2 — Data + Case + Prep (Summer 2026)
-**Goal:** turn pilot results into a sellable pitch. This happens June–August while teachers are off.
-**Duration:** 10–12 weeks.
-**What you produce:**
-- Pilot report (1-page, data-driven): time saved per para per day, incidents caught, handoffs made
-- Recorded 3-min demo video
-- Sales one-pager (printed + PDF)
-- Pricing sheet
-- A real website (not just vercel.app)
-- Data processing agreement template (DPA) — schools require this
-- Your first LLC/sole prop setup (WA state: LLC is $200 to file)
-
-### Phase 3 — Your District Pitch (Fall 2026)
-**Goal:** sell to your own district to cover multiple Fairview-style schools.
-**Timing:** Districts plan budgets during summer for the following year, OR have mid-year discretionary budgets that land in Oct/Nov. Aim for **October 2026** meeting with whoever runs Special Ed at the district level.
-**What you sell:** annual site license for each school in the district that wants it.
-**Price point I'd aim for:** $300–600 per school per year (district-paid), depending on size.
-
-### Phase 4 — Other WA Districts (Spring 2027 onward)
-**Goal:** replicate the district playbook 2–5 times in Washington.
-**Washington has 295 districts.** You don't need all of them. 10 districts at $3-8k/year each gets you $30-80k ARR and a real part-time income while you still teach. 50 districts is a full-time job.
-
----
-
-## Timeline table (concrete)
-
-| When | Milestone | Your time | Cost |
+| Buyer | Budget authority | Usually cares about | How to reach them |
 |---|---|---|---|
-| Apr 2026 | Pilot launches at Fairview | ~2 hrs/week support | $0 |
-| May 2026 | First real feedback, likely 3–5 bug fixes | ~4 hrs/week | $0 |
-| Late May 2026 | Upgrade Supabase to Pro if bandwidth hits | ~1 hr | **$25/mo** |
-| Jun 2026 | Pilot ends · collect data · thank-you email from principal in writing | ~10 hrs total | $0 |
-| Jul 2026 | Pilot report + demo video + website + one-pager | ~30 hrs | **~$100** (domain, maybe a video tool) |
-| Jul 2026 | File Washington LLC · open business checking | ~3 hrs | **$240** ($200 LLC + $40 business account setup) |
-| Aug 2026 | Draft Data Processing Agreement (use template) | ~5 hrs | **$0–500** (lawyer review optional but smart) |
-| Aug 2026 | Price sheet + contract templates | ~4 hrs | $0 |
-| Sep 2026 | Email your district Special Ed director to schedule demo | ~30 min | $0 |
-| Oct 2026 | District demo meeting | ~3 hrs (prep + meeting) | ~$30 parking |
-| Nov 2026 | If yes: first paid contract. Pilot terms on paper. | ~5 hrs negotiation | $0 |
-| Dec 2026 | Roll out to district schools that opted in | ~10 hrs onboarding | $0 |
-| Jan–Mar 2027 | Gather second round of case studies, start reaching other WA districts | ~5 hrs/week | $25–50/mo infra |
-| Summer 2027 | Decide: side project or serious business? | — | — |
+| **A paraprofessional** | $0 | "Will this make my day easier?" | They're your user, not your buyer. Useful as a CHAMPION inside a school. |
+| **Special Ed Teacher / Case Manager** | $0–300 discretionary | Student outcomes, paperwork time saved | Same — they're champions, not signers. |
+| **Principal** | $500–3,000 without board | Their staff's wellbeing, data for the school, no FERPA lawsuits | ← **This is you at Fairview.** Email intro, in-person meeting. |
+| **District Special Ed Director** | $3,000–50,000 | Compliance, audit trails, equity across schools | Principal referral, cold email, state conferences. |
+| **District CFO / Superintendent** | $50,000+ | ROI, contract terms, vendor risk | Usually only needed for big enterprise deals. |
+| **School Board** | $250,000+ | Public optics, vendor diversity | You will never talk to these people at your scale. |
 
-**Big time risk:** You're still a para. Most of this has to happen after school hours or on weekends. Be realistic about 5–10 hrs/week max during the school year, and 20 hrs/week possible in summer.
+### Your specific playbook for 2026-2028
+
+- **April–June 2026:** Sell to **paras** (user adoption, free). They're your data source.
+- **September 2026:** Sell to your **principal** (Fairview paid conversion).
+- **October 2026:** Sell to your **District Special Ed Director** (your district, first contract).
+- **January–May 2027:** Sell to **other WA District Sped Directors** (replicate).
+
+Don't skip levels. Trying to pitch a Superintendent in Year 1 is like asking for a meeting with the CEO of a 5,000-person company — you'll get declined, forgotten, or handed down to the right person after three months of delay.
 
 ---
 
-## What you'll spend (itemized, realistic)
+## 2. What you are actually selling (say this, not "software")
 
-### Year 1 (Apr 2026 – Apr 2027) — total: **$600–1,600**
+The worst sales pitch is "it's an app for paras to log stuff." People can't picture what that means.
 
-| Item | Cost | Required? |
+### The core pitch, in one sentence
+
+> "SupaPara is the first tool built specifically for special-ed paraprofessionals — one-tap logging during class, automatic handoffs between periods, FERPA-safe by design."
+
+### The three things you actually sell (in this order)
+
+**1. Time back for your paras.** Currently they log on paper, sticky notes, or not at all. 5-10 minutes × 3 times a day × 180 days = 30-60 hours/year/para of paperwork. SupaPara cuts that to near-zero.
+
+**2. Better student outcomes from continuity.** Kid has a rough 1st period — currently, the 2nd period para has to learn that the hard way. SupaPara's handoff feature means the 2nd para walks in prepared. This is the single most compelling anecdote in your pitch.
+
+**3. Defensible records.** When an IEP meeting or legal issue comes up, the school needs timestamped notes. Most paras don't have them. SupaPara creates them automatically. This is the principal's favorite feature (even though paras never mention it).
+
+### Your real competitive story
+
+There is NO software built for paras. All existing IEP tools (Frontline, IEP Direct, SEAS, Goalbook) are built for teachers, case managers, or admins. Paras are an afterthought in those tools — "put in a note if you want."
+
+You're not competing with them. You're filling a gap that they've never addressed.
+
+**Script:**
+> "Your district already uses [Frontline/IEP Direct/etc.] for the teachers and case managers. That's fine — SupaPara sits alongside it. We don't replace IEP authoring. We're the tool the paras actually use during class, and we export cleanly so the IEP meetings have real data. It's the missing layer."
+
+---
+
+## 3. The pitch — what to actually say (scripts)
+
+### The 60-second elevator pitch (for hallway conversations)
+
+> "I built a classroom app for paraprofessionals. Think one-tap logging for behavior, academics, breaks, handoffs between periods. Real names stay on the device — all cloud data is pseudonymous. Fairview's been piloting it with five paras this spring. If you want, I can show you in 3 minutes."
+
+### The 3-minute demo script
+
+> **0:00 — Problem.** "A para supporting 8 IEP students across 4 periods might write 20 notes a day. Most of it ends up on sticky notes. When Monday's behavior spike shows up Thursday, nobody connects the dots."
+
+> **0:30 — Show Simple Mode.** Open https://supapara.vercel.app, flip into Simple Mode. Click ⭐ Positive on a kid. Click ☕ Break on another. Point at the counts. "Two taps, logged. No typing. Nothing left undocumented."
+
+> **1:15 — Show handoff.** "1st period para sees a chair get thrown. Taps Behavior, adds 'triggered by loud transition.' Posts to the team. 2nd period para refreshes and sees it. They walk in prepared instead of surprised."
+
+> **2:00 — Show privacy.** Point at the sidebar. "Real student names never leave this computer. Cloud only sees 6-digit Para App Numbers. Your district's IT director should love this."
+
+> **2:30 — Ask.** "Would you want to try this at [their school] this fall? Five paras, one semester, free."
+
+**Practice this out loud at least 20 times before your first meeting.** Time it with a phone. If it's over 3:30, cut something.
+
+### The 10-minute meeting agenda (for scheduled district meetings)
+
+1. **Minute 0-2:** Who you are, why you built it (you're a para, you know the pain).
+2. **Minute 2-5:** Live demo (same as 3-min above, but expanded).
+3. **Minute 5-7:** Fairview pilot results (screenshot a graph of logs/week, show principal's quote).
+4. **Minute 7-8:** FERPA/privacy architecture ("real names stay local, we sign your DPA").
+5. **Minute 8-9:** Price and packaging ("Fairview pays $300, which is our founding-school rate. For [their district size], we'd propose $X.").
+6. **Minute 9-10:** Ask for the next step ("Would you want a 30-day demo for three schools?").
+
+**Leave 5 minutes for questions.** If you fill the full hour with your deck, you're doing it wrong.
+
+### The one-pager (printed + PDF)
+
+A physical one-pager is still the most effective artifact at a district meeting. Structure:
+
+```
+┌─────────────────────────────────────────────────┐
+│  SUPAPARA — classroom app for paraprofessionals │
+├─────────────────────────────────────────────────┤
+│  The problem:                                   │
+│  Paras support IEP students all day and         │
+│  document on paper, if at all. IEP meetings     │
+│  miss the best data in the building.            │
+│                                                 │
+│  What we do:                                    │
+│  • One-tap classroom logging                    │
+│  • Live handoffs between periods                │
+│  • Pseudonymous cloud, real names stay local    │
+│                                                 │
+│  Fairview Middle Pilot (Apr–Jun 2026):          │
+│  • 5 paras, 28 students, 10 weeks               │
+│  • [X] incidents captured that would have been  │
+│    lost to memory alone                         │
+│  • Principal quote: "..."                       │
+│                                                 │
+│  Pricing:                                       │
+│  • $600/year per school (unlimited paras)       │
+│  • District discount for 5+ schools             │
+│                                                 │
+│  Contact: deandre@supapara.app                  │
+└─────────────────────────────────────────────────┘
+```
+
+Fits on half a letter-size sheet. Print 100 for $10 at Office Depot. Carry them everywhere.
+
+---
+
+## 4. How to find buyers (lead generation for Washington state)
+
+### Tier 1 — warm intros (do these first, highest conversion)
+
+1. **Your Fairview principal → your District Special Ed Director.** Single most valuable intro in your whole journey. Ask your principal in May. Specific ask: *"If the pilot goes well, would you introduce me to [name] at the district office?"*
+2. **Your district Sped Director → peers at other WA districts.** Sped directors talk to each other. They have a listserv. Ask for two intros after you close your first contract.
+3. **Your friends who are teachers / admins at other schools.** Every special ed teacher in WA knows 5-10 paras. Ask for coffee with their admin.
+
+### Tier 2 — professional associations (WA-specific)
+
+| Organization | What they do | How to use |
 |---|---|---|
-| Supabase Pro (when pilot outgrows free) | $25/mo × ~9 months = **$225** | Yes by fall |
-| Vercel Pro (when traffic warrants) | $20/mo × 6 months = **$120** | Maybe |
-| Domain (e.g. `supapara.app` or `supapara.com`) | $15–25/year | Yes |
-| Washington LLC formation | **$200** one-time | Strongly recommended |
-| Annual report fee (WA) | **$60/year** | Yes, once LLC exists |
-| Business checking account | $0 (most free with LLC docs) | Yes |
-| E&O / professional liability insurance | **$500–1,000/year** | Yes before first paid contract |
-| Privacy policy + TOS (generic templates fine) | $0 or **$200** (Termly, iubenda) | Yes |
-| Data Processing Agreement (DPA) template | $0 if you adapt one; **$500-1,500** if lawyer drafts | School will require one |
-| Lawyer review of your first real contract | **$500–2,000** | Strongly recommended for contract #1 |
-| Demo video hosting (Loom / YouTube) | $0 | Yes |
-| Accounting software (Wave, free; QuickBooks ~$30/mo) | **$0–360** | Optional Year 1 |
+| **WSASP** (Washington State Assoc of School Psychologists) | Annual conference, newsletter | Attend the conference. ~$300 registration. Booth rental $800. Worth it in Year 2. |
+| **WASA** (WA Assoc of School Administrators) | Superintendent conference | Too senior for Year 1. Year 2+. |
+| **WEA** (Washington Education Association) | Paras are members | Write an article for their publication. Free marketing. |
+| **AOESD** (Educational Service Districts) | 9 regional ESDs that serve multiple districts | ESDs sometimes buy software for all their districts. HUGE leverage point. Contact them after 2nd district signs. |
+| **OSPI** (Office of Superintendent of Public Instruction) | State-level | Way too early. Year 3+. |
 
-### Year 1 aggressive tight budget: **~$600**
-- LLC + annual report: $260
+### Tier 3 — cold outreach (do in batches, expect 5-10% reply rate)
+
+- **LinkedIn:** Search "Special Education Director" + Washington state. ~295 districts. DM script below.
+- **Email:** Most district websites list Sped directors. Cold email script below.
+- **Facebook groups:** "Washington State Paraeducators," "Pacific NW Special Ed Teachers." Don't spam. Occasionally answer questions and mention you built a tool.
+- **Reddit:** r/specialed, r/teachers. Same rule — answer questions, don't spam.
+
+**Cold email template (Sped Director, post-pilot):**
+> Subject: 3-min demo — app built for paraprofessionals
+>
+> Hi [Name],
+>
+> I'm a paraprofessional at Fairview Middle in [district]. I built a classroom app specifically for paras — one-tap logging, live handoffs between periods, FERPA-safe by design. Fairview piloted it this spring and [principal's name] said it changed how the paras work.
+>
+> Would you be open to a 15-minute demo in September? Happy to come to your office or Zoom, whichever's easier.
+>
+> Deandre
+> https://supapara.app
+
+**LinkedIn DM template:**
+> Hey [Name] — I'm a para at Fairview Middle. Built a tool for paraprofessionals that's being piloted at my school this spring. Short demo I recorded: [Loom link]. If it's interesting, 15 min in September?
+
+Send 10-20 of these per week after the pilot ends. **Tracking: make a simple spreadsheet — Name, District, Role, Date Sent, Reply, Meeting.** Lead gen is a numbers game.
+
+### Tier 4 — content / SEO (long game, Year 2+)
+
+- Blog post: "Why I built an app for paraprofessionals (after 5 years as one)"
+- Medium / LinkedIn article: "The paraprofessional documentation gap"
+- Demo video on YouTube: optimizes for searches like "para IEP tracking app"
+- Monthly newsletter to anyone who demos (Mailchimp free tier)
+
+---
+
+## 5. Objections — the 10 things buyers will ask, with answers
+
+These will come up every single meeting. Memorize them.
+
+**Q: "Is it FERPA compliant?"**
+> A: "FERPA-aligned by architecture. Real student names never leave the device — the cloud only sees pseudonymous 6-digit IDs that your admin controls. We sign your Data Processing Agreement. Happy to share the architecture doc if your IT team wants to review."
+
+**Q: "Who's behind this? Are you a company?"**
+> A: "I'm a paraprofessional myself — built this to solve my own problem, then Fairview's principal saw it and asked if the team could use it. SupaPara LLC is registered in Washington. I'm the sole engineer today."
+*Don't hide that you're solo. Education buyers actually like that the builder is also a practitioner. It's authentic.*
+
+**Q: "What if you stop developing it?"**
+> A: "Built-in one-click data export — every log, every incident, your whole dataset as JSON and CSV. You never get locked in. I can also hand over the codebase to your district in an escrow arrangement for district-level contracts."
+
+**Q: "Does it work on Chromebooks?"**
+> A: "Yes — designed for Chromebook viewport and touchscreens from day one. Tested on 1280×720 and 1366×768. Most paraprofessionals I know use Chromebooks exclusively."
+
+**Q: "Will our teachers have to use it too?"**
+> A: "No. It's para-only. Teachers keep using whatever IEP platform you already have — Frontline, Goalbook, whatever. SupaPara is the layer under that."
+
+**Q: "What about kids who have BIPs? Can it handle sensitive content?"**
+> A: "Yes — we have alert flagging for BIP students right on the student card. All cloud data is pseudonymous, so even in a breach the content isn't tied to a real student without the local roster file."
+
+**Q: "What does it cost?"**
+> A: [Lead with per-school, pivot to district if they're big.] "For a single school, $600/year with unlimited paras. For a district like yours with [N] schools, typically $X — I can send you a quote sheet."
+
+**Q: "We have no budget."**
+> A: "Understood. The return is measurable — time paras currently spend on paperwork. At even $15/hour para rate, one para saving 30 minutes a day is $1,350/year in recovered time. Site license is $600. If budget's truly locked, let's start with the Free Starter tier: one school, three paras, no cloud sync. Free forever."
+
+**Q: "We already use [competitor]. Why SupaPara?"**
+> A: "What you have is great for [teachers / case managers / admins]. SupaPara is specifically for paras — one-tap logging, handoffs, classroom-first. We don't replace [competitor], we sit alongside. Let me show you the difference." [Demo Simple Mode.]
+
+**Q: "What's your uptime / reliability?"**
+> A: "Cloud runs on Supabase (enterprise Postgres). 99.9% uptime SLA. App works fully offline if cloud is unreachable — paras can log locally and sync when they're back online. No class ever stops because the internet is bad."
+
+**Q: "Can we try before we buy?"**
+> A: **"Yes — 30-day free pilot at up to 3 schools. If it works, you convert to paid. If it doesn't, we part as friends, you keep your data."** This is your single most powerful response. Use it as often as you can.
+
+---
+
+## 6. Product tiers & packaging — multiple ideas to pick from
+
+Don't offer all of these. Pick 3-4 that feel right and put them on the pricing sheet. The rest are optionality.
+
+### A. Free tier (give-away, loss leader)
+
+**Name:** SupaPara Solo
+**Price:** $0 forever
+**Limits:** 1 school, 3 paras max, no cloud sync (localStorage only), no handoffs
+**Why it exists:** Gets the product in front of skeptical individuals without a purchase decision. Converts maybe 5% to paid over time.
+
+### B. School tiers
+
+**School Starter** — $400/year
+- 1 school, up to 5 paras
+- All core features (logs, case memory, Simple Mode, Export Today)
+- No parent notes, no handoffs
+- Email support only
+
+**School Standard** — $600/year ← **this is your default sell**
+- 1 school, unlimited paras
+- Everything in Starter
+- Handoffs + real-time team sync
+- Parent notes (Sped-only)
+- Phone/video support once a month
+
+**School Pro** — $900/year
+- Everything in Standard
+- Dedicated onboarding session (1 hour)
+- Priority support (24 hr response)
+- Analytics dashboard with exports
+
+### C. District tiers (volume discounts baked in)
+
+**District Small** — $3,500/year (up to 10 schools)
+- Effective rate: $350/school — 42% off list
+- Admin console for district-wide reporting
+- DPA + FERPA attestation letter included
+
+**District Standard** — $10,000/year (up to 30 schools) ← **sweet spot**
+- Effective rate: $333/school
+- Everything above + on-site training (one day)
+- Dedicated account manager (you, until you hire)
+
+**District Enterprise** — $25,000+/year (30+ schools)
+- Custom pricing based on size
+- Custom subdomain (e.g. `seattle.supapara.app`)
+- SSO / SAML login (costs you, charge extra)
+- Annual audit / review meeting
+
+### D. Add-ons (pure profit once the base is sold)
+
+- **On-site training day:** $800 flat
+- **Parent portal (Year 2 build):** $200/year/school
+- **District branded theme / logo:** $500 one-time
+- **Custom data export format:** $300 one-time
+- **Priority support upgrade:** $500/year
+- **White-glove onboarding:** $1,500 one-time (3 hours of your time × 5 schools)
+
+### E. Experimental pricing ideas
+
+- **Pay-per-incident-logged:** $0.10/log. Probably don't do this. Too variable, paras will avoid logging.
+- **Free for Title I schools:** Get PR, support equity. Cost you 10-15% of possible revenue but worth it for story. Announce in Year 2.
+- **"Founder Lifetime" — $2,000 one-time:** For the first 5 schools ever. Good PR, gets cash now. Means those 5 never pay again. Only do if you really need cash.
+- **Revenue share with the district:** Crazy idea — 50% of paid seats goes to the district's para hardship fund. Great pitch, complicated paperwork. Probably not Year 1.
+
+---
+
+## 7. Pricing — what to actually put on the sheet (2026-27 school year)
+
+Pick one set and ship it. You can always change prices for Year 2.
+
+### Recommended Year 1 pricing sheet
+
+| Tier | Price | Includes |
+|---|---|---|
+| **Solo (free)** | $0 | 1 school · 3 paras · local only |
+| **School Standard** | **$600/year** | 1 school · unlimited paras · handoffs · parent notes · email support |
+| **District Small** | **$3,500/year** | Up to 10 schools · admin console · DPA · FERPA attestation |
+| **District Standard** | **$10,000/year** | Up to 30 schools · on-site training · dedicated AM |
+
+**One-liner:** "Most schools are on Standard at $600. Most districts are on District Standard at $10,000. Solo is free if you just want to try it yourself."
+
+### Fairview next year (specific)
+
+Fairview is your "Founding School" — give them a permanent 50% discount:
+- **$300/year, locked forever as long as they renew annually.**
+- Do a small in-person renewal conversation in July 2026 with your principal.
+- Get a 3-year signed contract if they'll do it ($900 total).
+
+### Your district's first paid deal (target: Oct 2026)
+
+- Propose **District Small at $3,500/year for 10 schools** including Fairview.
+- If they push back: $2,800/year as "Launch Partner" for Year 1 only, rising to $3,500 in Year 2.
+- Multi-year: 10% discount for 2-year contract.
+
+---
+
+## 8. The close — what you actually send them to sign
+
+You need three documents. None are complicated. Templates at the end of this file.
+
+### Document 1 — Master Services Agreement (MSA)
+
+- 1 year, auto-renewing
+- Payment: annual, Net-30 invoice
+- Termination: 30 days written notice
+- Data export: within 30 days of termination
+- Governing law: Washington State
+- Limitation of liability: $X (usually contract amount or 2x)
+- Indemnification: mutual, standard
+
+### Document 2 — Data Processing Agreement (DPA)
+
+- What data you collect
+- Where it's stored (Supabase, US region)
+- Subprocessors (Supabase, Vercel)
+- Security measures
+- Breach notification (72 hours)
+- Data return/deletion on termination
+
+**Shortcut:** adapt Google's or Microsoft's DPA template. Those are the gold standard in K-12. Schools expect their language. Changing it signals "vendor is new."
+
+### Document 3 — Order Form
+
+One page per customer:
+- Their name, address, contact person
+- Tier + price
+- Effective date + term
+- Signature lines
+
+Most districts have their OWN contract templates they want you to sign. Read every line. Push back on:
+- Unlimited liability (change to $X or contract amount)
+- Unlimited indemnification (change to mutual, limited)
+- Source code escrow for small contracts (only for $50k+)
+- "We own the data" (you don't, they do, but also pushback if they claim ownership of your software)
+
+### Payment mechanics
+
+- **Invoice via Stripe Invoicing** (free, looks professional). Accept ACH and credit card.
+- **Never take personal Venmo/Zelle for business.**
+- **For districts:** They'll want to pay via PO + paper check. That's fine, just factor 30-60 days from invoice to check.
+
+---
+
+## 9. Revenue projections — honest three scenarios
+
+Updated from v1 to reflect "Fairview free through June, $300 starting Fall 2026."
+
+### Conservative (this-is-a-side-project scenario)
+
+| Year | What happened | Revenue | Costs | Net |
+|---|---|---|---|---|
+| 2026-27 | Fairview $300. No district deal. | $300 | $1,200 | **–$900** |
+| 2027-28 | 3 schools in your district at $500 avg. | $1,800 | $1,500 | **+$300** |
+| 2028-29 | 8 schools, 1 district small deal. | $6,500 | $2,500 | **+$4,000** |
+| 2029-30 | 20 schools, 2 district small deals. | $14,000 | $4,000 | **+$10,000** |
+
+### Moderate (you push hard summers + evenings)
+
+| Year | What happened | Revenue | Costs | Net |
+|---|---|---|---|---|
+| 2026-27 | Fairview $300 + 3 pilot-to-paid schools at $400. | $1,500 | $1,500 | **$0** |
+| 2027-28 | 1 district small deal ($3,500) + 8 individual schools. | $8,300 | $3,000 | **+$5,300** |
+| 2028-29 | 3 district deals, 30 schools total. | $30,000 | $6,000 | **+$24,000** |
+| 2029-30 | 6 districts, ~80 schools. | $70,000 | $12,000 | **+$58,000** |
+
+### Ambitious (full-time by end of 2027)
+
+| Year | What happened | Revenue | Costs | Net |
+|---|---|---|---|---|
+| 2026-27 | Fairview + 5 schools + 1 district deal late spring. | $7,500 | $2,500 | **+$5,000** |
+| 2027-28 | 5 districts signed. Go full-time mid-year. | $45,000 | $15,000 | **+$30,000** |
+| 2028-29 | 15 districts, ~150 schools. Hire 1 person. | $130,000 | $50,000 | **+$80,000** |
+| 2029-30 | 40 districts, ~400 schools. WA-dominant. | $300,000+ | $120,000 | **+$180,000+** |
+
+**Honest bet:** you'll land in Moderate if you commit. The gap between Moderate and Ambitious is "do you quit teaching to sell full-time." Most people don't, and that's fine.
+
+---
+
+## 10. Costs — what to actually spend (condensed from v1)
+
+### Year 1 (through Apr 2027), tight budget: **~$600**
+- LLC + WA annual report: $260
 - Domain: $20
-- Supabase 4 months: $100
-- Basic insurance: $500
-- (skip lawyer, skip Vercel Pro, DIY contracts)
+- Supabase + Vercel free tier where possible: $0–100
+- E&O insurance: $250 (if you find a cheap one)
+- Privacy policy template (Termly): $0-180
 
-### Year 1 "do it right": **~$1,600**
-- LLC + annual report: $260
-- Domain: $20
-- Supabase 9 months + Vercel Pro 3 months: $285
-- Insurance: $750
-- Lawyer review × 1 contract: $500
+### Year 1, "do it right": **~$1,600**
+Everything above plus:
+- Lawyer review of first contract: $500
+- Better insurance: $750
+- Supabase Pro for full year: $300
 
-### Later (Year 2+) — when selling to multiple districts
+### Year 2+ (when second paid district comes in)
 
-You'll eventually need:
+- Lawyer on retainer: $500–2,000/deal
+- D&O + cyber insurance: $2,000–5,000/year
+- SOC 2 Type 1 (only when asked): $8,000–15,000 one-time
+- Accountant: $500–1,500/year
+- Possibly a contractor to help with support: $500–2,000/month
 
-| Item | Cost |
-|---|---|
-| **SOC 2 Type 1 attestation** — districts 3+ usually ask | ~$8,000–15,000 one-time |
-| **Full D&O + cyber liability insurance** | $2,000–5,000/year |
-| **Real lawyer on retainer for contracts** | $500–2,000/deal |
-| **Supabase Team or Enterprise** when you pass 500 MB storage or 50 GB bandwidth | $599/mo+ |
-| **Business email / Google Workspace** | $72/user/year |
-| **Accountant for taxes** | $500–1,500/year |
-
-Don't spend any of this until you've closed your second paying district. Most of it is table stakes for selling to enterprise education buyers.
+Don't spend any of Year 2+ money until the revenue is landing.
 
 ---
 
-## What you can charge — three models, pick one
+## 11. Timeline — the critical 18 months
 
-### Model A — Per-para seat license
-
-$5–10 per para per month, billed annually to the school.
-
-**Math:**
-- Fairview has ~5 paras → $300–600/year/school
-- A mid-size district with 20 schools × 5 paras = 100 paras = $6,000–12,000/year
-
-**Pro:** Simple to explain. Scales with usage.
-**Con:** Districts hate per-seat pricing — it penalizes wider adoption. Paras are hourly, often high turnover, so the seat count changes.
-
-### Model B — Per-school site license (recommended to start)
-
-$400–800 per school per year, flat, unlimited paras.
-
-**Math:**
-- Fairview = $500/year
-- District with 20 schools that opt in = $10,000/year (price for 20+ schools, volume discount)
-- Multi-year contract with 5% discount is standard
-
-**Pro:** Easy line-item on a school budget. Encourages adding more paras. Easier to pitch ("one low fee per school, everyone who needs it can use it").
-**Con:** Undercharges small schools (they pay same as big ones). Fix with tiered pricing.
-
-**Recommended tiers:**
-- **Small school** (≤ 3 paras using it): $400/year
-- **Standard school** (4–10 paras): $600/year
-- **Big school** (11+ paras): $800/year
-
-### Model C — District enterprise
-
-$5,000–25,000/year for a district, based on student population. All schools included.
-
-**Math:**
-- Small district (1,000 students): $5,000/year
-- Medium district (10,000 students): $12,000/year
-- Large district (50,000+, e.g. Seattle): $25,000/year+
-
-**Pro:** Single contract, no school-by-school haggling. Predictable revenue.
-**Con:** Takes longer to close (district-level procurement).
+| Month | Action | Outcome |
+|---|---|---|
+| Apr 2026 | Launch pilot at Fairview | 5 paras using it daily |
+| May 2026 | Collect real usage data. Write down every quote. | Pilot data for pitch |
+| Jun 2026 | Pilot retrospective. Principal's written testimonial. | Case study in hand |
+| **Jul 2026** | **File WA LLC ($260). Buy domain. Adapt DPA. Get E&O quote. Draft one-pager.** | Legally operational |
+| Aug 2026 | Write pilot report PDF. Record 3-min demo. Landing page. | Marketing assets ready |
+| Sep 2026 | Fairview renewal conversation. $300/year "Founding School." | First revenue |
+| Sep 2026 | Email district Sped Director. Ask for October meeting. | Meeting booked |
+| Oct 2026 | District pitch. Ask for 3-school trial. | Contract draft going back and forth |
+| Nov 2026 | Close or don't. Either way, you learn a ton. | First district or first rejection |
+| Dec 2026 | If yes: roll out. If no: 5 cold emails to other districts. | Either way, momentum |
+| Jan 2027 | WSASP conference if in range. $300 + travel. | 2-3 warm leads |
+| Feb–Apr 2027 | Cold outreach + demos to other WA districts. | 2nd district closing Q2 |
+| May 2027 | Year 1 review. Decide 2027-28 strategy. | Moderate or Ambitious path choice |
 
 ---
 
-### My recommended play
+## 12. First 30 days — what to do, this week, this month
 
-Start with **Model B (per-school)** in your district. Once you have 5+ schools in one district, pivot the conversation with the district to **Model C** at a discount. Carry both pricing sheets.
+### This week (Apr 23–30, 2026)
+- [ ] Buy domain (`supapara.app` ~$15). Point Vercel at it.
+- [ ] Write a one-sentence pitch for Fairview paras to see when they open the app: "Piloting April–June with your team. Free to use."
+- [ ] Draft a simple Fairview Pilot Agreement (two paragraphs) and get it signed by principal next week.
+- [ ] Start a spreadsheet: "Pilot Feedback Tracker" — para name, date, quote, bug, feature request.
 
-**First-paid-customer discount:** charge Fairview $250 for the Apr–Jun pilot if the principal wants to convert it to paid. This gives you a "paying customer" reference on paper. Don't give it away free if they're willing to pay even a token — it sets the wrong precedent.
+### Weeks 2-4 (May)
+- [ ] 15-minute in-person check-in with each para using it. Bring donuts.
+- [ ] Write a privacy policy + terms of service (use Termly for $15, or adapt a template). Link from the app footer.
+- [ ] Record a 2-minute Loom demo video. Use it in every future conversation.
+- [ ] Ask your principal: "If this pilot goes well, would you introduce me to Sped leadership at the district?"
 
----
-
-## Revenue projections (honest three scenarios)
-
-### Conservative — you do this as a side thing
-
-| Year | Customers | ARR | Net after costs |
-|---|---|---|---|
-| Year 1 (Apr 2026–Apr 2027) | Fairview only | $250–500 | **–$800 to –$1,000** (pilot loss) |
-| Year 2 | 3 schools in your district | $1,500–2,400 | **–$600 to +$200** |
-| Year 3 | 10 schools / 1 small district | $4,000–6,000 | **+$2,000–4,000** |
-| Year 4 | 25 schools / 2 districts | $12,000–18,000 | **+$9,000–14,000** |
-
-### Moderate — you push on it in summer + evenings
-
-| Year | Customers | ARR | Net after costs |
-|---|---|---|---|
-| Year 1 | Fairview + 2 friend districts' schools | $1,500 | –$500 |
-| Year 2 | 15 schools / 2 districts | $9,000 | +$6,000 |
-| Year 3 | 50 schools / 5 districts | $30,000 | +$20,000 |
-| Year 4 | 120 schools / 10 districts | $70,000 | +$45,000 |
-
-### Ambitious — you go full-time on it in 2027
-
-| Year | Customers | ARR | Net after costs |
-|---|---|---|---|
-| Year 1 | Fairview + 5 schools | $3,000 | –$1,000 |
-| Year 2 | 40 schools / 4 districts | $24,000 | +$12,000 (still teaching PT) |
-| Year 3 | 150 schools / 12 districts | $90,000 | +$55,000 (first year full-time) |
-| Year 4 | 400 schools / 30 districts | $240,000 | +$150,000 |
-
-**Reality:** Hitting "Ambitious" requires either (a) going full-time in Year 3 or (b) hiring help. Most solo founders land between Conservative and Moderate in Year 2–3.
+### June (the critical month)
+- [ ] Run a 30-minute pilot retrospective meeting with the paras + principal.
+- [ ] Get the principal's testimonial in writing (a 3-sentence email works).
+- [ ] Decide: do you commit to pitching the district? If yes, block 20 hours in July for prep.
 
 ---
 
-## Risks — the ones that actually bite
+## 13. Risks — what actually kills this
 
-### Privacy / FERPA
-- Schools will ask: "Is it FERPA-compliant?" The right answer is: **"Our architecture is FERPA-aligned — real student names never leave the school's devices, only anonymized identifiers sync. We'll sign your Data Processing Agreement."**
-- They will NOT ask for a SOC 2 at first. But district #3 or #4 probably will.
-- You need a written privacy policy on your site before you take money.
-
-### Liability
-- If a paraprofessional logs that "Kid X threw a chair" and that gets subpoenaed in a lawsuit, you are named in the lawsuit.
-- **Get E&O insurance before you take a dollar.** Insurers like Hiscox or Next cover solo tech founders for ~$500–1000/year.
-
-### Procurement speed
-- School districts take 3–12 months to approve new software.
-- Your pilot letter from Fairview skips a HUGE amount of this.
-- But other districts won't have that advantage. Budget for 6 months cycle.
-
-### Competitive threat
-- Bigger players: **Frontline Education, IEP Direct, SEAS, GoalBook, Unique Learning System**. They mostly target teachers and case managers, NOT paras. That's your wedge.
-- Risk: one of them notices and copies your para-focused features. Defense: move fast, own the relationships.
-
-### Single-person risk
-- You get sick, the product dies. Districts notice.
-- Mitigate by: good docs, daily Supabase backups (Pro tier), a trusted friend with access to push hotfixes.
-
-### Your day job
-- You're a para. Spending 20 hrs/week on this during school year = burnout in 6 months. Set boundaries.
-- The pilot is cheaper in time than district sales. The district pitch is the time spike — plan to use your July/August for it.
+1. **You burn out during the school year.** You're still a para. 10 hrs/week max on this during school. Hold the line.
+2. **Your principal leaves.** Principals turn over. Get your agreement in writing, not just verbal.
+3. **A district IT director rejects on FERPA grounds** even though you're aligned. Have your architecture doc ready. If they still reject, move on — it's not worth arguing.
+4. **Someone copies your feature set.** Unlikely at your stage but possible. Move fast and own the relationships. The features aren't the moat; the paras' trust is.
+5. **You hire too early.** Don't hire before you have 3 paying districts. You'll stress cash flow and manage someone who has no playbook.
+6. **You quit teaching too early.** Don't quit your day job until you have 6 months of runway AND monthly revenue > 1.5x your para salary for 3 months straight.
 
 ---
 
-## Legal + compliance checklist (do these before first paid contract)
+## 14. Appendix — document templates (drop-in)
 
-1. **File WA LLC** — $200 online, takes 1 week. Entity name: "SupaPara LLC" or similar.
-2. **Get an EIN from IRS** — free, online, 15 minutes. You need this for business banking + taxes.
-3. **Open business checking** (Chase, Bluevine, or Wise). Keep personal and business separate day one.
-4. **Buy a domain** — `supapara.app` or `supapara.com`. Point the Vercel deploy at it so it's not on `*.vercel.app`. Feels like a real product.
-5. **Write a Privacy Policy + Terms of Service.** Use Termly or iubenda ($15–30/mo) or copy a reasonable template from a similar edtech product and adapt (but know what you're signing).
-6. **Draft a Data Processing Agreement (DPA)** — schools will require this. Adapt Google's or Microsoft's template for education customers. Keep it short.
-7. **Get E&O insurance** — Hiscox, Next, Hartford. Quote in minutes.
-8. **Trademark** — optional. "SupaPara" is probably fine to use without TM. If you want one, ~$350 via LegalZoom or USPTO directly.
-9. **Register with WA Dept. of Revenue** — file a business license ($90 one-time + annual renewal). Needed to collect sales tax if WA ever decides SaaS is taxable (currently mostly not for B2B services, but check).
+### Fairview Pilot Agreement (1 page)
+
+> **SupaPara Pilot Agreement — Fairview Middle School**
+>
+> SupaPara ("the App") will be made available at no charge to Fairview Middle School's paraprofessional team between April 1, 2026 and June 15, 2026.
+>
+> During this pilot:
+> - Paraprofessionals will use the App to log classroom observations, share handoffs, and track IEP student support.
+> - Real student names will not be stored in the cloud. Only pseudonymous 6-digit identifiers and working notes (as described in the SupaPara Privacy Architecture) will sync.
+> - Fairview may terminate the pilot at any time by notifying the developer.
+> - At pilot end, all data from the pilot may be exported and retained by Fairview.
+>
+> This agreement carries no financial obligation.
+>
+> Signed:
+> ______________________________  [Principal]
+> ______________________________  [Deandre — SupaPara LLC]
+> Date: _________
+
+### District cold email (post-pilot)
+
+> Subject: Fairview's paras using a new classroom app — 15-min demo?
+>
+> Hi [Dr. X / Mx. Y],
+>
+> I'm Deandre, a paraprofessional at Fairview Middle. This spring our five paras piloted an app I built specifically for paraprofessionals — one-tap classroom logging, live handoffs between periods, FERPA-aligned by design (real student names never leave the device).
+>
+> [Principal name] sent me this note at the end of the pilot: *"[3-sentence quote]"*.
+>
+> I'd love 15 minutes in September to show you where our paras landed and see if it's interesting for [their district]. Happy to come to your office, or Zoom if that's easier.
+>
+> Two-minute demo if you want to preview: https://supapara.app/demo
+>
+> Thanks,
+> Deandre
+> SupaPara LLC
+> deandre@supapara.app
+> [phone]
+
+### Price sheet (one page, PDF)
+
+```
+SUPAPARA · 2026-27 PRICING
+
+School Standard — $600/year/school
+  Unlimited paras · handoffs · parent notes
+  Cloud sync · email support
+  This is the right fit for 95% of schools.
+
+District Small — $3,500/year (up to 10 schools)
+  Everything in School Standard for every covered school
+  Admin console · DPA · FERPA attestation letter
+
+District Standard — $10,000/year (up to 30 schools)
+  Everything in District Small
+  On-site training · dedicated account manager
+
+Founding School rate (Fairview and first 2 customers):
+  $300/year, locked as long as you renew
+
+Solo (individual para, free):
+  1 school, 3 paras, local-only, no cloud
+
+Pilots are always free for 30 days at up to 3 schools.
+
+Questions: deandre@supapara.app · supapara.app
+```
 
 ---
 
-## What to do in the next 30 days
+## TL;DR
 
-### Week 1 (this week)
-- [ ] Buy `supapara.app` or similar domain ($15). Point Vercel at it.
-- [ ] Draft a one-page "Fairview Pilot Agreement" — free pilot April–June, privacy terms, no data sharing. Get your principal to sign it. This is your first legal doc and your template for later.
-- [ ] Create a simple landing page (can be one HTML file) with: what SupaPara is, privacy model, "Request a pilot" email link.
+- **Don't charge Fairview through June.** Stay free as promised.
+- **Starting Sep 2026:** Fairview pays $300/year as Founding School.
+- **Target district Sped Director Oct 2026** for first real contract (~$3,500/year, 10 schools).
+- **Expect $0–$5,000 net in Year 1** and $5k–$30k in Year 2 if you push.
+- **Your single biggest sales asset** is the Fairview principal's written testimonial. Every district pitch leans on it.
+- **Your single biggest time risk** is burning out during the school year. Cap at 10 hrs/week in-term, 20 hrs/week out-of-term.
+- **Charge $600/school/year standard, $3,500/district/year for small volume, $10k/district for medium volume.**
+- **Spend ~$600 in Year 1** (LLC, domain, insurance, basic legal). Don't spend more until revenue shows up.
+- **Do NOT spend on SOC 2 until your third paid district asks for it.**
 
-### Weeks 2–3
-- [ ] Write a privacy policy + TOS — use Termly or adapt an existing edtech one. Ship to your site.
-- [ ] Set up the pilot at Fairview formally — email the para team, share signup instructions.
-- [ ] Start a log of every bug, every feature request, every compliment — this is your pilot report data.
-
-### Week 4 (end of April)
-- [ ] First pilot retrospective. Ask each para: "Would you keep using this next year? What would you pay?"
-- [ ] Form your WA LLC if the feedback is positive.
-- [ ] Get a quote for E&O insurance (just know the number).
-
----
-
-## The "don't" list
-
-- ❌ Don't give the app away free forever. Charge *something* for Fairview even if it's $250 so you have a paying customer.
-- ❌ Don't try to sell to a district before you have a pilot report. "Fairview used it and loved it" is your only currency.
-- ❌ Don't spend on SOC 2 before your third paying district asks.
-- ❌ Don't quit your day job until ARR > 2x your para salary for 3 consecutive months AND you have a written 6-month runway.
-- ❌ Don't sign a district contract without a lawyer reviewing the first one.
-- ❌ Don't take investor money at this stage. You don't need it, and it changes everything about your incentives.
-- ❌ Don't add features during the pilot unless a para explicitly asks. Every feature you add is one more thing to break.
-- ❌ Don't promise features you haven't built ("yes, we'll have SMS alerts next month" → trust-destroying if you miss).
-
----
-
-## The "do" list
-
-- ✅ Do get a written letter of support from your principal at the end of pilot. Use it in every district pitch.
-- ✅ Do record a 3-minute demo video (Loom) — principals can't sit through a 30-min demo but they'll watch 3 min.
-- ✅ Do read Washington's *Student User Privacy Act* (SB 5419) — it's the state law you'll be compliant with. One afternoon's reading.
-- ✅ Do talk to special ed directors at other local districts socially, informally, ASAP. You want warm intros, not cold pitches.
-- ✅ Do join your state's paraprofessional professional association (WEA-PARA or similar) — that's where word-of-mouth spreads.
-- ✅ Do reply to every para's bug report within 24 hours during the pilot. Overservice is your moat.
-- ✅ Do price for the buyer's budget, not your hope. A principal can discretionary-approve $500 without going to the board. $5,000 is a budget-cycle conversation.
-
----
-
-## One specific strategic question to decide now
-
-**Do you want this to stay local/regional, or do you want a real software business?**
-
-They're different products and different lives. Both are legitimate.
-
-- **Local/regional:** Sell to 10–30 schools in your area. Run it as a part-time thing. $20–50k/year net. You stay a para. Low stress, durable.
-- **Real software business:** Washington → Pacific Northwest → national. Requires eventually quitting your day job, hiring, raising money. $500k+/year ceiling but higher stress and risk.
-
-**My read:** Start local/regional and decide in Year 2 whether the market pulls you into "real software business." The Fairview pilot and your first district together will tell you which one feels right.
-
-You're not locked into either path by any of the above. Every decision in Year 1 is reversible.
-
----
-
-## Summary in one paragraph
-
-April–June 2026: free Fairview pilot. Spend ~$0, collect data. Summer 2026: file LLC ($260), buy domain ($20), get E&O insurance (~$750), write pilot report + privacy docs. September 2026: pitch your district at $500–800/school/year. Year 1 realistic net: break even to small loss. Year 2 realistic net: $5k–$15k. Year 3 realistic net: $20k–$55k. Year 4 could be part-time income or a pivot decision. Biggest cost isn't money — it's your time during the school year. The thing that will make or break this is pilot quality, not product features.
+The whole game right now: run the pilot like your career depends on it, because this story is what you're selling in October.
