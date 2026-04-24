@@ -99,13 +99,46 @@ export function splitByStudents(iepText, rosterNames) {
 // Takes { name → section-text } and produces { name → parsed IEP object }.
 // Calls onProgress(name, status) for UI feedback.
 
+// Strip anything that looks like the student's real name (or common PII
+// keys like "Student:", "Name:") from the section text BEFORE sending it
+// to the AI. We already know the name from the roster — the model doesn't
+// need it. With the cloud provider this matters for privacy; with local
+// Ollama it doesn't, but the stripping is cheap and consistent.
+export function stripNameFromSection(name, sectionText) {
+  if (!sectionText) return '';
+  let out = sectionText;
+  if (name) {
+    const parts = name.split(/\s+/).filter(Boolean);
+    const first = parts[0] ? parts[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : '';
+    const last = parts.length > 1 ? parts[parts.length - 1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : '';
+    // Full name patterns (with optional middle tokens)
+    if (first && last) {
+      const re = new RegExp(`\\b${first}\\b(?:\\s+\\w+\\.?)*\\s+\\b${last}\\b`, 'gi');
+      out = out.replace(re, '[STUDENT]');
+    } else if (first) {
+      out = out.replace(new RegExp(`\\b${first}\\b`, 'gi'), '[STUDENT]');
+    }
+    // Individual first/last occurrences (for references later in the text)
+    if (first) out = out.replace(new RegExp(`\\b${first}\\b`, 'gi'), '[STUDENT]');
+    if (last)  out = out.replace(new RegExp(`\\b${last}\\b`, 'gi'), '[STUDENT]');
+  }
+  // Also strip common PII label lines: "Name: ...", "Student: ..."
+  out = out.replace(/^\s*(Name|Student|Full\s*Name)\s*[:—-].*$/gim, '');
+  return out.trim();
+}
+
 export async function extractAllStudents(sections, onProgress = () => {}) {
   const results = new Map();
   const errors = [];
   for (const [name, text] of sections.entries()) {
     onProgress(name, 'parsing');
     try {
-      const parsed = await parseIEP(text);
+      // Send the IEP body WITHOUT the student's real name. We already know
+      // the name from the roster; the AI doesn't need to see it to extract
+      // eligibility / goals / accs. This protects names from ever reaching
+      // any third-party cloud provider on the Gemini path.
+      const anonymized = stripNameFromSection(name, text);
+      const parsed = await parseIEP(anonymized);
       if (parsed) {
         results.set(name, parsed);
         onProgress(name, 'done');

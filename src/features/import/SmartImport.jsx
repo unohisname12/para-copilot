@@ -314,6 +314,30 @@ export default function SmartImport({ onBulkImport, onIdentityLoad }) {
             <button onClick={saveCloudConfig} className="btn btn-primary btn-sm">
               Save + re-check
             </button>
+            {/* Privacy warning — explains free vs paid tier data handling */}
+            <div style={{
+              padding: 'var(--space-3)',
+              background: 'var(--yellow-muted)',
+              border: '1px solid rgba(251,191,36,0.35)',
+              borderRadius: 'var(--radius-md)',
+              fontSize: 11.5, color: 'var(--text-primary)',
+              lineHeight: 1.55, marginTop: 'var(--space-2)',
+            }}>
+              <div style={{ fontWeight: 700, color: 'var(--yellow)', marginBottom: 4 }}>
+                ⚠ Privacy: know what tier you're on
+              </div>
+              <div style={{ color: 'var(--text-secondary)' }}>
+                <b>Free API key (no billing enabled):</b> Google uses prompts + responses to
+                improve their models. Not safe for real student data.<br />
+                <b>Paid API key (billing enabled, often $0/mo in practice):</b> Google does
+                NOT train on your data; 55-day abuse-detection retention only.<br /><br />
+                We <b>already strip student names</b> before sending text to the cloud, but
+                IEP details still go. For district deployments, flip on billing at{' '}
+                <a href="https://console.cloud.google.com/billing" target="_blank" rel="noopener noreferrer"
+                   style={{ color: 'var(--accent-hover)' }}>console.cloud.google.com/billing</a>.
+                Your key format stays the same; data handling changes immediately.
+              </div>
+            </div>
           </div>
         )}
       </div>

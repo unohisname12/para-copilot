@@ -2,6 +2,7 @@ import {
   splitByStudents,
   buildBundleFromExtraction,
   buildMatchReport,
+  stripNameFromSection,
 } from '../features/import/iepExtractor';
 
 describe('splitByStudents', () => {
@@ -83,6 +84,38 @@ describe('buildBundleFromExtraction', () => {
     const bundle = buildBundleFromExtraction(roster, new Map());
     expect(bundle.normalizedStudents.students[0].flags.iepNotYetOnFile).toBe(true);
     expect(bundle.normalizedStudents.students[0].eligibility).toBe('');
+  });
+});
+
+describe('stripNameFromSection', () => {
+  test('replaces full name with [STUDENT]', () => {
+    const input = 'Jordan Smith\nEligibility: Speech\nJordan needs extra time.';
+    const out = stripNameFromSection('Jordan Smith', input);
+    expect(out).not.toMatch(/Jordan/i);
+    expect(out).not.toMatch(/Smith/i);
+    expect(out).toMatch(/STUDENT/);
+    expect(out).toMatch(/Eligibility: Speech/);
+  });
+
+  test('handles first name or last name references later in the text', () => {
+    const input = 'Jordan Smith\nBackground\nSmith has struggled with articulation. Jordan will attend speech therapy.';
+    const out = stripNameFromSection('Jordan Smith', input);
+    expect(out).not.toMatch(/\bJordan\b/);
+    expect(out).not.toMatch(/\bSmith\b/);
+  });
+
+  test('strips "Name:" and "Student:" lines', () => {
+    const input = 'Name: Jordan Smith\nGrade: 7\nStudent: Jordan\nGoals: articulation';
+    const out = stripNameFromSection('Jordan Smith', input);
+    expect(out).not.toMatch(/^Name:/m);
+    expect(out).not.toMatch(/^Student:/m);
+    expect(out).toMatch(/Grade: 7/);
+    expect(out).toMatch(/Goals:/);
+  });
+
+  test('is safe with no name given', () => {
+    const input = 'Some unrelated text.';
+    expect(stripNameFromSection('', input)).toBe('Some unrelated text.');
   });
 });
 
