@@ -8,57 +8,66 @@
 
 /* ── Design Tokens ─────────────────────────────────────────── */
 :root {
-  /* Palette — deeper blacks, blue-violet gradient accents */
-  --bg-deep:      #03060d;
-  --bg-dark:      #080d1a;
-  --bg-surface:   #0d1428;
-  --panel-bg:     #111a33;
-  --panel-hover:  #17223f;
-  --panel-raised: #1a2648;
+  /* Palette — calm deep navy, not pure black. Less saturated, less glow. */
+  --bg-deep:      #0a0f1c;
+  --bg-dark:      #0f1524;
+  --bg-surface:   #131a2e;
+  --panel-bg:     #161e36;
+  --panel-hover:  #1c2644;
+  --panel-raised: #1f2a4b;
 
-  --border:        #1f2b4a;
-  --border-light:  #293a63;
-  --border-accent: rgba(125, 120, 255, 0.28);
+  --border:        #243055;
+  --border-light:  #33416d;
+  --border-accent: rgba(59, 130, 246, 0.32);
 
-  /* Text hierarchy */
-  --text-primary:   #eef2fb;
-  --text-secondary: #aab9d6;
-  --text-muted:     #6b7ea3;
-  --text-dim:       #3f537a;
+  /* Text hierarchy — soft white, not pure white */
+  --text-primary:   #e7ecf5;
+  --text-secondary: #a7b3cf;
+  --text-muted:     #6d7b9a;
+  --text-dim:       #455477;
 
-  /* Accent: blue → violet gradient family */
-  --accent:          #7a9cff;
-  --accent-strong:   #6488ff;
-  --accent-hover:    #9bb3ff;
-  --accent-glow:     rgba(122, 156, 255, 0.14);
-  --accent-border:   rgba(122, 156, 255, 0.38);
+  /* Primary brand: Academic Blue (blue-500 / blue-600) */
+  --accent:          #3b82f6;
+  --accent-strong:   #2563eb;
+  --accent-hover:    #60a5fa;
+  --accent-glow:     rgba(59, 130, 246, 0.12);
+  --accent-border:   rgba(59, 130, 246, 0.35);
 
-  --violet:       #a78bfa;
-  --violet-muted: rgba(167, 139, 250, 0.18);
+  /* Secondary decoration only — reserved for brand mark / rare emphasis */
+  --violet:       #8b5cf6;
+  --violet-muted: rgba(139, 92, 246, 0.14);
   --cyan:         #22d3ee;
-  --cyan-muted:   rgba(34, 211, 238, 0.16);
+  --cyan-muted:   rgba(34, 211, 238, 0.14);
 
-  /* State colors */
-  --green:        #34d399;
-  --green-muted:  rgba(52, 211, 153, 0.14);
-  --yellow:       #fbbf24;
-  --yellow-muted: rgba(251, 191, 36, 0.14);
-  --red:          #f87171;
-  --red-muted:    rgba(248, 113, 113, 0.14);
-  --orange:       #fb923c;
+  /* CTA — Orange. ONLY for primary action buttons. Never chrome. */
+  --cta:          #f97316;
+  --cta-hover:    #fb923c;
+  --cta-active:   #ea580c;
+  --cta-glow:     rgba(249, 115, 22, 0.28);
+
+  /* State colors — semantic, single-purpose */
+  --green:        #22c55e;
+  --green-muted:  rgba(34, 197, 94, 0.14);
+  --yellow:       #eab308;
+  --yellow-muted: rgba(234, 179, 8, 0.14);
+  --red:          #ef4444;
+  --red-muted:    rgba(239, 68, 68, 0.14);
+  --orange:       var(--cta);
 
   /* Legacy compat (existing code uses these) */
   --blue:         var(--accent);
-  --blue-muted:   rgba(122, 156, 255, 0.2);
+  --blue-muted:   rgba(59, 130, 246, 0.18);
   --purple:       var(--violet);
   --purple-muted: var(--violet-muted);
   --teal:         var(--cyan);
 
-  /* Gradients */
-  --grad-primary:   linear-gradient(135deg, #6488ff 0%, #a78bfa 100%);
-  --grad-accent:    linear-gradient(135deg, #7a9cff 0%, #c084fc 100%);
-  --grad-surface:   linear-gradient(180deg, rgba(26, 38, 72, 0.6) 0%, rgba(13, 20, 40, 0.6) 100%);
-  --grad-card-glow: radial-gradient(1000px circle at 30% -10%, rgba(122,156,255,0.08), transparent 40%);
+  /* Gradients — brand only. Everyday UI uses solid colors. */
+  --grad-primary:   linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+  --grad-brand:     linear-gradient(135deg, #2563eb 0%, #8b5cf6 100%);
+  --grad-cta:       linear-gradient(180deg, #fb923c 0%, #f97316 100%);
+  --grad-accent:    var(--grad-primary);
+  --grad-surface:   linear-gradient(180deg, rgba(31, 42, 75, 0.45) 0%, rgba(19, 26, 46, 0.45) 100%);
+  --grad-card-glow: radial-gradient(800px circle at 30% -10%, rgba(59,130,246,0.04), transparent 40%);
 
   /* Spacing scale (4px base) */
   --space-1: 4px;
@@ -80,11 +89,12 @@
   --radius-2xl:  28px;
   --radius-pill: 999px;
 
-  /* Shadows — 2-layer with subtle violet tint */
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.35), 0 0 0 1px rgba(122,156,255,0.04);
-  --shadow-md: 0 6px 18px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.4);
-  --shadow-lg: 0 20px 50px rgba(0,0,0,0.55), 0 2px 6px rgba(0,0,0,0.35);
-  --shadow-glow: 0 0 0 1px var(--accent-border), 0 8px 28px rgba(122,156,255,0.22);
+  /* Shadows — calmer, depth via layering not glow */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.30);
+  --shadow-md: 0 4px 14px rgba(0,0,0,0.40), 0 1px 2px rgba(0,0,0,0.30);
+  --shadow-lg: 0 16px 40px rgba(0,0,0,0.45), 0 2px 4px rgba(0,0,0,0.25);
+  --shadow-glow: 0 0 0 1px var(--accent-border), 0 4px 16px rgba(59,130,246,0.12);
+  --shadow-cta: 0 4px 14px rgba(249,115,22,0.28), inset 0 1px 0 rgba(255,255,255,0.15);
 
   /* Motion */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -121,10 +131,9 @@ body {
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
   height: 100vh;
-  /* Subtle vignette */
+  /* Single subtle top highlight — removed bottom violet wash */
   background-image:
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(122,156,255,0.06), transparent 60%),
-    radial-gradient(ellipse 80% 50% at 80% 120%, rgba(167,139,250,0.05), transparent 60%);
+    radial-gradient(ellipse 70% 40% at 50% -10%, rgba(59,130,246,0.035), transparent 60%);
 }
 
 #root { height: 100vh; }
@@ -163,7 +172,7 @@ input:focus:not(:focus-visible), textarea:focus:not(:focus-visible) {
 .sidebar {
   width: var(--sidebar-w);
   flex-shrink: 0;
-  background: linear-gradient(180deg, var(--bg-dark) 0%, var(--bg-deep) 100%);
+  background: var(--bg-dark);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -171,7 +180,6 @@ input:focus:not(:focus-visible), textarea:focus:not(:focus-visible) {
   gap: var(--space-1);
   overflow-y: auto;
   overflow-x: hidden;
-  box-shadow: inset -1px 0 0 var(--border), 1px 0 50px rgba(122,156,255,0.04);
   transition: width var(--duration-base) var(--ease-out);
 }
 
@@ -234,14 +242,10 @@ input:focus:not(:focus-visible), textarea:focus:not(:focus-visible) {
   font-size: 16px;
   font-weight: 800;
   letter-spacing: -0.02em;
-  color: var(--text-primary);
+  color: var(--accent);
   padding: var(--space-1) var(--space-1) var(--space-4);
   margin-bottom: var(--space-2);
   border-bottom: 1px solid var(--border);
-  background: var(--grad-primary);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
 }
 
 .sidebar-section-label {
@@ -301,8 +305,7 @@ input:focus:not(:focus-visible), textarea:focus:not(:focus-visible) {
   background: var(--accent-glow);
   color: var(--text-primary);
   font-weight: 600;
-  border-color: var(--accent-border);
-  box-shadow: var(--shadow-glow);
+  border-color: transparent;
 }
 
 .nav-btn.active::before {
@@ -310,7 +313,7 @@ input:focus:not(:focus-visible), textarea:focus:not(:focus-visible) {
   width: 3px;
   height: 18px;
   border-radius: var(--radius-pill);
-  background: var(--grad-primary);
+  background: var(--accent);
   margin-right: 4px;
   flex-shrink: 0;
 }
@@ -325,17 +328,7 @@ input:focus:not(:focus-visible), textarea:focus:not(:focus-visible) {
   position: relative;
 }
 
-.main-content::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background:
-    radial-gradient(ellipse 50% 40% at 20% 0%, rgba(122,156,255,0.04), transparent 60%),
-    radial-gradient(ellipse 40% 40% at 100% 100%, rgba(167,139,250,0.035), transparent 60%);
-  pointer-events: none;
-  z-index: 0;
-}
-
+/* Ambient wash removed — clarity > atmosphere */
 .main-content > * { position: relative; z-index: 1; }
 
 /* ══════════════════════════════════════════════════════════════
@@ -359,7 +352,7 @@ input:focus:not(:focus-visible), textarea:focus:not(:focus-visible) {
   inset: 0;
   background: var(--grad-card-glow);
   pointer-events: none;
-  opacity: 0.6;
+  opacity: 0.25;
 }
 
 .panel > * { position: relative; }
@@ -378,18 +371,12 @@ input:focus:not(:focus-visible), textarea:focus:not(:focus-visible) {
   overflow: hidden;
 }
 
-.card-elevated::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: var(--grad-card-glow);
-  pointer-events: none;
-}
+/* Elevated card glow removed — depth comes from shadow + border */
 
 .card-elevated:hover {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
   box-shadow: var(--shadow-lg);
-  border-color: var(--accent-border);
+  border-color: var(--border-light);
 }
 
 .card-elevated > * { position: relative; z-index: 1; }
@@ -438,22 +425,14 @@ input:focus:not(:focus-visible), textarea:focus:not(:focus-visible) {
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 2px;
-  background: var(--grad-primary);
-  opacity: 0.8;
-}
-
-.metric-card::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: var(--grad-card-glow);
-  pointer-events: none;
+  background: var(--accent);
+  opacity: 0.55;
 }
 
 .metric-card:hover {
-  transform: translateY(-2px);
-  border-color: var(--accent-border);
-  box-shadow: var(--shadow-lg);
+  transform: translateY(-1px);
+  border-color: var(--border-light);
+  box-shadow: var(--shadow-md);
 }
 
 .metric-card > * { position: relative; z-index: 1; }
@@ -515,6 +494,7 @@ input:focus:not(:focus-visible), textarea:focus:not(:focus-visible) {
   inset: 0;
   background: var(--grad-card-glow);
   pointer-events: none;
+  opacity: 0.5;
 }
 
 .welcome-banner > * { position: relative; z-index: 1; }
@@ -590,11 +570,11 @@ input:focus:not(:focus-visible), textarea:focus:not(:focus-visible) {
 }
 
 .chat-bubble.user {
-  background: var(--grad-primary);
+  background: var(--accent-strong);
   color: #fff;
   border-bottom-right-radius: 4px;
   align-self: flex-end;
-  box-shadow: 0 4px 16px rgba(100, 136, 255, 0.32);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.18);
 }
 
 .chat-bubble.app {
@@ -664,17 +644,19 @@ input:focus:not(:focus-visible), textarea:focus:not(:focus-visible) {
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .btn-primary {
-  background: var(--grad-primary);
+  background: var(--cta);
   color: #fff;
   border-color: transparent;
-  box-shadow: 0 4px 14px rgba(100,136,255,0.3), inset 0 1px 0 rgba(255,255,255,0.15);
+  box-shadow: var(--shadow-cta);
 }
 
 .btn-primary:hover:not(:disabled) {
-  box-shadow: 0 6px 20px rgba(100,136,255,0.45), inset 0 1px 0 rgba(255,255,255,0.2);
+  background: var(--cta-hover);
+  box-shadow: 0 6px 20px rgba(249,115,22,0.38), inset 0 1px 0 rgba(255,255,255,0.18);
   transform: translateY(-1px);
-  filter: brightness(1.08);
 }
+
+.btn-primary:active:not(:disabled) { background: var(--cta-active); }
 
 .btn-secondary {
   background: var(--bg-surface);
@@ -805,10 +787,10 @@ input:focus:not(:focus-visible), textarea:focus:not(:focus-visible) {
 }
 
 .modal-content {
-  background: linear-gradient(180deg, var(--panel-raised), var(--panel-bg));
+  background: var(--panel-raised);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-lg), 0 0 1px var(--accent-border);
+  box-shadow: var(--shadow-lg);
   overflow: hidden;
   animation: modalSlide var(--duration-base) var(--ease-out);
   max-width: min(640px, 100vw - 32px);
