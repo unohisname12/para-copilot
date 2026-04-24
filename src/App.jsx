@@ -850,6 +850,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
               logs={logs}
               addLog={addLog}
               deleteLog={deleteLog}
+              updateLogText={updateLogText}
               currentDate={currentDate}
               allStudents={allStudents}
               effectivePeriodStudents={effectivePeriodStudents}

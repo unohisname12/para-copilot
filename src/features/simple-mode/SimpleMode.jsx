@@ -1,8 +1,11 @@
 // ══════════════════════════════════════════════════════════════
-// SIMPLE MODE — Para Note Entry (v2)
-// The para should never have to type unless they want to. Every
-// category is a one-tap action on every student. If they DO want
-// to write something, the "+note" button opens a full note screen.
+// SIMPLE MODE — Para Note Entry (v3)
+// - One-tap per category (same as v2)
+// - Inline quick-note bar appears 5s after any tap; Enter appends note
+// - Today's summary strip with clickable pills (filter to "not yet today")
+// - Double-click a category icon → jump straight to the note screen
+//   with that category pre-selected
+// - Responsive grid: 1 column on narrow, 2 on wide (auto-fit ≥ 520px)
 // ══════════════════════════════════════════════════════════════
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { DB, SUPPORT_CARDS } from '../../data';
@@ -81,7 +84,7 @@ function sortRows(rows, mode) {
   return sorted;
 }
 
-export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, deleteLog, currentDate, allStudents, effectivePeriodStudents }) {
+export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, deleteLog, updateLogText, currentDate, allStudents, effectivePeriodStudents }) {
   const [step, setStep] = useState("students"); // "students" | "note" | "tool"
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [noteText, setNoteText] = useState("");
@@ -93,6 +96,15 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
   const [sortMode, setSortMode] = useState("needs"); // "needs" | "name"
   const [undoEntry, setUndoEntry] = useState(null); // { logId, studentId, categoryLabel, deadlineTs }
   const undoTimer = useRef();
+
+  // v3: inline quick-note window that opens below the row for 5s after a tap.
+  // { logId, studentId, categoryLabel, tone } | null
+  const [quickNoteFor, setQuickNoteFor] = useState(null);
+  const [quickNoteDraft, setQuickNoteDraft] = useState("");
+  const quickNoteTimer = useRef();
+
+  // v3: filter for "show only students who haven't gotten [category] today"
+  const [summaryFilter, setSummaryFilter] = useState(null);
 
   const period = DB.periods[activePeriod];
   const studentsMap = allStudents || {};
@@ -135,7 +147,46 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
     });
     setFlashState({ id: studentId, category: categoryId });
     setTimeout(() => setFlashState((f) => (f?.id === studentId ? null : f)), 900);
-    if (newLog?.id) showUndo(newLog.id, studentId, cat?.label || 'entry');
+    if (newLog?.id) {
+      showUndo(newLog.id, studentId, cat?.label || 'entry');
+      // v3: open the inline quick-note bar for this row for 5 seconds.
+      if (quickNoteTimer.current) clearTimeout(quickNoteTimer.current);
+      setQuickNoteDraft("");
+      setQuickNoteFor({ logId: newLog.id, studentId, categoryLabel: cat?.label, tone: cat?.color });
+      quickNoteTimer.current = setTimeout(() => {
+        setQuickNoteFor((q) => (q?.logId === newLog.id ? null : q));
+      }, 5000);
+    }
+  };
+
+  // v3: commit the inline note (append to the existing log).
+  const commitQuickNote = () => {
+    if (!quickNoteFor) return;
+    const text = quickNoteDraft.trim();
+    if (text && updateLogText) {
+      updateLogText(quickNoteFor.logId, text);
+    }
+    setQuickNoteFor(null);
+    setQuickNoteDraft("");
+    if (quickNoteTimer.current) clearTimeout(quickNoteTimer.current);
+  };
+  const cancelQuickNote = () => {
+    setQuickNoteFor(null);
+    setQuickNoteDraft("");
+    if (quickNoteTimer.current) clearTimeout(quickNoteTimer.current);
+  };
+
+  // v3: double-click on a category button → jump to full note screen with
+  // that student + category pre-selected. Gives paras who DO want to write
+  // a shortcut past the "tap name → pick category" two-step.
+  const handleCategoryDoubleClick = (e, studentId, categoryId) => {
+    e.stopPropagation();
+    e.preventDefault();
+    cancelQuickNote();
+    setSelectedStudent(studentId);
+    setSelectedCat(categoryId);
+    setNoteText("");
+    setStep("note");
   };
 
   const handleSave = () => {
@@ -167,8 +218,28 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
       const q = search.trim().toLowerCase();
       r = r.filter(row => resolveLabel(row.student, "compact").toLowerCase().includes(q));
     }
+    // v3: "missing category" filter — when summaryFilter is set, only show
+    // students who have NOT received that category today.
+    if (summaryFilter) {
+      r = r.filter(row => !(row.byCat?.[summaryFilter] > 0));
+    }
     return sortRows(r, sortMode);
-  }, [periodStudentIds, studentsMap, logs, currentDate, search, sortMode]);
+  }, [periodStudentIds, studentsMap, logs, currentDate, search, sortMode, summaryFilter]);
+
+  // v3: today's totals for the summary strip at the top.
+  const todayTotals = useMemo(() => {
+    const totals = { all: 0 };
+    CATEGORIES.forEach(c => { totals[c.id] = 0; });
+    logs.forEach(l => {
+      if (l.date !== currentDate) return;
+      if (l.source !== 'simple_mode' && l.source !== 'quick_action' && !l.category) return;
+      totals.all += 1;
+      if (l.category && totals[l.category] !== undefined) {
+        totals[l.category] += 1;
+      }
+    });
+    return totals;
+  }, [logs, currentDate]);
 
   // ── Tool overlay ──
   if (activeTool) {
@@ -271,14 +342,71 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
       {step === "students" && (
         <div style={{ flex: 1, overflowY: "auto", padding: "var(--space-4) var(--space-5) 120px" }}>
 
+          {/* Today's summary strip — totals + click-to-filter per category */}
+          <div style={{
+            marginBottom: 12,
+            padding: "var(--space-3) var(--space-4)",
+            background: "linear-gradient(90deg, var(--panel-raised), var(--panel-bg))",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius-lg)",
+            display: "flex", alignItems: "center", gap: "var(--space-3)", flexWrap: "wrap",
+          }}>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".1em", color: "var(--text-muted)" }}>
+                Today
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: "var(--text-primary)", lineHeight: 1 }}>
+                {todayTotals.all}
+              </div>
+              <div style={{ fontSize: 10, color: "var(--text-muted)" }}>
+                total log{todayTotals.all !== 1 ? 's' : ''}
+              </div>
+            </div>
+            <div style={{ width: 1, alignSelf: "stretch", background: "var(--border)" }} />
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", flex: 1 }}>
+              {CATEGORIES.map(c => {
+                const count = todayTotals[c.id] || 0;
+                const active = summaryFilter === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => setSummaryFilter(active ? null : c.id)}
+                    title={active
+                      ? `Showing students without a ${c.label} log today. Click to clear.`
+                      : `Click to filter to students who haven't gotten ${c.label} today.`}
+                    style={{
+                      padding: "6px 10px",
+                      borderRadius: "var(--radius-pill)",
+                      border: `1px solid ${active ? c.color : c.color + "40"}`,
+                      background: active ? c.color + "25" : "transparent",
+                      color: c.color,
+                      cursor: "pointer",
+                      fontSize: 12, fontWeight: 600, fontFamily: "inherit",
+                      display: "inline-flex", alignItems: "center", gap: 6,
+                      transition: "all 120ms cubic-bezier(0.16,1,0.3,1)",
+                    }}
+                  >
+                    <span style={{ fontSize: 14 }}>{c.icon}</span>
+                    <span>{count}</span>
+                    <span style={{ color: "var(--text-muted)", fontWeight: 500 }}>{c.label}</span>
+                  </button>
+                );
+              })}
+              {summaryFilter && (
+                <button
+                  onClick={() => setSummaryFilter(null)}
+                  className="btn btn-ghost btn-sm"
+                  style={{ fontSize: 11, color: "var(--text-muted)" }}
+                >
+                  Clear filter
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* Legend */}
-          <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
-            {CATEGORIES.map(c => (
-              <span key={c.id} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                <span style={{ fontSize: 15 }}>{c.icon}</span>
-                <span style={{ color: "var(--text-muted)", fontSize: 11 }}>{c.label}</span>
-              </span>
-            ))}
+          <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>💡 Tap = log · Double-tap = add detail · Type after a tap to attach a note</span>
           </div>
 
           {rows.length === 0 && (
@@ -291,11 +419,16 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
             </div>
           )}
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(520px, 1fr))",
+            gap: 10,
+          }}>
             {rows.map(({ id, student: s, health, todayCount, byCat, hasAlert, alertText }) => {
               const isFlashing = flashState?.id === id;
               const label = resolveLabel(s, "compact");
               const flashCat = isFlashing ? CATEGORIES.find(c => c.id === flashState.category) : null;
+              const showQuickNote = quickNoteFor?.studentId === id;
               return (
                 <div key={id}
                   style={{
@@ -374,7 +507,8 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                           <button
                             key={cat.id}
                             onClick={e => handleQuickLog(e, id, cat.id)}
-                            title={`Log: ${cat.label}${count > 0 ? ` (${count} today)` : ''}`}
+                            onDoubleClick={e => handleCategoryDoubleClick(e, id, cat.id)}
+                            title={`Tap: log ${cat.label}. Double-tap: add detail.${count > 0 ? ` (${count} today)` : ''}`}
                             style={{
                               position: "relative",
                               width: 48, height: 48,
@@ -388,6 +522,8 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                               fontFamily: "inherit",
                               display: "flex", alignItems: "center", justifyContent: "center",
                               transition: "all 120ms cubic-bezier(0.16,1,0.3,1)",
+                              userSelect: "none",
+                              WebkitUserSelect: "none",
                             }}
                             onMouseEnter={e => { e.currentTarget.style.borderColor = cat.color; e.currentTarget.style.background = cat.color + '30'; }}
                             onMouseLeave={e => { e.currentTarget.style.borderColor = cat.color + '40'; e.currentTarget.style.background = count > 0 ? cat.color + '20' : 'var(--bg-dark)'; }}
@@ -428,6 +564,57 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                       </button>
                     </div>
                   </div>
+
+                  {/* Inline quick-note bar — appears for 5s after any one-tap log.
+                      User can type a short note and hit Enter to attach it to the
+                      log that was just created. Ignoring it leaves the log as-is. */}
+                  {showQuickNote && (
+                    <div style={{
+                      padding: "10px 14px",
+                      borderTop: `1px solid ${quickNoteFor.tone}40`,
+                      background: `${quickNoteFor.tone}0e`,
+                      display: "flex", gap: 8, alignItems: "center",
+                      animation: "fadeIn 160ms ease",
+                    }}>
+                      <span style={{ fontSize: 11, color: quickNoteFor.tone, fontWeight: 700, whiteSpace: "nowrap" }}>
+                        ✓ {quickNoteFor.categoryLabel} logged — add detail?
+                      </span>
+                      <input
+                        autoFocus
+                        value={quickNoteDraft}
+                        onChange={e => setQuickNoteDraft(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === "Enter") { e.preventDefault(); commitQuickNote(); }
+                          if (e.key === "Escape") { e.preventDefault(); cancelQuickNote(); }
+                        }}
+                        placeholder="e.g. 'used chunking strategy, finished 3 problems'"
+                        style={{
+                          flex: 1,
+                          padding: "6px 10px",
+                          background: "var(--bg-dark)",
+                          border: "1px solid var(--border)",
+                          borderRadius: "var(--radius-sm)",
+                          color: "var(--text-primary)",
+                          fontSize: 13, fontFamily: "inherit",
+                        }}
+                      />
+                      <button
+                        onClick={commitQuickNote}
+                        disabled={!quickNoteDraft.trim()}
+                        className="btn btn-primary btn-sm"
+                        style={{ fontSize: 11 }}
+                      >
+                        Attach
+                      </button>
+                      <button
+                        onClick={cancelQuickNote}
+                        className="btn btn-ghost btn-sm"
+                        style={{ fontSize: 11, color: "var(--text-muted)" }}
+                      >
+                        Skip
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
