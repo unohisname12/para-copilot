@@ -10,7 +10,7 @@
 // All processing happens locally. Real names live only in the returned
 // `privateRosterMap` — `normalizedStudents` is pseudonymous.
 
-import { ollamaParseIEP, checkOllamaHealth } from '../../engine/ollama';
+import { parseIEP, checkAiHealth } from '../../engine/aiProvider';
 
 // ── File → text ──────────────────────────────────────────────
 
@@ -105,7 +105,7 @@ export async function extractAllStudents(sections, onProgress = () => {}) {
   for (const [name, text] of sections.entries()) {
     onProgress(name, 'parsing');
     try {
-      const parsed = await ollamaParseIEP(text);
+      const parsed = await parseIEP(text);
       if (parsed) {
         results.set(name, parsed);
         onProgress(name, 'done');
@@ -201,7 +201,7 @@ export function buildBundleFromExtraction(rosterPairs, parsedStudents) {
 // ── Pre-flight: is Ollama reachable? ─────────────────────────
 
 export async function checkAvailability() {
-  return checkOllamaHealth();
+  return checkAiHealth();
 }
 
 // ── Report — "who matched what" for the preview UI ───────────

@@ -14,7 +14,7 @@
 //
 // Admin never touches JSON. This is the primary, promoted path.
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState, useEffect } from 'react';
 import { parseRosterFile } from './rosterParsers';
 import {
   readFileAsText,
@@ -28,6 +28,14 @@ import { buildIdentityRegistry } from '../../models';
 import { useTeamOptional } from '../../context/TeamProvider';
 import { useVault } from '../../context/VaultProvider';
 import { pushStudents } from '../../services/teamSync';
+import {
+  AI_PROVIDERS, getAiProvider, setAiProvider,
+  getCloudApiKey, setCloudApiKey,
+  getCloudModel, setCloudModel, DEFAULT_GEMINI_MODEL,
+} from '../../engine/aiProvider';
+import {
+  saveBundleLocally, pickBackupFolder, getBackupFolderName, fsaSupported,
+} from '../../utils/localBackup';
 
 export default function SmartImport({ onBulkImport, onIdentityLoad }) {
   const [rosterFile, setRosterFile] = useState(null);
@@ -40,7 +48,14 @@ export default function SmartImport({ onBulkImport, onIdentityLoad }) {
   const [matchReport, setMatchReport] = useState(null);
   const [bundle, setBundle] = useState(null);
   const [error, setError] = useState(null);
-  const [ollamaStatus, setOllamaStatus] = useState(null); // { online, model }
+  const [aiStatus, setAiStatus] = useState(null); // { online, model, provider, reason? }
+  const [provider, setProviderState] = useState(() => getAiProvider());
+  const [cloudKeyDraft, setCloudKeyDraft] = useState(() => getCloudApiKey());
+  const [cloudModelDraft, setCloudModelDraft] = useState(() => getCloudModel());
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [keyRevealed, setKeyRevealed] = useState(false);
+  const [backupFolder, setBackupFolder] = useState(null);
+  const [lastBackup, setLastBackup] = useState(null); // { method, folderName, filenames }
   const team = useTeamOptional();
   const vault = useVault();
   const rosterRef = useRef();
@@ -48,11 +63,24 @@ export default function SmartImport({ onBulkImport, onIdentityLoad }) {
 
   const checkOllama = useCallback(async () => {
     const s = await checkAvailability();
-    setOllamaStatus(s);
+    setAiStatus(s);
     return s;
   }, []);
 
-  React.useEffect(() => { checkOllama(); }, [checkOllama]);
+  useEffect(() => { checkOllama(); }, [checkOllama, provider]);
+  useEffect(() => { getBackupFolderName().then(setBackupFolder); }, []);
+
+  // Apply provider change + save cloud config
+  function handleProviderChange(next) {
+    setProviderState(next);
+    setAiProvider(next);
+    setAiStatus(null);
+  }
+  function saveCloudConfig() {
+    setCloudApiKey(cloudKeyDraft.trim());
+    setCloudModel(cloudModelDraft.trim() || DEFAULT_GEMINI_MODEL);
+    checkOllama();
+  }
 
   async function onRosterSelected(file) {
     setRosterFile(file);
@@ -79,7 +107,14 @@ export default function SmartImport({ onBulkImport, onIdentityLoad }) {
 
     const status = await checkOllama();
     if (!status.online) {
-      setError('Local AI (Ollama) is offline. Start it with: ollama serve');
+      if (status.provider === 'cloud') {
+        if (status.reason === 'no_key')       setError('Gemini API key not set. Open Settings and paste a key.');
+        else if (status.reason === 'invalid_key') setError('Gemini rejected the API key. Check it in Settings.');
+        else if (status.reason === 'quota')   setError('Gemini quota exceeded. Wait a minute and retry.');
+        else                                  setError('Gemini is unreachable. Check your network.');
+      } else {
+        setError('Local AI (Ollama) is offline. Start it with: ollama serve');
+      }
       return;
     }
 
@@ -133,9 +168,27 @@ export default function SmartImport({ onBulkImport, onIdentityLoad }) {
         }
       }
 
+      // Save BOTH files locally so the admin can see where the data lives.
+      // Pseudonymous bundle + private roster (names + Para App Numbers) + README.
+      try {
+        const backup = await saveBundleLocally(bundle, registry);
+        setLastBackup(backup);
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn('[smart-import] local backup failed', e);
+      }
+
       setParsingStep('committed');
     } catch (e) {
       setError('Commit failed: ' + e.message);
+    }
+  }
+
+  async function handlePickFolder() {
+    const ok = await pickBackupFolder();
+    if (ok) {
+      const name = await getBackupFolderName();
+      setBackupFolder(name);
     }
   }
 
@@ -166,23 +219,103 @@ export default function SmartImport({ onBulkImport, onIdentityLoad }) {
         </p>
       </div>
 
-      {/* Ollama status */}
-      <div className="panel" style={{
-        padding: 'var(--space-3) var(--space-4)',
-        display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
-      }}>
-        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Local AI:</span>
-        {ollamaStatus?.online
-          ? <span className="pill pill-green" style={{ fontSize: 11 }}>
-              ✓ Online · {ollamaStatus.model || 'qwen2.5:7b-instruct'}
-            </span>
-          : <span className="pill pill-red" style={{ fontSize: 11 }}>
-              ✗ Offline — run: <code style={{ fontFamily: 'JetBrains Mono, monospace' }}>ollama serve</code>
-            </span>
-        }
-        <button onClick={checkOllama} className="btn btn-ghost btn-sm" style={{ fontSize: 11 }}>
-          Re-check
-        </button>
+      {/* AI provider bar — picks Ollama vs Gemini, shows status, opens settings */}
+      <div className="panel" style={{ padding: 'var(--space-3) var(--space-4)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>AI:</span>
+          <div style={{
+            display: 'flex', gap: 2, padding: 3,
+            background: 'var(--bg-dark)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-md)',
+          }}>
+            {Object.values(AI_PROVIDERS).map(p => (
+              <button key={p.id} onClick={() => handleProviderChange(p.id)} style={{
+                padding: '5px 10px', borderRadius: 'var(--radius-sm)',
+                border: 'none', cursor: 'pointer',
+                fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+                background: provider === p.id ? 'var(--grad-primary)' : 'transparent',
+                color: provider === p.id ? '#fff' : 'var(--text-secondary)',
+                transition: 'all 120ms cubic-bezier(0.16,1,0.3,1)',
+              }}>
+                {p.label} <span style={{ opacity: 0.75 }}>· {p.tag}</span>
+              </button>
+            ))}
+          </div>
+          {aiStatus?.online
+            ? <span className="pill pill-green" style={{ fontSize: 11 }}>
+                ✓ Online{aiStatus.model ? ` · ${aiStatus.model}` : ''}
+              </span>
+            : (
+              <span className="pill pill-red" style={{ fontSize: 11 }}>
+                {provider === 'cloud' && aiStatus?.reason === 'no_key' && '✗ Need API key'}
+                {provider === 'cloud' && aiStatus?.reason === 'invalid_key' && '✗ Invalid key'}
+                {provider === 'cloud' && aiStatus?.reason === 'quota' && '✗ Quota exceeded'}
+                {provider === 'cloud' && aiStatus?.reason === 'network' && '✗ Network error'}
+                {provider === 'cloud' && !aiStatus?.reason && '✗ Offline'}
+                {provider === 'local' && '✗ Offline — run: ollama serve'}
+              </span>
+            )
+          }
+          <button onClick={checkOllama} className="btn btn-ghost btn-sm" style={{ fontSize: 11 }}>
+            Re-check
+          </button>
+          {provider === 'cloud' && (
+            <button onClick={() => setSettingsOpen(!settingsOpen)} className="btn btn-ghost btn-sm" style={{ fontSize: 11 }}>
+              ⚙ Settings
+            </button>
+          )}
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>
+          {AI_PROVIDERS[provider].description}
+        </div>
+
+        {/* Cloud settings (expanded) */}
+        {provider === 'cloud' && settingsOpen && (
+          <div style={{
+            marginTop: 'var(--space-3)', padding: 'var(--space-3)',
+            background: 'var(--bg-dark)', border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: 10,
+          }}>
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: 4 }}>
+                Gemini API key
+              </label>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <input
+                  type={keyRevealed ? 'text' : 'password'}
+                  value={cloudKeyDraft}
+                  onChange={e => setCloudKeyDraft(e.target.value)}
+                  placeholder="AIza…"
+                  className="chat-input"
+                  style={{ flex: 1, fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}
+                />
+                <button onClick={() => setKeyRevealed(k => !k)} className="btn btn-secondary btn-sm" style={{ fontSize: 11 }}>
+                  {keyRevealed ? 'Hide' : 'Show'}
+                </button>
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.5 }}>
+                Get a free key at{' '}
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer"
+                   style={{ color: 'var(--accent-hover)' }}>aistudio.google.com/app/apikey</a>.
+                Stored in this browser's localStorage only. Never sent anywhere except Google.
+              </div>
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: 4 }}>
+                Model
+              </label>
+              <select value={cloudModelDraft} onChange={e => setCloudModelDraft(e.target.value)} className="period-select" style={{ width: '100%', fontSize: 12 }}>
+                <option value="gemini-2.5-flash">gemini-2.5-flash — cheap + fast (recommended)</option>
+                <option value="gemini-2.5-pro">gemini-2.5-pro — smarter, 5× pricier</option>
+                <option value="gemini-2.0-flash">gemini-2.0-flash — older, still solid</option>
+              </select>
+            </div>
+            <button onClick={saveCloudConfig} className="btn btn-primary btn-sm">
+              Save + re-check
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Two-file picker */}
@@ -252,11 +385,11 @@ export default function SmartImport({ onBulkImport, onIdentityLoad }) {
       {rosterPairs.length > 0 && iepText && parsingStep === 'idle' && (
         <button
           onClick={runExtraction}
-          disabled={!ollamaStatus?.online}
+          disabled={!aiStatus?.online}
           className="btn btn-primary"
           style={{ padding: 'var(--space-4)', fontSize: 15 }}
         >
-          {ollamaStatus?.online
+          {aiStatus?.online
             ? `🎯 Run Smart Import (${rosterPairs.length} students)`
             : 'Local AI must be online first'}
         </button>
@@ -358,7 +491,7 @@ export default function SmartImport({ onBulkImport, onIdentityLoad }) {
           display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start',
         }}>
           <span style={{ fontSize: 24 }}>✅</span>
-          <div>
+          <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 700, color: 'var(--green)', fontSize: 15 }}>
               Imported {matchReport?.length || 0} students.
             </div>
@@ -370,10 +503,79 @@ export default function SmartImport({ onBulkImport, onIdentityLoad }) {
                 the sidebar if you want names to survive page refresh.</>
               )}
             </div>
+
+            {/* Where the backup files went */}
+            {lastBackup && (
+              <div style={{
+                marginTop: 'var(--space-3)',
+                padding: 'var(--space-3)',
+                background: 'var(--bg-dark)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-md)',
+                fontSize: 12.5, color: 'var(--text-primary)', lineHeight: 1.55,
+              }}>
+                <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                  📁 Backup files saved to <code style={{ fontFamily: 'JetBrains Mono, monospace', color: 'var(--accent-hover)' }}>
+                    {lastBackup.folderName}
+                  </code>
+                  {lastBackup.method === 'downloads' && (
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500, marginLeft: 6 }}>
+                      (your browser's default Downloads folder)
+                    </span>
+                  )}
+                </div>
+                <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--text-secondary)' }}>
+                  {lastBackup.filenames.map(f => (
+                    <li key={f}>
+                      <code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11.5 }}>{f}</code>
+                    </li>
+                  ))}
+                </ul>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.5 }}>
+                  The <b>bundle</b> file is safe to share — no real names.
+                  The <b>private roster</b> contains real names; keep it on this device only.
+                  The <b>README.txt</b> explains both files.
+                </div>
+              </div>
+            )}
+
             <button onClick={reset} className="btn btn-secondary btn-sm" style={{ marginTop: 'var(--space-3)' }}>
               Run another import
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Backup folder control (always visible, above the run button) */}
+      {(parsingStep === 'idle' || !parsingStep) && fsaSupported() && (
+        <div className="panel" style={{
+          padding: 'var(--space-3) var(--space-4)',
+          display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+        }}>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>📁 Backup folder:</span>
+          {backupFolder ? (
+            <>
+              <code style={{
+                fontFamily: 'JetBrains Mono, monospace', fontSize: 11,
+                padding: '3px 8px', background: 'var(--accent-glow)',
+                color: 'var(--accent-hover)',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--accent-border)',
+              }}>{backupFolder}</code>
+              <button onClick={handlePickFolder} className="btn btn-ghost btn-sm" style={{ fontSize: 11 }}>
+                Change
+              </button>
+            </>
+          ) : (
+            <>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                Default: your browser's Downloads folder.
+              </span>
+              <button onClick={handlePickFolder} className="btn btn-secondary btn-sm" style={{ fontSize: 11 }}>
+                Pick a folder…
+              </button>
+            </>
+          )}
         </div>
       )}
 
