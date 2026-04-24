@@ -6,6 +6,7 @@
 import { DB } from '../data';
 import { parseDocForPeriod } from '../engine';
 import { resolveLabel } from '../privacy/nameResolver';
+import { getStudentPatterns } from '../features/analytics/getStudentPatterns';
 
 // ── Build a context pack from App state ──────────────────────
 export function buildContextPack({
@@ -50,6 +51,13 @@ export function buildContextPack({
     ? parseDocForPeriod(docContent, period.label || "")
     : null;
 
+  // Per-student pattern summaries — name-free, derived from logs only.
+  // Safe to include in AI prompts because resolveLabel() governs display.
+  const patternsByStudent = {};
+  targetIds.forEach(id => {
+    patternsByStudent[id] = getStudentPatterns(id, logs);
+  });
+
   return {
     period: {
       id: activePeriod,
@@ -59,6 +67,7 @@ export function buildContextPack({
     },
     students,
     logs: filteredLogs,
+    patternsByStudent,
     docSnippet,
     currentDate,
     detectedSituations,
@@ -209,6 +218,31 @@ export function serializeForEmailPrompt(student, logs) {
     logText,
     "",
     `Start the email with "Hi ${student.caseManager || "Team"},"`,
+  ].join("\n");
+}
+
+// ── One-shot support suggestion ───────────────────────────────
+// Tiny prompt. Asks the AI for ONE short strategy the para can try next.
+// Feed this to the existing askAI / local-Ollama pipeline — no new wiring
+// required, and names are already stripped by resolveLabel + pattern logic.
+export function serializeForOneShotSupport(pack, focusStudentId) {
+  const student = pack.students.find(s => s.id === focusStudentId) || pack.students[0];
+  if (!student) return "";
+  const p = pack.patternsByStudent?.[focusStudentId] || {};
+  const worked = (p.successfulSupports || []).slice(0, 3).map(x => `${x.label} (×${x.count})`).join(", ") || "none recorded";
+  const failed = (p.failedSupports     || []).slice(0, 3).map(x => `${x.label} (×${x.count})`).join(", ") || "none recorded";
+  const common = (p.commonBehaviors    || []).slice(0, 2).map(x => `${x.label} (×${x.count})`).join(", ") || "none";
+  return [
+    `STUDENT: ${resolveLabel(student)}`,
+    `Eligibility: ${student.eligibility || "—"}`,
+    `Strategies on file: ${(student.strategies || []).join("; ") || "—"}`,
+    `Triggers: ${(student.triggers || []).join("; ") || "—"}`,
+    "",
+    `What has worked: ${worked}`,
+    `What has not worked: ${failed}`,
+    `Most common behaviors: ${common}`,
+    "",
+    "In 1–2 sentences, suggest one specific support the para can try next. No preamble.",
   ].join("\n");
 }
 

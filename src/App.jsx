@@ -27,6 +27,7 @@ import { useCaseMemory } from './hooks/useCaseMemory';
 
 // Utilities
 import { exportCSV, exportCSVPrivate } from './utils/exportCSV';
+import { logsInLastHours } from './features/analytics/getStudentPatterns';
 
 // Components
 import { VisualTimer, CalculatorTool, MultChart, CEROrganizer, BreathingExercise, GroundingExercise } from './components/tools';
@@ -331,6 +332,13 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
   const renderVault = () => {
     const allStu = Object.entries(allStudents);
     const counts = { green: allStu.filter(([id]) => getHealth(id, logs, currentDate) === "green").length, yellow: allStu.filter(([id]) => getHealth(id, logs, currentDate) === "yellow").length, red: allStu.filter(([id]) => getHealth(id, logs, currentDate) === "red").length };
+    // Students with >3 logs in the last 24h — surface as "needs attention"
+    // next to the byStudent filter so nothing gets lost in a busy day.
+    const needsAttention = new Set(
+      allStu
+        .map(([id]) => id)
+        .filter(id => logsInLastHours(id, logs, 24) > 3)
+    );
     let filteredLogs = logs;
     // Tab-based filters
     if (vaultTab === "byStudent" && vaultFilter !== "all") filteredLogs = filteredLogs.filter(l => l.studentId === vaultFilter);
@@ -464,7 +472,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
           </button>
         ))}
       </div>
-      {(vaultTab === "byStudent" || vaultTab === "byPeriod") && (<div style={{ marginBottom: "14px", display: "flex", gap: "8px", alignItems: "center" }}><span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Filter:</span><select value={vaultFilter} onChange={e => setVaultFilter(e.target.value)} className="period-select" style={{ maxWidth: "280px" }}><option value="all">All</option>{vaultTab === "byStudent" && Object.entries(allStudents).map(([id, s]) => (<option key={id} value={id}>{resolveLabel(s, "compact")} ({logs.filter(l => l.studentId === id).length})</option>))}{vaultTab === "byPeriod" && Object.entries(DB.periods).map(([id, p]) => (<option key={id} value={id}>{p.label}</option>))}</select></div>)}
+      {(vaultTab === "byStudent" || vaultTab === "byPeriod") && (<div style={{ marginBottom: "14px", display: "flex", gap: "8px", alignItems: "center" }}><span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Filter:</span><select value={vaultFilter} onChange={e => setVaultFilter(e.target.value)} className="period-select" style={{ maxWidth: "280px" }}><option value="all">All</option>{vaultTab === "byStudent" && Object.entries(allStudents).map(([id, s]) => (<option key={id} value={id}>{needsAttention.has(id) ? "⚠ " : ""}{resolveLabel(s, "compact")} ({logs.filter(l => l.studentId === id).length})</option>))}{vaultTab === "byPeriod" && Object.entries(DB.periods).map(([id, p]) => (<option key={id} value={id}>{p.label}</option>))}</select></div>)}
 
       {/* Interactive filter + search bar (hidden on KB tab) */}
       {vaultTab !== "knowledge" && (
@@ -586,9 +594,15 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
           ? `↯ ${(l.studentId || '').slice(0, 24)}${(l.studentId || '').length > 24 ? '…' : ''}`
           : (s.realName || resolveLabel(s, "compact"));
         const isExpanded = vaultExpandedId === l.id;
+        const rowNeedsAttn = needsAttention.has(l.studentId);
+        const rowBg = isExpanded
+          ? "var(--panel-hover)"
+          : rowNeedsAttn
+            ? "rgba(239,68,68,0.06)"
+            : undefined;
         return (
           <React.Fragment key={l.id}>
-            <tr style={isExpanded ? { background: "var(--panel-hover)" } : undefined}>
+            <tr style={rowBg ? { background: rowBg } : undefined}>
               <td style={{ textAlign: "center", padding: 0 }}>
                 <button
                   onClick={() => setVaultExpandedId(isExpanded ? null : l.id)}

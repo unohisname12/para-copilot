@@ -13,6 +13,8 @@ import { runLocalEngine } from '../../engine';
 import { getHealth, hdot } from '../../models';
 import { resolveLabel } from '../../privacy/nameResolver';
 import { VisualTimer, BreathingExercise } from '../../components/tools';
+import { getStudentPatterns } from '../analytics/getStudentPatterns';
+import PatternsCard from '../analytics/PatternsCard';
 
 // Category order matters: arranged left-to-right from most-positive to most-critical.
 const CATEGORIES = [
@@ -585,9 +587,10 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                       padding: "10px 14px",
                       borderTop: `1px solid ${quickNoteFor.tone}40`,
                       background: `${quickNoteFor.tone}0e`,
-                      display: "flex", gap: 8, alignItems: "center",
+                      display: "flex", flexDirection: "column", gap: 8,
                       animation: "fadeIn 160ms ease",
                     }}>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                       <span style={{ fontSize: 11, color: quickNoteFor.tone, fontWeight: 700, whiteSpace: "nowrap" }}>
                         ✓ {quickNoteFor.categoryLabel} logged — add detail?
                       </span>
@@ -629,6 +632,15 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                       >
                         Skip
                       </button>
+                      </div>
+                      <PatternsCard
+                        patterns={getStudentPatterns(quickNoteFor.studentId, logs)}
+                        studentLabel={resolveLabel(studentsMap[quickNoteFor.studentId], "compact")}
+                        onTry={(s) => {
+                          freezeQuickNoteTimer();
+                          setQuickNoteDraft(d => d ? d + ` — try: ${s.label}` : `Try: ${s.label}`);
+                        }}
+                      />
                     </div>
                   )}
                 </div>
