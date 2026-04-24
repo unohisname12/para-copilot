@@ -165,16 +165,10 @@ export function Dashboard({
         flexShrink: 0, gap: "var(--space-4)", flexWrap: "wrap",
         position: "relative", overflow: "hidden",
       }}>
-        {/* Accent gradient bar */}
+        {/* Single accent bar — quiet */}
         <div style={{
           position: "absolute", top: 0, left: 0, right: 0, height: 2,
-          background: "var(--grad-primary)", opacity: 0.85,
-        }} />
-        {/* Ambient glow */}
-        <div style={{
-          position: "absolute", inset: 0,
-          background: "radial-gradient(800px circle at 20% -40%, rgba(122,156,255,0.1), transparent 50%)",
-          pointerEvents: "none",
+          background: "var(--accent)", opacity: 0.5,
         }} />
 
         <div style={{ position: "relative", zIndex: 1, minWidth: 0 }}>
@@ -234,7 +228,7 @@ export function Dashboard({
                 style={{
                   width: 32, height: 28,
                   borderRadius: "var(--radius-sm)", border: "none", cursor: "pointer",
-                  background: layout.cols === n ? "var(--grad-primary)" : "transparent",
+                  background: layout.cols === n ? "var(--accent-strong)" : "transparent",
                   color: layout.cols === n ? "#fff" : "var(--text-muted)",
                   fontSize: 11, fontWeight: 700, lineHeight: 1,
                   transition: "all 120ms cubic-bezier(0.16,1,0.3,1)",
@@ -245,8 +239,15 @@ export function Dashboard({
           </div>
           <button
             onClick={() => setLayout(l => ({ ...l, chatOpen: !l.chatOpen }))}
-            className={layout.chatOpen ? "btn btn-primary btn-sm" : "btn btn-secondary btn-sm"}
-            style={{ minHeight: 36 }}
+            className="btn btn-secondary btn-sm"
+            style={{
+              minHeight: 36,
+              ...(layout.chatOpen && {
+                background: 'var(--accent-glow)',
+                borderColor: 'var(--accent-border)',
+                color: 'var(--accent-hover)',
+              }),
+            }}
           >
             💬 Copilot
           </button>
@@ -258,14 +259,12 @@ export function Dashboard({
 
         {/* ── TODAY'S PLAN CARD (merged Topic + Class Notes Doc) ─ */}
         <div style={{
-          background: (topic || docContent)
-            ? "linear-gradient(135deg, rgba(122,156,255,0.1), var(--panel-bg))"
-            : "var(--panel-bg)",
+          background: "var(--panel-bg)",
           border: `1px solid ${(topic || docContent) ? "var(--accent-border)" : "var(--border)"}`,
           borderRadius: "var(--radius-xl)",
           overflow: "hidden",
           transition: "all 200ms cubic-bezier(0.16,1,0.3,1)",
-          boxShadow: (topic || docContent) ? "var(--shadow-glow)" : "var(--shadow-sm)",
+          boxShadow: "var(--shadow-sm)",
         }}>
           {/* Header row: icon + label + mode selector + export */}
           <div style={{
@@ -275,11 +274,10 @@ export function Dashboard({
           }}>
             <div style={{
               width: 44, height: 44,
-              background: (topic || docContent) ? "var(--grad-primary)" : "var(--bg-dark)",
+              background: (topic || docContent) ? "var(--accent-strong)" : "var(--bg-dark)",
               borderRadius: "var(--radius-md)",
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 20, flexShrink: 0,
-              boxShadow: (topic || docContent) ? "0 4px 14px rgba(122,156,255,0.4)" : "none",
             }}>
               📚
             </div>
@@ -318,7 +316,7 @@ export function Dashboard({
                     cursor: "pointer",
                     fontSize: 12, fontWeight: 600,
                     fontFamily: "inherit",
-                    background: planMode === id ? "var(--grad-primary)" : "transparent",
+                    background: planMode === id ? "var(--accent-strong)" : "transparent",
                     color: planMode === id ? "#fff" : "var(--text-secondary)",
                     transition: "all 120ms cubic-bezier(0.16,1,0.3,1)",
                     whiteSpace: "nowrap",

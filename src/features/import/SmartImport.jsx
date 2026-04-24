@@ -89,7 +89,7 @@ export default function SmartImport({ onBulkImport, onIdentityLoad }) {
       const { entries, errors } = await parseRosterFile(file);
       setRosterPairs(entries);
       setRosterErrors(errors || []);
-    } catch (e) { setError('Roster parse failed: ' + e.message); }
+    } catch (e) { setError("Couldn't read the name list: " + e.message); }
   }
 
   async function onIepSelected(file) {

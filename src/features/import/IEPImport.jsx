@@ -612,9 +612,9 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
             <span style={{ fontSize: "36px" }}>{preparedData ? "✓" : "📁"}</span>
             <span>{preparedData
               ? `Loaded — ${preparedData.normalizedStudents.students.length} student${preparedData.normalizedStudents.students.length !== 1 ? "s" : ""} ready`
-              : "Upload Prepared Profiles (JSON)"
+              : "Upload your prepared student file"
             }</span>
-            {!preparedData && <span style={{ fontSize: "12px", color: "var(--text-muted)", fontWeight: "400" }}>App Bundle JSON (schemaVersion 2.0 / 2.1)</span>}
+            {!preparedData && <span style={{ fontSize: "12px", color: "var(--text-muted)", fontWeight: "400" }}>The one-file version your admin prepared</span>}
           </button>
 
           {/* Validation error */}
@@ -642,7 +642,7 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
 
               <button onClick={doPreparedImport}
                 style={{ width: "100%", padding: "14px", borderRadius: "12px", border: "1px solid #1d4ed8", background: "#0c1a3d", color: "#60a5fa", fontSize: "15px", fontWeight: "800", cursor: "pointer" }}>
-                Load {preparedData.normalizedStudents.students.length} Student{preparedData.normalizedStudents.students.length !== 1 ? "s" : ""} into App
+                Load {preparedData.normalizedStudents.students.length} student{preparedData.normalizedStudents.students.length !== 1 ? "s" : ""} into the app
               </button>
             </>
           )}
@@ -685,7 +685,7 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
 
           {/* Privacy notice */}
           <div style={{ padding: "10px 14px", background: "#12102a", border: "1px solid #4c1d95", borderRadius: "10px", fontSize: "11px", color: "#c4b5fd", lineHeight: "1.6" }}>
-            🔒 <strong>FERPA-safe:</strong> App bundle files contain pseudonyms only. <code>privateRosterMap</code> stays in this panel only — never stored in app state, AI context, logs, analytics, or exports.
+            🔒 <strong>Safe to use:</strong> This file has fake names only. If it also includes real names, they stay on this computer — never sent to the cloud, AI, or anyone else.
           </div>
 
           {/* Bundle file input */}
@@ -695,7 +695,7 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
           <button onClick={() => bundleFileRef.current?.click()}
             style={{ width: "100%", padding: "14px 20px", borderRadius: "10px", border: `2px solid ${bundleData ? "#6d28d9" : "var(--border-light)"}`, background: bundleData ? "#12102a" : "var(--bg-surface)", color: bundleData ? "#a78bfa" : "var(--text-primary)", fontSize: "14px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", gap: "12px", textAlign: "left" }}>
             <span style={{ fontSize: "22px" }}>📦</span>
-            <span>{bundleData ? `✓ Bundle loaded — schema v${bundleData.schemaVersion}` : "Upload App Bundle JSON from Computer"}</span>
+            <span>{bundleData ? `✓ File loaded` : "Upload your student file"}</span>
           </button>
 
           {/* Validation error */}
@@ -773,7 +773,7 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
               {/* Import button */}
               <button onClick={doBundleImport}
                 style={{ width: "100%", padding: "14px", borderRadius: "12px", border: "1px solid #6d28d9", background: "#1e1b4b", color: "#a78bfa", fontSize: "15px", fontWeight: "800", cursor: "pointer" }}>
-                📦 Import {bundleSummary.total} Student{bundleSummary.total !== 1 ? "s" : ""} into App
+                📦 Load {bundleSummary.total} student{bundleSummary.total !== 1 ? "s" : ""} into the app
               </button>
 
             </>
@@ -783,10 +783,10 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
           {bundleImported && (
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
               <div style={{ padding: "20px", borderRadius: "12px", background: "#0d2010", border: "2px solid #166534", color: "#4ade80", textAlign: "center", fontSize: "16px", fontWeight: "700" }}>
-                ✓ {bundleSummary.total} student{bundleSummary.total !== 1 ? "s" : ""} imported from bundle!
+                ✓ {bundleSummary.total} student{bundleSummary.total !== 1 ? "s" : ""} loaded!
               </div>
               <div style={{ padding: "12px 16px", borderRadius: "10px", background: "#12102a", border: "1px solid #4c1d95", fontSize: "12px", color: "#c4b5fd", lineHeight: "1.6" }}>
-                👤 <strong>Have a Private Roster JSON?</strong> Load it now using the <strong>👤 Private Roster</strong> button in the left sidebar to reconnect real names to these students.
+                👤 <strong>Have a saved name list file?</strong> Load it now using the <strong>👤 Real Names</strong> button in the left sidebar so you see real names next to each student.
               </div>
             </div>
           )}
@@ -799,13 +799,13 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
 
           {/* Privacy notice */}
           <div style={{ padding: "10px 14px", background: "#071a0e", border: "1px solid #166534", borderRadius: "10px", fontSize: "11px", color: "#4ade80", lineHeight: "1.6" }}>
-            🔒 <strong>FERPA-safe:</strong> Real names are read from this file and placed into the Private Roster only — never stored in app state, AI context, logs, analytics, or exports. The app works with pseudonyms only.
+            🔒 <strong>Safe to use:</strong> Real names stay on this computer only. They're never sent to the cloud, AI, or anyone else. The shared version uses only Para App Numbers.
           </div>
 
           {/* Duplicate-import warning */}
           {importedCount > 0 && (
             <div style={{ padding: "10px 14px", background: "#1a1505", border: "1px solid #854d0e", borderRadius: "10px", fontSize: "11px", color: "#fbbf24", lineHeight: "1.6" }}>
-              ⚠ <strong>You already have {importedCount} imported student{importedCount !== 1 ? "s" : ""}.</strong> Importing a Master Roster adds new records with different IDs. To avoid duplicates, clear imported students first.
+              ⚠ <strong>You already have {importedCount} student{importedCount !== 1 ? "s" : ""} loaded.</strong> Loading another name list will add duplicates. Clear the current students first if you want to start fresh.
             </div>
           )}
 
@@ -816,7 +816,7 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
           <button onClick={() => masterRosterFileRef.current?.click()}
             style={{ width: "100%", padding: "14px 20px", borderRadius: "10px", border: `2px solid ${masterRosterData ? "#166534" : "var(--border-light)"}`, background: masterRosterData ? "#071a0e" : "var(--bg-surface)", color: masterRosterData ? "#4ade80" : "var(--text-primary)", fontSize: "14px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", gap: "12px", textAlign: "left" }}>
             <span style={{ fontSize: "22px" }}>🗂️</span>
-            <span>{masterRosterData ? `✓ Roster loaded — ${mrStudents.length} student${mrStudents.length !== 1 ? "s" : ""} in ${mrPeriods.length} period${mrPeriods.length !== 1 ? "s" : ""}` : "Upload Master Roster JSON"}</span>
+            <span>{masterRosterData ? `✓ Loaded — ${mrStudents.length} student${mrStudents.length !== 1 ? "s" : ""} across ${mrPeriods.length} period${mrPeriods.length !== 1 ? "s" : ""}` : "Upload a school-style name list"}</span>
           </button>
 
           {/* Validation error */}
@@ -949,7 +949,7 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
 
             {/* Privacy conversion preview */}
             <div style={{ padding: "14px", background: "#070e1c", border: `2px solid ${slotColor}40`, borderRadius: "12px" }}>
-              <div style={{ fontSize: "11px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: "10px", fontWeight: "600" }}>Privacy Conversion</div>
+              <div style={{ fontSize: "11px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: "10px", fontWeight: "600" }}>How the app protects the name</div>
               <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "8px" }}>
                 <div style={{ flex: 1, padding: "8px 12px", background: "#1a0505", borderRadius: "8px", fontSize: "12px", color: "#f87171", textDecoration: "line-through", opacity: .6 }}>
                   {data.studentName || "Student Name"} (stays local only)
@@ -961,13 +961,13 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
                 </div>
               </div>
               <div style={{ fontSize: "10px", color: "var(--text-muted)", lineHeight: "1.5" }}>
-                The app uses <strong style={{ color: slotColor }}>{pseudonym}</strong> everywhere. Real name never stored in app data.
+                The app uses <strong style={{ color: slotColor }}>{pseudonym}</strong> everywhere. The real name stays on this computer only.
               </div>
             </div>
 
             {/* Extracted fields */}
             <div className="panel" style={{ padding: "14px" }}>
-              <div style={{ fontSize: "12px", fontWeight: "700", color: "var(--text-primary)", marginBottom: "12px" }}>Extracted Fields</div>
+              <div style={{ fontSize: "12px", fontWeight: "700", color: "var(--text-primary)", marginBottom: "12px" }}>What we found</div>
               <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "12px" }}>
                 {data.eligibility && <Row label="Eligibility" value={data.eligibility} color="#60a5fa" />}
                 {data.caseManager && <Row label="Case Manager" value={data.caseManager} />}
@@ -1060,11 +1060,10 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
                 <strong style={{ color: "#e2e8f0" }}>
                   {pendingRosterData.length} student{pendingRosterData.length !== 1 ? "s" : ""}
                 </strong>
-                {" "}— each real name now has one pseudonym and color across all their classes.
+                {" "}— each real name now has one display name and color across all their classes.
                 Save this file to your computer.
                 <br /><br />
-                Re-upload it via the <strong style={{ color: "#e2e8f0" }}>👤 Private Roster</strong> sidebar button
-                in any future session to restore name recognition.
+                Next time, load it using the <strong style={{ color: "#e2e8f0" }}>👤 Real Names</strong> button in the left sidebar to see real names again.
                 <br /><br />
                 <span style={{ color: "#fbbf24" }}>
                   ⚠ This file contains real names. Store it securely and never share it.

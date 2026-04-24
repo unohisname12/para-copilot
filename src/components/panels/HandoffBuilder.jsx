@@ -56,11 +56,11 @@ export function HandoffBuilder({ students, onSave, studentsMap, ollamaOnline, ol
       <div><label style={lbl}>Student (or all)</label><select value={stuId} onChange={e => setStuId(e.target.value)} className="period-select" style={{ width: "100%" }}><option value="all">All students this period</option>{students.filter(id => lookup[id]).map(id => <option key={id} value={id}>{resolveLabel(lookup[id], "compact")}</option>)}</select></div>
       <div><label style={lbl}>Summary*</label><textarea value={summary} onChange={e => setSummary(e.target.value)} className="data-textarea" style={{ height: "70px" }} placeholder="What happened, what to know..." /></div>
       <div><label style={lbl}>Action Needed</label><input value={nextStep} onChange={e => setNextStep(e.target.value)} className="chat-input" placeholder="e.g. Check in with student at start of next period" /></div>
-      {urgency === "urgent" && <div style={{ fontSize: "11px", color: "#f87171", background: "#7f1d1d30", padding: "6px 10px", borderRadius: "6px" }}>🔴 This will be flagged as urgent in the Data Vault.</div>}
+      {urgency === "urgent" && <div style={{ fontSize: "11px", color: "#f87171", background: "#7f1d1d30", padding: "6px 10px", borderRadius: "6px" }}>🔴 This will show up as urgent in your records.</div>}
       {canShare && (
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#93c5fd", cursor: "pointer" }}>
           <input type="checkbox" checked={shareWithTeam} onChange={e => setShareWithTeam(e.target.checked)} />
-          Share with team (realtime handoff to other paras)
+          Share with team (other paras see this right away)
         </label>
       )}
       <div style={{ display: "flex", gap: "6px" }}>

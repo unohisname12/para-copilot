@@ -2,36 +2,34 @@ import { migrateIdentity } from '../../identity';
 
 export function validatePrivateRoster(json) {
   if (!json || typeof json !== "object" || Array.isArray(json))
-    return "Not a valid JSON object.";
+    return "That file doesn't look right.";
 
   // Combined export format (has privateRosterMap key)
   if (json.privateRosterMap) {
     const inner = json.privateRosterMap;
     if (!inner || typeof inner !== "object" || Array.isArray(inner))
-      return 'Malformed file: "privateRosterMap" must be an object.';
+      return "That file is missing its name list section.";
     if (!Array.isArray(inner.privateRosterMap))
-      return 'Malformed file: expected "privateRosterMap.privateRosterMap" to be an array.';
+      return "That file's name list isn't in the expected format.";
     if (!inner.privateRosterMap.some(e => e && e.realName && String(e.realName).trim()))
-      return "No real student names found in this file.";
+      return "No real student names were found in that file.";
     return null;
   }
 
   // Pure app bundle (no private roster data)
   if (json.normalizedStudents)
-    return "This looks like an App Bundle file — upload it in IEP Import → App Bundle JSON tab, not here.";
+    return "This looks like a student file — upload it on the IEP Import page under 'Full student info (one file)'.";
 
   if (json.students && json.periods && !json.type)
-    return "This looks like a Master Roster file — upload it in IEP Import → Master Roster JSON tab.";
+    return "This looks like a school-style name list — upload it on the IEP Import page under 'School-style roster'.";
 
   // Official privateRoster artifact (schemaVersion 1.0 or 2.0)
   if (json.type !== "privateRoster")
-    return json.type
-      ? `Wrong file type: "${json.type}". Expected a Private Roster file.`
-      : 'Missing type field. Expected { "type": "privateRoster", ... }';
+    return "That doesn't look like a saved name list file.";
   if (!Array.isArray(json.students))
-    return 'Missing "students" array in file.';
+    return "That file is missing its student list.";
   if (!json.students.some(e => e && e.realName && String(e.realName).trim()))
-    return "No real student names found in this file.";
+    return "No real student names were found in that file.";
   return null;
 }
 

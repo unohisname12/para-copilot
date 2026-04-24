@@ -392,7 +392,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
       }
       return 0;
     });
-    const vaultTabs = [{ id: "all", label: "All Logs" }, { id: "byStudent", label: "By Student" }, { id: "byPeriod", label: "By Period" }, { id: "flagged", label: `Flagged (${logs.filter(l => l.flagged).length})` }, { id: "handoffs", label: `Handoffs (${logs.filter(l => l.type === "Handoff Note").length})` }, { id: "goalProgress", label: `Goals (${logs.filter(l => l.type === "Goal Progress").length})` }, { id: "knowledge", label: `KB (${knowledgeBase.length})` }];
+    const vaultTabs = [{ id: "all", label: "All Logs" }, { id: "byStudent", label: "By Student" }, { id: "byPeriod", label: "By Period" }, { id: "flagged", label: `Flagged (${logs.filter(l => l.flagged).length})` }, { id: "handoffs", label: `Handoffs (${logs.filter(l => l.type === "Handoff Note").length})` }, { id: "goalProgress", label: `Goals (${logs.filter(l => l.type === "Goal Progress").length})` }, { id: "knowledge", label: `Notes (${knowledgeBase.length})` }];
     return (<div>
       <div className="header">
         <div>
@@ -402,21 +402,21 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
               {logs.length} observations
             </span>
             <span className="pill pill-violet" style={{ fontSize: 11, marginRight: 8 }}>
-              {knowledgeBase.length} KB docs
+              {knowledgeBase.length} saved notes
             </span>
             <span className="pill pill-green" style={{ fontSize: 11 }}>
-              FERPA-safe
+              Real names stay local
             </span>
           </p>
         </div>
         <div style={{ display: "flex", gap: "var(--space-2)" }}>
-          <button className="btn btn-secondary" onClick={() => handleExportCSV(filteredLogs)}>Export Filtered</button>
-          <button className="btn btn-primary" onClick={() => handleExportCSV()}>Export All</button>
+          <button className="btn btn-primary" onClick={() => handleExportCSV(filteredLogs)}>Export filtered data</button>
+          <button className="btn btn-secondary" onClick={() => handleExportCSV()}>Export everything</button>
           {identityRegistry.length > 0 && (
             <button className="btn btn-secondary"
               style={{ borderColor: "rgba(251,191,36,0.35)", color: "var(--yellow)" }}
               onClick={() => handleExportCSVPrivate(filteredLogs)}>
-              Export with Names
+              Export with real names
             </button>
           )}
         </div>
@@ -834,9 +834,9 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
                   marginTop: 6,
                 }}
               >
-                🧹 Reset Local Data
+                🧹 Reset data on this computer
               </button>
-              <div style={{ fontSize: "11px", color: "#334155", textAlign: "center", lineHeight: "1.8", marginTop: 4 }}>FERPA-Safe — Pseudonyms only</div>
+              <div style={{ fontSize: "11px", color: "#334155", textAlign: "center", lineHeight: "1.8", marginTop: 4 }}>Student names stay on this computer</div>
             </div>
           </>);
         })()}

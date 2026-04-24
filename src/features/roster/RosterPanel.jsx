@@ -70,7 +70,7 @@ export function RosterPanel({ onClose, allStudents = {}, identityRegistry = [], 
       const err = validatePrivateRoster(json);
       if (err) { setRosterError(err); return; }
       onIdentityLoad?.(extractIdentityEntries(json, allStudents));
-    } catch { setRosterError("Could not read file. Make sure it is a valid Private Roster JSON."); }
+    } catch { setRosterError("Could not read that file. Make sure it's a saved name list file."); }
     e.target.value = "";
   };
 
@@ -90,7 +90,7 @@ export function RosterPanel({ onClose, allStudents = {}, identityRegistry = [], 
       if (err) { alert("Invalid format: " + err); return; }
       onIdentityLoad?.(extractIdentityEntries(data, allStudents));
       setImportText(""); setShowImport(false);
-    } catch { alert("Invalid JSON. Paste the contents of your saved Private Roster file."); }
+    } catch { alert("That text doesn't look right. Paste the contents of your saved name list file."); }
   };
 
   const renderStudentRow = (stuId) => {
@@ -124,7 +124,7 @@ export function RosterPanel({ onClose, allStudents = {}, identityRegistry = [], 
     if (unresolved.length === 0) return null;
     return (
       <div style={{ fontSize: "9px", color: "#334155", fontStyle: "italic", paddingLeft: "8px", marginTop: "3px" }}>
-        {unresolved.length} not in roster
+        {unresolved.length} not in name list
       </div>
     );
   };
@@ -135,10 +135,10 @@ export function RosterPanel({ onClose, allStudents = {}, identityRegistry = [], 
       {/* Header */}
       <div style={{ padding: "10px 12px", background: "#0a1628", borderBottom: "1px solid #1e3a5f", flexShrink: 0 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "3px" }}>
-          <span style={{ fontSize: "12px", fontWeight: "700", color: "#e2e8f0" }}>Private Roster</span>
+          <span style={{ fontSize: "12px", fontWeight: "700", color: "#e2e8f0" }}>Real Names</span>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "#475569", fontSize: "20px", cursor: "pointer", lineHeight: 1 }}>×</button>
         </div>
-        <div style={{ fontSize: "9px", color: "#f59e0b" }}>⚠ Local only — never saved or sent to AI</div>
+        <div style={{ fontSize: "9px", color: "#f59e0b" }}>⚠ Stays on this computer only — never sent anywhere</div>
       </div>
 
       {/* Scrollable body — everything below the header in one region */}
@@ -149,7 +149,7 @@ export function RosterPanel({ onClose, allStudents = {}, identityRegistry = [], 
           {(["current", "whole"]).map(mode => (
             <button key={mode} onClick={() => setRosterMode(mode)}
               style={{ flex: 1, padding: "6px", background: rosterMode === mode ? "#1e3a5f" : "transparent", color: rosterMode === mode ? "#93c5fd" : "#475569", fontSize: "10px", fontWeight: rosterMode === mode ? "700" : "400", border: "none", cursor: "pointer" }}>
-              {mode === "current" ? "Current Class" : "Whole Roster"}
+              {mode === "current" ? "This class" : "All students"}
             </button>
           ))}
         </div>
@@ -160,7 +160,7 @@ export function RosterPanel({ onClose, allStudents = {}, identityRegistry = [], 
           <button onClick={() => { setRosterError(""); fileInputRef.current?.click(); }}
             style={{ width: "100%", padding: "8px 10px", borderRadius: "8px", border: `2px solid ${hasNames ? "#166534" : "#1e3a5f"}`, background: hasNames ? "#0d2010" : "#0a1628", color: hasNames ? "#4ade80" : "#475569", fontSize: "11px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", gap: "7px", justifyContent: "center" }}>
             <span>{hasNames ? "✓" : "📂"}</span>
-            <span>{hasNames ? "Private Roster Loaded" : "Load Private Roster JSON"}</span>
+            <span>{hasNames ? "Name list loaded" : "Load name list file"}</span>
           </button>
           {rosterError && (
             <div style={{ fontSize: "10px", color: "#f87171", background: "#1a0505", border: "1px solid #7f1d1d", borderRadius: "6px", padding: "7px 9px", marginTop: "6px", lineHeight: "1.5" }}>

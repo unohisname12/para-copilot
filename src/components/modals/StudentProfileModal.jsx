@@ -322,13 +322,13 @@ function StudentProfileModalInner({ studentId, logs, currentDate, activePeriod, 
                   {/* Save guided */}
                   <div style={{ display: 'flex', gap: '6px' }}>
                     <button onClick={handleSaveGuided} style={{ padding: '6px 14px', borderRadius: '6px', border: `1px solid ${c}`, background: c, color: '#000', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>Save with Details</button>
-                    <button onClick={handleSaveNote} style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #1e293b', background: 'transparent', color: '#8fa3c4', fontSize: '11px', cursor: 'pointer' }}>Just Save Note</button>
+                    <button onClick={handleSaveNote} style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #1e293b', background: 'transparent', color: '#8fa3c4', fontSize: '11px', cursor: 'pointer' }}>Just save note</button>
                   </div>
                 </div>
               )}
               {/* Default save button — hidden when guided flow is active or prompt is showing */}
               {helpPhase === "note" && !(helpWorthy && logNote.trim().length > 0) && (
-                <button className="btn btn-primary" style={{ background: c, borderColor: c, color: "#000" }} onClick={handleSaveNote}>Save to Vault</button>
+                <button className="btn btn-primary" style={{ background: c, borderColor: c, color: "#000" }} onClick={handleSaveNote}>Save note</button>
               )}
             </div>
             {onUpdateIdentity && (
