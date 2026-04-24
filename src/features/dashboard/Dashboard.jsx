@@ -305,7 +305,7 @@ export function Dashboard({
             }}>
               {[
                 ["write", "✏️ Write it"],
-                ["fetch", "📄 Fetch Doc"],
+                ["fetch", "📄 Get from link"],
                 ["none",  "— Skip"],
               ].map(([id, label]) => (
                 <button

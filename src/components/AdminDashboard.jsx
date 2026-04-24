@@ -19,11 +19,11 @@ import {
 } from '../services/teamSync';
 
 const ROLE_META = {
-  owner:        { label: 'Owner',         tone: '#a78bfa', desc: 'Full admin. Multiple owners allowed. Co-lead or transfer ownership by promoting someone else to Owner.' },
-  sped_teacher: { label: 'Sped Teacher',  tone: '#7a9cff', desc: 'Full admin access. Parent notes visible. Same powers as Owner.' },
-  para:         { label: 'Para',          tone: '#34d399', desc: 'Sees IEP summary + logs + handoffs. No admin access.' },
-  sub:          { label: 'Sub',           tone: '#fbbf24', desc: 'Substitute. Same as Para, but team admin can block all subs with one toggle.' },
-  member:       { label: 'Member (legacy)', tone: '#64748b', desc: 'Pre-Phase-2 membership — promote to a real role.' },
+  owner:        { label: 'Owner',         tone: '#a78bfa', desc: 'Full control. Can add, remove, and change anyone. Multiple owners allowed — good for co-leads.' },
+  sped_teacher: { label: 'Sped Teacher',  tone: '#7a9cff', desc: 'Full control, same as Owner. Can see parent notes.' },
+  para:         { label: 'Para',          tone: '#34d399', desc: 'Sees IEP summary, logs, and handoffs. Cannot see parent notes or change team settings.' },
+  sub:          { label: 'Sub',           tone: '#fbbf24', desc: 'Substitute. Same view as Para, but the team admin can turn off all subs\' access with one switch.' },
+  member:       { label: 'Member (old)',  tone: '#64748b', desc: 'Older membership — please change to a newer role.' },
 };
 
 // Confirmation required when promoting TO Owner or demoting FROM Owner.

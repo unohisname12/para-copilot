@@ -68,8 +68,8 @@ export default function SignInScreen() {
             SupaPara
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: 14, lineHeight: 1.5 }}>
-            Powering ParaProfessionals. Classroom notes, team handoffs,
-            case memory — FERPA-safe.
+            Built for paraprofessionals. Classroom notes, team handoffs,
+            and a memory of what's worked — with student privacy protected.
           </p>
         </div>
 
@@ -115,7 +115,8 @@ export default function SignInScreen() {
           paddingTop: 'var(--space-4)', width: '100%',
           lineHeight: 1.5,
         }}>
-          Real student names never leave your device. Only pseudonymous data is synced.
+          Real student names never leave this computer. Only each kid's
+          6-digit number and notes sync with the team.
         </div>
       </div>
     </div>

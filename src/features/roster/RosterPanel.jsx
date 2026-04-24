@@ -214,17 +214,17 @@ export function RosterPanel({ onClose, allStudents = {}, identityRegistry = [], 
           {hasNames && (
             <button onClick={handleSaveRoster}
               style={{ width: "100%", padding: "7px", borderRadius: "6px", border: "1px solid #166534", background: "#0d2010", color: "#4ade80", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>
-              ↓ Save Private Roster
+              ↓ Save name list to file
             </button>
           )}
           <button onClick={() => setShowImport(!showImport)}
             style={{ width: "100%", padding: "6px", borderRadius: "6px", border: "1px solid #1e3a5f", background: "transparent", color: "#475569", fontSize: "10px", cursor: "pointer" }}>
-            {showImport ? "Cancel" : "Import JSON"}
+            {showImport ? "Cancel" : "Paste name list text"}
           </button>
           {showImport && (
             <>
               <textarea value={importText} onChange={e => setImportText(e.target.value)}
-                placeholder="Paste saved Private Roster JSON here..."
+                placeholder="Paste your saved name list text here..."
                 style={{ width: "100%", minHeight: "70px", padding: "7px", background: "#0a1628", border: "1px solid #1e3a5f", borderRadius: "6px", color: "#e2e8f0", fontSize: "10px", resize: "none", fontFamily: "monospace", boxSizing: "border-box" }} />
               <button onClick={handlePasteImport}
                 style={{ width: "100%", padding: "6px", borderRadius: "6px", border: "1px solid #166534", background: "#14532d", color: "#4ade80", fontSize: "10px", fontWeight: "700", cursor: "pointer" }}>
@@ -235,7 +235,7 @@ export function RosterPanel({ onClose, allStudents = {}, identityRegistry = [], 
           {hasNames && (
             <button onClick={() => { if (window.confirm("Clear all real names?")) { onClearRoster?.(); setRosterError(""); } }}
               style={{ width: "100%", padding: "5px", borderRadius: "6px", border: "1px solid #7f1d1d", background: "#1a0505", color: "#f87171", fontSize: "9px", cursor: "pointer" }}>
-              Clear Private Roster
+              Clear name list
             </button>
           )}
         </div>

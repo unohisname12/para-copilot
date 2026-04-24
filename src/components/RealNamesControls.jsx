@@ -55,7 +55,7 @@ export default function RealNamesControls() {
             textTransform: 'uppercase', letterSpacing: '0.1em',
             color: 'var(--text-muted)',
           }}>
-            Real Names
+            Real Names (this computer only)
           </div>
 
           {/* Toggle */}
@@ -102,7 +102,7 @@ export default function RealNamesControls() {
                 onClick={() => {
                   if (window.confirm(
                     'Purge all real names from this device?\n\n' +
-                    'You\'ll need to reload the private roster JSON next session.'
+                    'You\'ll need to reload the name list file next session.'
                   )) purgeVault();
                 }}
                 className="btn btn-ghost btn-sm"
@@ -162,7 +162,7 @@ export default function RealNamesControls() {
                 fontSize: 20, fontWeight: 800, letterSpacing: '-0.01em',
                 marginBottom: 'var(--space-3)',
               }}>
-                Store real names on this device?
+                Remember real names on this computer?
               </h3>
 
               <div style={{
@@ -173,9 +173,9 @@ export default function RealNamesControls() {
                 marginBottom: 'var(--space-4)',
                 fontSize: 13, lineHeight: 1.55, color: 'var(--text-primary)',
               }}>
-                Real student names will be saved to this browser's IndexedDB.
-                They <b style={{ color: 'var(--text-primary)' }}>never leave the device</b> and are
-                never uploaded.
+                Real student names will be saved in this browser's storage on this
+                computer. They <b style={{ color: 'var(--text-primary)' }}>never leave the
+                computer</b> and are never uploaded anywhere.
               </div>
 
               <div style={{
@@ -196,7 +196,7 @@ export default function RealNamesControls() {
                 fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5,
                 marginBottom: 'var(--space-5)',
               }}>
-                Auto-purges after {INACTIVITY_DAYS_LABEL} of inactivity. You can purge anytime from the sidebar.
+                Auto-wipes after {INACTIVITY_DAYS_LABEL} of not using the app. You can wipe manually anytime from the sidebar.
               </div>
 
               <div style={{ display: 'flex', gap: 'var(--space-2)' }}>

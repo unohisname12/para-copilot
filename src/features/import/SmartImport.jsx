@@ -209,13 +209,13 @@ export default function SmartImport({ onBulkImport, onIdentityLoad }) {
       {/* Intro card */}
       <div className="card-elevated" style={{ padding: 'var(--space-5)' }}>
         <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>
-          🎯 Smart Import — one-step IEP load
+          🎯 Smart Import — load everyone in one step
         </h3>
         <p style={{ fontSize: 13.5, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-          Upload <b>two files</b> — a roster (names + 6-digit Para App Numbers) and your IEP
-          summaries. The local AI extracts each kid's IEP, matches by name, builds the
-          structured data, and routes real names into your device's private vault.
-          Admin never sees a JSON file.
+          Upload <b>two files</b> — a name list (each student's name + 6-digit Para App
+          Number) and a document with each student's IEP summary. The AI reads both, matches
+          each kid to their IEP, and sets everything up for you. Real names stay on this
+          computer; only the Para App Number and IEP info go anywhere else.
         </p>
       </div>
 
@@ -351,15 +351,16 @@ export default function SmartImport({ onBulkImport, onIdentityLoad }) {
         <div className="panel" style={{ padding: 'var(--space-4)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <span style={{ fontSize: 20 }}>👥</span>
-            <span style={{ fontWeight: 700 }}>Roster</span>
+            <span style={{ fontWeight: 700 }}>Name list</span>
             {rosterPairs.length > 0 && (
               <span className="pill pill-green" style={{ fontSize: 10 }}>
-                {rosterPairs.length} paired
+                {rosterPairs.length} students found
               </span>
             )}
           </div>
           <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: 'var(--space-2)' }}>
-            Names + 6-digit Para App Numbers. JSON, CSV, Markdown, TXT, or PDF.
+            Each student's real name + their 6-digit Para App Number.
+            Accepts Word, PDF, a typed list, a spreadsheet — pretty much any format.
           </p>
           <input
             ref={rosterRef}
@@ -385,15 +386,16 @@ export default function SmartImport({ onBulkImport, onIdentityLoad }) {
         <div className="panel" style={{ padding: 'var(--space-4)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <span style={{ fontSize: 20 }}>📄</span>
-            <span style={{ fontWeight: 700 }}>IEP Summaries</span>
+            <span style={{ fontWeight: 700 }}>IEP summaries</span>
             {iepText && (
               <span className="pill pill-green" style={{ fontSize: 10 }}>
-                {Math.round(iepText.length / 1000)} KB of text
+                loaded
               </span>
             )}
           </div>
           <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: 'var(--space-2)' }}>
-            One document with IEP summary per student. PDF or text. AI splits it by name.
+            One document with a short IEP summary for each student (goals, accommodations,
+            etc.). PDF or a text/Word file. The AI finds each student by name.
           </p>
           <input
             ref={iepRef}
@@ -619,19 +621,20 @@ export default function SmartImport({ onBulkImport, onIdentityLoad }) {
       {/* Help block */}
       <details style={{ fontSize: 12, color: 'var(--text-muted)' }}>
         <summary style={{ cursor: 'pointer', color: 'var(--text-secondary)' }}>
-          What should each file look like?
+          Not sure what each file should look like? Examples →
         </summary>
         <div style={{ padding: 'var(--space-3)', marginTop: 'var(--space-2)', display: 'grid', gap: 'var(--space-3)' }}>
           <div>
-            <b style={{ color: 'var(--text-primary)' }}>Roster</b> — one line per student:
+            <b style={{ color: 'var(--text-primary)' }}>Name list</b> — one line per student,
+            name and number separated by a dash or colon:
             <pre style={preStyle}>{`Jordan Smith - 847293
 Taylor Johnson - 128456
 Maria Garcia - 555555`}</pre>
           </div>
           <div>
-            <b style={{ color: 'var(--text-primary)' }}>IEP Summaries</b> — a single document
-            containing each student's IEP summary. Start each student's section with
-            their full name (first + last) on its own line so the app can split it:
+            <b style={{ color: 'var(--text-primary)' }}>IEP summaries</b> — one document with
+            a short section for each student. Put each student's full name at the top of
+            their section so the app can tell them apart:
             <pre style={preStyle}>{`Jordan Smith
 Eligibility: Speech/Language
 Case Manager: Heather Thomas
