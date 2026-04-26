@@ -45,6 +45,35 @@ export function downloadManifest(manifest) {
   URL.revokeObjectURL(url);
 }
 
+// CSV export — same shape parseRosterCsv accepts.
+// Two columns: Name, ParaAppNumber. Order is auto-detected on import,
+// so even hand-edited rows work. Header row included for readability.
+export function buildAssignmentCsv(students) {
+  const lines = ['Name,ParaAppNumber'];
+  students.forEach(s => {
+    const name = (s.realName || s.fullName || s.pseudonym || '').replace(/"/g, '""');
+    const num  = s.studentUid || s.student_uid || s.paraAppNumber || s.paraNumber || '';
+    if (!num) return;
+    const safeName = name.includes(',') || name.includes('"') ? `"${name}"` : name;
+    lines.push(`${safeName},${num}`);
+  });
+  return lines.join('\n') + '\n';
+}
+
+export function downloadAssignmentCsv(paraName, students) {
+  const safe = (paraName || 'para').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'para';
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const blob = new Blob([buildAssignmentCsv(students)], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `students-for-${safe}-${dateStr}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export function validateManifest(json) {
   if (!json || typeof json !== 'object' || Array.isArray(json))
     return 'That file does not look right.';

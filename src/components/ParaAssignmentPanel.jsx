@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { resolveLabel } from '../privacy/nameResolver';
 import { listAssignments, assignStudents, unassignStudents } from '../services/paraAssignments';
-import { buildAssignmentManifest, downloadManifest } from '../utils/assignmentManifest';
+import { buildAssignmentManifest, downloadManifest, downloadAssignmentCsv } from '../utils/assignmentManifest';
 
 // Sped teacher / owner screen. Pick a para, check student boxes, save.
 // Pre-register a para by email if they haven't signed in yet — the
@@ -82,23 +82,39 @@ export default function ParaAssignmentPanel({ teamId, teamLabel = '', members = 
     }
   }
 
-  function exportManifestForPicked() {
-    if (!pickedPara) return;
-    const studentRecords = [...pickedStudents]
+  // Build the student records used by both export formats (JSON manifest + CSV).
+  function pickedStudentRecords() {
+    return [...pickedStudents]
       .map(id => allStudents[id])
       .filter(Boolean)
       .map(s => ({
         ...s,
-        realName: vaultNames[s.id] || '',
+        realName: vaultNames[s.id] || s.realName || '',
       }));
+  }
+
+  function exportManifestForPicked() {
+    if (!pickedPara) return;
     const manifest = buildAssignmentManifest({
       paraName:  pickedPara.name || preRegName,
       paraEmail: pickedPara.email || preRegEmail,
-      students:  studentRecords,
+      students:  pickedStudentRecords(),
       teamLabel,
     });
     downloadManifest(manifest);
-    setMsg({ tone: 'ok', text: 'Assignment file downloaded. Email it to the para.' });
+    setMsg({ tone: 'ok', text: 'Assignment file downloaded. Email it to the para — they pick it up in "Find my students".' });
+  }
+
+  function exportCsvForPicked() {
+    if (!pickedPara) return;
+    const records = pickedStudentRecords();
+    if (records.length === 0) {
+      setMsg({ tone: 'error', text: 'Pick at least one student first.' });
+      return;
+    }
+    const paraName = pickedPara.name || preRegName || pickedPara.email || 'para';
+    downloadAssignmentCsv(paraName, records);
+    setMsg({ tone: 'ok', text: `CSV downloaded with ${records.length} student${records.length === 1 ? '' : 's'}. The para can paste rows into "Find my students" or upload the file.` });
   }
 
   function pickExistingMember(m) {
@@ -265,12 +281,20 @@ export default function ParaAssignmentPanel({ teamId, teamLabel = '', members = 
               {busy ? 'Saving…' : 'Save assignment'}
             </button>
             <button
+              onClick={exportCsvForPicked}
+              disabled={pickedStudents.size === 0}
+              className="btn btn-secondary"
+              title="Plain CSV with names + Para App Numbers — easy to edit in any spreadsheet, perfect for adding new kids later"
+            >
+              📊 Download CSV
+            </button>
+            <button
               onClick={exportManifestForPicked}
               disabled={pickedStudents.size === 0}
               className="btn btn-secondary"
-              title="Download a file the para can upload to instantly see real names + IEP info"
+              title="Full assignment file — the para drops it in 'Find my students' and gets real names + IEP info instantly"
             >
-              📁 Export file for this para
+              📦 Download assignment file
             </button>
             <button
               onClick={() => { setPickedPara(null); setPickedStudents(new Set()); }}
