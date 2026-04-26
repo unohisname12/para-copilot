@@ -66,6 +66,8 @@ export function Dashboard({
   caseMemory,
   onLoadDemo,
   onClearDemo,
+  hasVault = false,
+  onFindMyStudents,
 }) {
   // ── Persisted layout ──────────────────────────────────────
   const [layout, setLayout] = useLS(LAYOUT_KEY, { cols: 2, chatOpen: false, chatH: 320 });
@@ -261,6 +263,41 @@ export function Dashboard({
 
       {/* ══ SCROLLABLE BODY ══════════════════════════════════ */}
       <div style={{ flex: 1, overflowY: "auto", padding: "0 var(--space-6) var(--space-6)", display: "flex", flexDirection: "column", gap: "var(--space-4)", minHeight: 0 }}>
+
+        {/* ── EMPTY-STATE NUDGE — first thing a new para sees ── */}
+        {!hasVault && effectivePeriodStudents.length > 0 && onFindMyStudents && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: "var(--space-3)",
+            padding: "var(--space-4) var(--space-5)",
+            background: "linear-gradient(135deg, var(--accent-glow), transparent)",
+            border: "1px solid var(--accent-border)",
+            borderRadius: "var(--radius-lg)",
+          }}>
+            <div style={{
+              width: 44, height: 44,
+              borderRadius: "var(--radius-md)",
+              background: "var(--accent-strong)",
+              color: "#fff",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 20, flexShrink: 0,
+            }}>🎯</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)", letterSpacing: "-0.01em" }}>
+                See real names + your caseload
+              </div>
+              <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2, lineHeight: 1.5 }}>
+                Right now you're seeing students by their Para App Number. Drop in your name list (or just type names + numbers) and the app fills in the rest. Stays on this computer only.
+              </div>
+            </div>
+            <button
+              onClick={onFindMyStudents}
+              className="btn btn-primary"
+              style={{ minHeight: 40, whiteSpace: "nowrap" }}
+            >
+              Find my students →
+            </button>
+          </div>
+        )}
 
         {/* ── TODAY'S PLAN CARD (merged Topic + Class Notes Doc) ─ */}
         <div style={{

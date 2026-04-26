@@ -18,6 +18,7 @@ export default function ParaAssignmentPanel({ teamId, teamLabel = '', members = 
   const [assignments, setAssignments]     = useState([]);
   const [busy, setBusy]                   = useState(false);
   const [msg, setMsg]                     = useState(null);
+  const [showMoreExports, setShowMoreExports] = useState(false);
 
   useEffect(() => { refresh(); }, [teamId]);
 
@@ -284,18 +285,30 @@ export default function ParaAssignmentPanel({ teamId, teamLabel = '', members = 
               onClick={exportCsvForPicked}
               disabled={pickedStudents.size === 0}
               className="btn btn-secondary"
-              title="Plain CSV with names + Para App Numbers — easy to edit in any spreadsheet, perfect for adding new kids later"
+              title="CSV — fastest, easy to edit in any spreadsheet"
             >
-              📊 Download CSV
+              📊 CSV — fastest, easy to edit later
             </button>
-            <button
-              onClick={exportManifestForPicked}
-              disabled={pickedStudents.size === 0}
-              className="btn btn-secondary"
-              title="Full assignment file — the para drops it in 'Find my students' and gets real names + IEP info instantly"
-            >
-              📦 Download assignment file
-            </button>
+            {!showMoreExports && pickedStudents.size > 0 && (
+              <button
+                onClick={() => setShowMoreExports(true)}
+                className="btn btn-ghost btn-sm"
+                style={{ fontSize: 11, color: 'var(--text-muted)' }}
+                title="See another export format"
+              >
+                More options ▾
+              </button>
+            )}
+            {showMoreExports && (
+              <button
+                onClick={exportManifestForPicked}
+                disabled={pickedStudents.size === 0}
+                className="btn btn-secondary"
+                title="Full file — para gets real names auto-loaded when they drop it"
+              >
+                📦 Full file — para gets real names auto-loaded
+              </button>
+            )}
             <button
               onClick={() => { setPickedPara(null); setPickedStudents(new Set()); }}
               className="btn btn-ghost"

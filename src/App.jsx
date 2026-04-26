@@ -756,6 +756,30 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
           return (<>
             <div className="brand" style={{ fontSize: "11px", color: "#1e3a5f", padding: "0 4px 10px", marginBottom: "2px" }}>v2</div>
 
+            {/* Para's primary front door — always visible at the top so a new
+                para never has to hunt for "where do I start". */}
+            <button
+              type="button"
+              onClick={() => setFindStudentsOpen(true)}
+              title="Load your students so you see real names + each kid's IEP info"
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                marginBottom: 10,
+                borderRadius: "var(--radius-md)",
+                border: "1px solid var(--accent-border)",
+                background: "var(--accent-glow)",
+                color: "var(--accent-hover)",
+                cursor: "pointer",
+                fontSize: 13, fontWeight: 700,
+                display: "flex", alignItems: "center", gap: 8,
+                fontFamily: "inherit",
+              }}
+            >
+              <span style={{ fontSize: 16 }}>🎯</span>
+              {!sidebarCollapsed && <span>Find my students</span>}
+            </button>
+
             <Tip text="Simplified note-taking for paras. Large buttons, plain language — advanced processing runs in the background." pos="right">
               <button onClick={() => setSimpleMode(!simpleMode)} style={{ width: "100%", padding: "9px 7px", borderRadius: "8px", border: `2px solid ${simpleMode ? "#166534" : "#1d4ed8"}`, background: simpleMode ? "#14532d" : "#0c1a2e", color: simpleMode ? "#4ade80" : "#93c5fd", cursor: "pointer", fontSize: "12px", fontWeight: "700", marginBottom: "10px" }}>
                 {simpleMode ? "✓ Simple Mode ON" : "📝 Simple Mode"}
@@ -860,23 +884,6 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
                 🧹 Reset data on this computer
               </button>
               <div style={{ marginTop: 8 }}>
-                <button
-                  type="button"
-                  onClick={() => setFindStudentsOpen(true)}
-                  className="nav-btn"
-                  title="Load your students so you see real names + IEP info"
-                  style={sidebarCollapsed ? { justifyContent: 'center', padding: '8px 6px' } : {
-                    background: 'var(--accent-glow)',
-                    border: '1px solid var(--accent-border)',
-                    color: 'var(--accent-hover)',
-                    fontWeight: 600,
-                  }}
-                >
-                  <span style={{ fontSize: 14 }}>🎯</span>
-                  {!sidebarCollapsed && <span style={{ marginLeft: 8 }}>Find my students</span>}
-                </button>
-              </div>
-              <div style={{ marginTop: 4 }}>
                 <BugReportButton collapsed={sidebarCollapsed} />
               </div>
               <div style={{ fontSize: "11px", color: "#334155", textAlign: "center", lineHeight: "1.8", marginTop: 4 }}>Student names stay on this computer</div>
@@ -915,6 +922,8 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
                   caseMemory={caseMemory}
                   onLoadDemo={handleLoadDemo}
                   onClearDemo={handleClearDemo}
+                  hasVault={vaultCtx?.hasVault}
+                  onFindMyStudents={() => setFindStudentsOpen(true)}
                 />
               )}
               {view === "vault" && renderVault()}
