@@ -68,6 +68,7 @@ export function Dashboard({
   onClearDemo,
   hasVault = false,
   onFindMyStudents,
+  bannerHiddenAlways = false,
 }) {
   // ── Persisted layout ──────────────────────────────────────
   const [layout, setLayout] = useLS(LAYOUT_KEY, { cols: 2, chatOpen: false, chatH: 320 });
@@ -269,7 +270,7 @@ export function Dashboard({
             Dismissible per-session. Comes back if they refresh without
             loading a name list. Won't keep nagging them once they've
             seen it for the day. */}
-        {!hasVault && !findStudentsBannerDismissed && effectivePeriodStudents.length > 0 && onFindMyStudents && (
+        {!hasVault && !findStudentsBannerDismissed && !bannerHiddenAlways && effectivePeriodStudents.length > 0 && onFindMyStudents && (
           <div style={{
             position: "relative",
             display: "flex", alignItems: "center", gap: "var(--space-3)",

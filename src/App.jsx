@@ -47,6 +47,7 @@ import RealNamesControls from './components/RealNamesControls';
 import AdminDashboard from './components/AdminDashboard';
 import BugReportButton from './components/BugReportButton';
 import FindMyStudentsModal from './components/FindMyStudentsModal';
+import SettingsModal, { isFindStudentsBannerHidden } from './components/SettingsModal';
 import { claimPendingAssignments } from './services/paraAssignments';
 import SubLockedScreen from './components/SubLockedScreen';
 import { VaultProvider, useVault, enrichStudentsWithNames } from './context/VaultProvider';
@@ -163,6 +164,8 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
   const [simpleMode, setSimpleMode] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [findStudentsOpen, setFindStudentsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [bannerHiddenAlways, setBannerHiddenAlways] = useState(() => isFindStudentsBannerHidden());
   const [onboardingOpen, setOnboardingOpen] = useState(() => !hasSeenOnboarding());
   const [sampleDataClearedToast, setSampleDataClearedToast] = useState(false);
 
@@ -884,6 +887,18 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
                 🧹 Reset data on this computer
               </button>
               <div style={{ marginTop: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setSettingsOpen(true)}
+                  className="nav-btn"
+                  title="Settings"
+                  style={sidebarCollapsed ? { justifyContent: 'center', padding: '8px 6px' } : null}
+                >
+                  <span style={{ fontSize: 14 }}>⚙️</span>
+                  {!sidebarCollapsed && <span style={{ marginLeft: 8 }}>Settings</span>}
+                </button>
+              </div>
+              <div style={{ marginTop: 4 }}>
                 <BugReportButton collapsed={sidebarCollapsed} />
               </div>
               <div style={{ fontSize: "11px", color: "#334155", textAlign: "center", lineHeight: "1.8", marginTop: 4 }}>Student names stay on this computer</div>
@@ -924,6 +939,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
                   onClearDemo={handleClearDemo}
                   hasVault={vaultCtx?.hasVault}
                   onFindMyStudents={() => setFindStudentsOpen(true)}
+                  bannerHiddenAlways={bannerHiddenAlways}
                 />
               )}
               {view === "vault" && renderVault()}
@@ -969,6 +985,16 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
         open={findStudentsOpen}
         onClose={() => setFindStudentsOpen(false)}
         onIdentityLoad={students.handleIdentityLoad}
+      />
+      <SettingsModal
+        open={settingsOpen}
+        onClose={() => {
+          // Re-read the persistent flag whenever the modal closes so the
+          // dashboard banner immediately reflects any toggle changes.
+          setBannerHiddenAlways(isFindStudentsBannerHidden());
+          setSettingsOpen(false);
+        }}
+        onReplayOnboarding={() => setOnboardingOpen(true)}
       />
 
       {sampleDataClearedToast && (
