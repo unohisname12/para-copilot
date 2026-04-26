@@ -256,6 +256,7 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
   const mrStudents = masterRosterData?.students || [];
   const mrPeriods  = masterRosterData?.periods  || [];
   const mrCrossPeriodCount = mrStudents.filter(s => Array.isArray(s.periodIds) && s.periodIds.length > 1).length;
+  const mrWithParaNumber   = mrStudents.filter(s => s.paraAppNumber || s.externalKey || s.externalStudentKey).length;
 
   // ── Private Roster accumulator ────────────────────────────────
   const [exportedPrivateRoster, setExportedPrivateRoster] = useState([]);
@@ -829,11 +830,12 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
           {/* Preview */}
           {masterRosterData && !masterRosterImported && (
             <>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px" }}>
                 {[
                   { label: "Students",      val: mrStudents.length,      color: "#e2e8f0" },
                   { label: "Periods",       val: mrPeriods.length,       color: "#60a5fa" },
                   { label: "Multi-Period",  val: mrCrossPeriodCount,     color: "#4ade80" },
+                  { label: "Para App #s",   val: mrWithParaNumber,       color: mrWithParaNumber === mrStudents.length ? "#4ade80" : "#fbbf24" },
                 ].map(({ label, val, color }) => (
                   <div key={label} style={{ background: "var(--bg-surface)", borderRadius: "8px", padding: "10px 12px", textAlign: "center" }}>
                     <div style={{ fontSize: "22px", fontWeight: "700", color }}>{val}</div>
@@ -842,9 +844,43 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
                 ))}
               </div>
 
+              {/* Para App Numbers preview — first 6 with names */}
+              {mrWithParaNumber > 0 && (
+                <div style={{
+                  padding: "10px 12px",
+                  background: "var(--bg-surface)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "8px",
+                  fontSize: 11, color: "var(--text-muted)", lineHeight: 1.6,
+                }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>
+                    Para App Numbers detected
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {mrStudents.filter(s => s.paraAppNumber).slice(0, 8).map(s => (
+                      <span key={s.id} className="mono" style={{
+                        padding: "2px 8px",
+                        background: "var(--bg-dark)",
+                        border: "1px solid var(--border)",
+                        borderRadius: "var(--radius-pill)",
+                        color: "var(--text-secondary)",
+                        fontSize: 11,
+                      }}>
+                        #{s.paraAppNumber} <span style={{ color: "var(--text-muted)" }}>· {s.fullName || "—"}</span>
+                      </span>
+                    ))}
+                    {mrWithParaNumber > 8 && (
+                      <span style={{ fontSize: 11, color: "var(--text-muted)", alignSelf: "center" }}>
+                        + {mrWithParaNumber - 8} more
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <button onClick={doMasterRosterImport}
                 style={{ width: "100%", padding: "14px", borderRadius: "12px", border: "1px solid #166534", background: "#0d2010", color: "#4ade80", fontSize: "15px", fontWeight: "800", cursor: "pointer" }}>
-                🗂️ Import {mrStudents.length} Student{mrStudents.length !== 1 ? "s" : ""} into App
+                🗂️ Load {mrStudents.length} student{mrStudents.length !== 1 ? "s" : ""} into the app
               </button>
             </>
           )}
@@ -852,7 +888,12 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
           {/* Success banner */}
           {masterRosterImported && (
             <div style={{ padding: "20px", borderRadius: "12px", background: "#0d2010", border: "2px solid #166534", color: "#4ade80", textAlign: "center", fontSize: "16px", fontWeight: "700" }}>
-              ✓ {mrImportedStudentCount} student{mrImportedStudentCount !== 1 ? "s" : ""} imported from Master Roster!
+              ✓ {mrImportedStudentCount} student{mrImportedStudentCount !== 1 ? "s" : ""} loaded
+              {mrWithParaNumber > 0 && (
+                <div style={{ fontSize: 13, fontWeight: 500, marginTop: 4, color: "#86efac" }}>
+                  {mrWithParaNumber} Para App Number{mrWithParaNumber !== 1 ? "s" : ""} attached — paras can find their students by these numbers.
+                </div>
+              )}
             </div>
           )}
         </div>

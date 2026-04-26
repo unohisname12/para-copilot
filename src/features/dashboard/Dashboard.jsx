@@ -628,6 +628,17 @@ export function Dashboard({
                       <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 500 }}>
                         {s.eligibility}
                       </span>
+                      {s.paraAppNumber && (
+                        <span className="mono" style={{
+                          fontSize: 10, color: "var(--text-dim)",
+                          padding: "1px 6px",
+                          background: "var(--bg-dark)",
+                          border: "1px solid var(--border)",
+                          borderRadius: "var(--radius-pill)",
+                        }}>
+                          #{s.paraAppNumber}
+                        </span>
+                      )}
                       {s.flags?.iepNotYetOnFile && (
                         <span className="pill pill-yellow" style={{ fontSize: 9, padding: "1px 6px" }}>
                           IEP Pending
