@@ -809,14 +809,41 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
             )}
 
             {sb.showToolbox && (
-              <div style={{ marginTop: "16px" }}>
-                <div style={{ fontSize: "10px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: "6px", padding: "0 4px" }}>Toolbox <span style={{ color: "#334155", fontWeight: "400", textTransform: "none" }}>(dbl-click = pop out)</span></div>
-                {toolboxTools.map(t => (
-                  <Tip key={t.id} text={t.tip} pos="right"><button className="nav-btn" style={activeToolbox === t.id ? { background: "#1e3a5f", color: "#93c5fd" } : {}}
-                    onClick={() => setActiveToolbox(activeToolbox === t.id ? null : t.id)}
-                    onDoubleClick={(e) => { e.preventDefault(); setActiveToolbox(null); if (!floatingTools.includes(t.id)) setFloatingTools(prev => [...prev, t.id]); }}
-                  >{t.label}</button></Tip>
+              <div style={{ marginTop: "16px", display: "flex", flexDirection: "column", gap: 4 }}>
+                {/* Tools the para uses for their own work — opens in side panel */}
+                <div className="sidebar-section-label">For your work</div>
+                {toolboxTools.filter(t => !t.studentSafe).map(t => (
+                  <Tip key={t.id} text={t.tip} pos="right">
+                    <button
+                      className={`nav-btn${activeToolbox === t.id ? ' active' : ''}`}
+                      onClick={() => setActiveToolbox(activeToolbox === t.id ? null : t.id)}
+                      onDoubleClick={(e) => { e.preventDefault(); setActiveToolbox(null); if (!floatingTools.includes(t.id)) setFloatingTools(prev => [...prev, t.id]); }}
+                    >
+                      {t.label}
+                    </button>
+                  </Tip>
                 ))}
+
+                {/* Student-safe tools — typically popped out fullscreen for the kid */}
+                {toolboxTools.some(t => t.studentSafe) && (
+                  <>
+                    <div className="sidebar-section-label" style={{ marginTop: 8 }}>For your student</div>
+                    {toolboxTools.filter(t => t.studentSafe).map(t => (
+                      <Tip key={t.id} text={t.tip} pos="right">
+                        <button
+                          className={`nav-btn${activeToolbox === t.id ? ' active' : ''}`}
+                          onClick={() => setActiveToolbox(activeToolbox === t.id ? null : t.id)}
+                          onDoubleClick={(e) => { e.preventDefault(); setActiveToolbox(null); if (!floatingTools.includes(t.id)) setFloatingTools(prev => [...prev, t.id]); }}
+                        >
+                          {t.label}
+                        </button>
+                      </Tip>
+                    ))}
+                    <div style={{ fontSize: 10, color: "var(--text-dim)", padding: "2px 8px 0", lineHeight: 1.4 }}>
+                      Double-click any tool to pop it out into a window.
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
@@ -959,7 +986,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
         }
       </main>
 
-      {activeToolbox && (<aside style={{ width: "320px", flexShrink: 0, background: "var(--panel-bg)", borderLeft: "1px solid var(--border)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      {activeToolbox && (<aside style={{ width: activeToolbox === "cards" || activeToolbox === "strategies" ? "380px" : "320px", flexShrink: 0, background: "var(--panel-bg)", borderLeft: "1px solid var(--border)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
           <strong style={{ fontSize: "13px" }}>{toolboxTools.find(t => t.id === activeToolbox)?.label}</strong>
           <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
