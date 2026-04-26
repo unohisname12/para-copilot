@@ -6,6 +6,7 @@ import {
   manifestToVaultEntries,
 } from '../utils/assignmentManifest';
 import { claimPendingAssignments } from '../services/paraAssignments';
+import { useVault } from '../context/VaultProvider';
 
 // One screen, one job: get the para's students loaded so they see
 // real names + IEP info. Smart-routes based on what they hand it:
@@ -23,6 +24,7 @@ Aiden Brown,449112
 
 export default function FindMyStudentsModal({ open, onClose, onIdentityLoad }) {
   const fileRef = useRef();
+  const vault   = useVault();
   const [paste, setPaste]     = useState('');
   const [busy, setBusy]       = useState(false);
   const [result, setResult]   = useState(null); // { found, errors }
@@ -199,6 +201,51 @@ export default function FindMyStudentsModal({ open, onClose, onIdentityLoad }) {
                   Real names show only on this computer. The cloud only sees the 6-digit numbers.
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Persistence prompt — only after a successful load AND when
+              the para isn't already remembering. Saves them from re-uploading
+              every browser session. */}
+          {result?.found > 0 && !vault?.persisted && vault?.requestEnablePersistence && (
+            <div style={{
+              padding: 'var(--space-3) var(--space-4)',
+              borderRadius: 'var(--radius-md)',
+              background: 'var(--bg-surface)',
+              border: '1px dashed var(--border-light)',
+              display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+            }}>
+              <div style={{ fontSize: 22, flexShrink: 0 }}>💾</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>
+                  Skip this next time?
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5, marginTop: 2 }}>
+                  Right now, names disappear when you close the browser. Turn on "Remember on this device" so they stick around. Auto-wipes after 14 days of inactivity. Real names still never leave this computer.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => vault.requestEnablePersistence()}
+                className="btn btn-primary btn-sm"
+                style={{ whiteSpace: 'nowrap' }}
+              >
+                Remember on this device
+              </button>
+            </div>
+          )}
+
+          {/* Already-remembering badge — calm reassurance */}
+          {result?.found > 0 && vault?.persisted && (
+            <div style={{
+              padding: '8px 12px',
+              borderRadius: 'var(--radius-md)',
+              background: 'var(--green-muted)',
+              border: '1px solid rgba(34,197,94,0.3)',
+              color: 'var(--green)',
+              fontSize: 12, lineHeight: 1.5,
+            }}>
+              💾 Names are remembered on this device — you won't have to re-upload next time.
             </div>
           )}
         </div>

@@ -80,6 +80,7 @@ export function Dashboard({
   const [topicEdit,   setTopicEdit]   = useState(false);
   const [topicDraft,  setTopicDraft]  = useState(topic);
   const [exportOpen,  setExportOpen]  = useState(false);
+  const [findStudentsBannerDismissed, setFindStudentsBannerDismissed] = useState(false);
   const [activeAction, setActiveAction] = useState(null); // class-wide action selector
   const [noteTarget,  setNoteTarget]  = useState(null);   // { studentId, action }
   const [noteDraft,   setNoteDraft]   = useState("");
@@ -264,38 +265,59 @@ export function Dashboard({
       {/* ══ SCROLLABLE BODY ══════════════════════════════════ */}
       <div style={{ flex: 1, overflowY: "auto", padding: "0 var(--space-6) var(--space-6)", display: "flex", flexDirection: "column", gap: "var(--space-4)", minHeight: 0 }}>
 
-        {/* ── EMPTY-STATE NUDGE — first thing a new para sees ── */}
-        {!hasVault && effectivePeriodStudents.length > 0 && onFindMyStudents && (
+        {/* ── EMPTY-STATE NUDGE — first thing a new para sees ──
+            Dismissible per-session. Comes back if they refresh without
+            loading a name list. Won't keep nagging them once they've
+            seen it for the day. */}
+        {!hasVault && !findStudentsBannerDismissed && effectivePeriodStudents.length > 0 && onFindMyStudents && (
           <div style={{
+            position: "relative",
             display: "flex", alignItems: "center", gap: "var(--space-3)",
-            padding: "var(--space-4) var(--space-5)",
+            padding: "var(--space-3) var(--space-4) var(--space-3) var(--space-5)",
             background: "linear-gradient(135deg, var(--accent-glow), transparent)",
             border: "1px solid var(--accent-border)",
             borderRadius: "var(--radius-lg)",
           }}>
             <div style={{
-              width: 44, height: 44,
+              width: 36, height: 36,
               borderRadius: "var(--radius-md)",
               background: "var(--accent-strong)",
               color: "#fff",
               display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 20, flexShrink: 0,
+              fontSize: 18, flexShrink: 0,
             }}>🎯</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)", letterSpacing: "-0.01em" }}>
+              <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--text-primary)", letterSpacing: "-0.01em" }}>
                 See real names + your caseload
               </div>
               <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2, lineHeight: 1.5 }}>
-                Right now you're seeing students by their Para App Number. Drop in your name list (or just type names + numbers) and the app fills in the rest. Stays on this computer only.
+                Drop in your name list, or type names + numbers. Stays on this computer only.
               </div>
             </div>
             <button
               onClick={onFindMyStudents}
-              className="btn btn-primary"
-              style={{ minHeight: 40, whiteSpace: "nowrap" }}
+              className="btn btn-primary btn-sm"
+              style={{ minHeight: 36, whiteSpace: "nowrap" }}
             >
               Find my students →
             </button>
+            <button
+              onClick={() => setFindStudentsBannerDismissed(true)}
+              aria-label="Hide for now"
+              title="Hide for now (the sidebar button stays available)"
+              style={{
+                width: 28, height: 28,
+                border: 'none',
+                background: 'transparent',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                fontSize: 18, lineHeight: 1,
+                borderRadius: 'var(--radius-sm)',
+                flexShrink: 0,
+              }}
+              onMouseEnter={e => e.currentTarget.style.color = 'var(--text-primary)'}
+              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+            >×</button>
           </div>
         )}
 
