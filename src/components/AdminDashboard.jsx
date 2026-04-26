@@ -52,7 +52,7 @@ function roleChangeConfirm(fromRole, toRole, displayName) {
 export default function AdminDashboard({ allStudents = {}, vaultNames = {} } = {}) {
   const team = useTeam();
   const { activeTeam, activeTeamId, isAdmin, user, reloadTeams } = team;
-  const [tab, setTab] = useState('members');
+  const [tab, setTab] = useState('start');
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
@@ -115,6 +115,7 @@ export default function AdminDashboard({ allStudents = {}, vaultNames = {} } = {
         width: 'fit-content',
       }}>
         {[
+          ['start',       '🤝 Get paras started'],
           ['members',     '👥 Members'],
           ['assignments', '🎯 Assign Students'],
           ['access',      '🔐 Access'],
@@ -309,6 +310,11 @@ export default function AdminDashboard({ allStudents = {}, vaultNames = {} } = {
         </div>
       )}
 
+      {/* ── Get Paras Started tab ────────────────────────── */}
+      {tab === 'start' && (
+        <ParaSetupGuide onGoToAssignments={() => setTab('assignments')} />
+      )}
+
       {/* ── Assignments tab ──────────────────────────────── */}
       {tab === 'assignments' && (
         <ParaAssignmentPanel
@@ -394,6 +400,167 @@ export default function AdminDashboard({ allStudents = {}, vaultNames = {} } = {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Para Setup Guide ─────────────────────────────────────────
+// Plain-English walkthrough for the sped teacher: "what your paras
+// need so they can find their kids in the app." No jargon. Tells them
+// the two keys (real name + 6-digit number), shows the workflow, and
+// drops a CTA into the Assign Students tab.
+function ParaSetupGuide({ onGoToAssignments }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+
+      {/* Big intro */}
+      <div className="card-elevated" style={{ padding: 'var(--space-6)' }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
+          For the sped teacher
+        </div>
+        <h2 style={{ fontSize: 24, fontWeight: 800, letterSpacing: '-0.01em', color: 'var(--text-primary)', marginTop: 4 }}>
+          What your paras need from you
+        </h2>
+        <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6, marginTop: 'var(--space-2)' }}>
+          Paras can't see real student names from the cloud — that's by design (FERPA). To match real names to students in the app,
+          each para needs <strong style={{ color: 'var(--text-primary)' }}>two keys</strong> for every kid they support:
+        </p>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
+          <KeyCard
+            icon="👤"
+            title="Real name"
+            body='Like "Maria Lopez". The para sees it on their computer only — never uploaded.'
+            tone="#3b82f6"
+          />
+          <KeyCard
+            icon="🔢"
+            title="6-digit Para App Number"
+            body='Like "847293". Goes to the cloud — that&apos;s how everyone&apos;s app finds the same kid without using a name.'
+            tone="#a78bfa"
+          />
+        </div>
+
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.55, marginTop: 'var(--space-4)' }}>
+          Without those, paras see students as <span className="mono" style={{ background: 'var(--bg-dark)', padding: '1px 6px', borderRadius: 4 }}>#847293</span> with no real name attached. The cloud has the IEP info ready — you just need to give them the bridge.
+        </p>
+      </div>
+
+      {/* The 4-step recipe */}
+      <div className="card-elevated" style={{ padding: 'var(--space-6)' }}>
+        <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 'var(--space-4)' }}>
+          The 4 steps
+        </h3>
+        <ol style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', listStyle: 'none', padding: 0 }}>
+          <Step n={1} title="Load the students once" body={(
+            <>Use <strong>IEP Import</strong> (Smart Import or School-style roster). Make sure each student has a Para App Number — the import preview shows you the count of "Para App #s" detected.</>
+          )} />
+          <Step n={2} title="Pick each para's caseload" body={(
+            <>Open the <strong>Assign Students</strong> tab. Pick a para → check their kids → save. You can pre-register paras by email if they haven't signed in yet.</>
+          )} cta={onGoToAssignments && (
+            <button onClick={onGoToAssignments} className="btn btn-primary btn-sm" style={{ marginTop: 4 }}>
+              Open Assign Students →
+            </button>
+          )} />
+          <Step n={3} title="Download a CSV for each para" body={(
+            <>After picking their kids, click <strong>📊 CSV — fastest, easy to edit later</strong>. You get a small spreadsheet file with each kid's name + 6-digit number. That's the bridge.</>
+          )} />
+          <Step n={4} title="Get the file to your para" body={(
+            <>Email it. Drop it in your shared drive. AirDrop. Whatever you already use. Tell them: <em style={{ color: 'var(--text-secondary)' }}>"Open the app's sidebar → Find my students → upload this."</em> They're set in 10 seconds.</>
+          )} />
+        </ol>
+      </div>
+
+      {/* The three ways to share */}
+      <div className="card-elevated" style={{ padding: 'var(--space-6)' }}>
+        <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 'var(--space-2)' }}>
+          Three ways to share with your paras
+        </h3>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.55, marginBottom: 'var(--space-4)' }}>
+          Pick whichever fits your team. The CSV file works for all of them.
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--space-3)' }}>
+          <ShareCard icon="📧" title="Email" body="Attach the CSV. Subject: 'Your students for SupaPara'. One sentence in the body: 'Drop this in Find my students.'" />
+          <ShareCard icon="📁" title="Shared drive" body="Drop the CSV in your team's Google Drive / OneDrive folder. Tell paras the folder name. They download → upload." />
+          <ShareCard icon="🗣️" title="Just text it" body="If they got a new kid mid-year, just text them the name + 6-digit number. They paste it directly into Find my students." />
+        </div>
+      </div>
+
+      {/* Privacy reminder */}
+      <div style={{
+        padding: 'var(--space-3) var(--space-4)',
+        background: 'var(--green-muted)',
+        border: '1px solid rgba(34,197,94,0.3)',
+        borderRadius: 'var(--radius-md)',
+        color: 'var(--green)',
+        fontSize: 12, lineHeight: 1.6,
+      }}>
+        🔒 <strong>The CSV file has real names — it lives only on your computer and the para's computer.</strong> The cloud only ever sees the 6-digit numbers. If a CSV ever ends up in a place it shouldn't (lost laptop, wrong email), it's just names + 6-digit numbers — no IEP details, no notes, no goals. The sensitive stuff stays on devices the para is signed into.
+      </div>
+    </div>
+  );
+}
+
+function KeyCard({ icon, title, body, tone }) {
+  return (
+    <div style={{
+      padding: 'var(--space-4)',
+      background: 'var(--bg-surface)',
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--radius-md)',
+      display: 'flex', flexDirection: 'column', gap: 6,
+    }}>
+      <div style={{
+        width: 40, height: 40,
+        borderRadius: 'var(--radius-md)',
+        background: tone + '22',
+        border: `1px solid ${tone}55`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 22,
+      }}>{icon}</div>
+      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{title}</div>
+      <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.55 }}>{body}</div>
+    </div>
+  );
+}
+
+function Step({ n, title, body, cta }) {
+  return (
+    <li style={{
+      display: 'flex', gap: 'var(--space-3)',
+      padding: 'var(--space-3) var(--space-4)',
+      background: 'var(--bg-surface)',
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--radius-md)',
+    }}>
+      <div style={{
+        width: 28, height: 28, flexShrink: 0,
+        borderRadius: '50%',
+        background: 'var(--accent-strong)',
+        color: '#fff',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 13, fontWeight: 800,
+      }}>{n}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{title}</div>
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.55, marginTop: 2 }}>{body}</div>
+        {cta}
+      </div>
+    </li>
+  );
+}
+
+function ShareCard({ icon, title, body }) {
+  return (
+    <div style={{
+      padding: 'var(--space-3) var(--space-4)',
+      background: 'var(--bg-surface)',
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--radius-md)',
+    }}>
+      <div style={{ fontSize: 22, marginBottom: 4 }}>{icon}</div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{title}</div>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.55, marginTop: 4 }}>{body}</div>
     </div>
   );
 }
