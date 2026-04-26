@@ -17,6 +17,7 @@ import {
   removeMember,
   setTeamAllowSubs,
 } from '../services/teamSync';
+import ParaAssignmentPanel from './ParaAssignmentPanel';
 
 const ROLE_META = {
   owner:        { label: 'Owner',         tone: '#a78bfa', desc: 'Full control. Can add, remove, and change anyone. Multiple owners allowed — good for co-leads.' },
@@ -48,7 +49,7 @@ function roleChangeConfirm(fromRole, toRole, displayName) {
   return null; // no confirm needed for para/sub/sped_teacher swaps
 }
 
-export default function AdminDashboard() {
+export default function AdminDashboard({ allStudents = {}, vaultNames = {} } = {}) {
   const team = useTeam();
   const { activeTeam, activeTeamId, isAdmin, user, reloadTeams } = team;
   const [tab, setTab] = useState('members');
@@ -114,9 +115,10 @@ export default function AdminDashboard() {
         width: 'fit-content',
       }}>
         {[
-          ['members', '👥 Members'],
-          ['access',  '🔐 Access'],
-          ['settings','⚙️  Settings'],
+          ['members',     '👥 Members'],
+          ['assignments', '🎯 Assign Students'],
+          ['access',      '🔐 Access'],
+          ['settings',    '⚙️  Settings'],
         ].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)} style={{
             padding: 'var(--space-2) var(--space-4)',
@@ -305,6 +307,17 @@ export default function AdminDashboard() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Assignments tab ──────────────────────────────── */}
+      {tab === 'assignments' && (
+        <ParaAssignmentPanel
+          teamId={activeTeamId}
+          teamLabel={activeTeam?.name || ''}
+          members={members}
+          allStudents={allStudents}
+          vaultNames={vaultNames}
+        />
       )}
 
       {/* ── Access tab ────────────────────────────────────── */}

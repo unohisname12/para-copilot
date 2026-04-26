@@ -45,6 +45,9 @@ import HandoffInbox from './components/HandoffInbox';
 import OnboardingModal, { hasSeenOnboarding } from './components/OnboardingModal';
 import RealNamesControls from './components/RealNamesControls';
 import AdminDashboard from './components/AdminDashboard';
+import BugReportButton from './components/BugReportButton';
+import AssignmentFileImport from './components/AssignmentFileImport';
+import { claimPendingAssignments } from './services/paraAssignments';
 import SubLockedScreen from './components/SubLockedScreen';
 import { VaultProvider, useVault, enrichStudentsWithNames } from './context/VaultProvider';
 import { useTeamOptional } from './context/TeamProvider';
@@ -101,6 +104,11 @@ export default function App() {
 
 function CloudGate({ children }) {
   const { authReady, session, teams, teamsLoading, subLockedOut } = useTeam();
+  // Auto-claim any pending email assignments the moment a session is live.
+  // Idempotent — safe to fire on every sign-in.
+  React.useEffect(() => {
+    if (session) { claimPendingAssignments().catch(() => {}); }
+  }, [session?.user?.id]);
   if (!authReady) {
     return <div style={{ padding: 40, color: 'white', background: '#04080f', minHeight: '100vh' }}>Loading…</div>;
   }
@@ -850,6 +858,15 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
               >
                 🧹 Reset data on this computer
               </button>
+              <div style={{ marginTop: 8 }}>
+                <AssignmentFileImport
+                  collapsed={sidebarCollapsed}
+                  onIdentityLoad={students.handleIdentityLoad}
+                />
+              </div>
+              <div style={{ marginTop: 4 }}>
+                <BugReportButton collapsed={sidebarCollapsed} />
+              </div>
               <div style={{ fontSize: "11px", color: "#334155", textAlign: "center", lineHeight: "1.8", marginTop: 4 }}>Student names stay on this computer</div>
             </div>
           </>);
@@ -891,7 +908,16 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
               {view === "vault" && renderVault()}
               {view === "import" && <IEPImport onImport={students.handleImport} onBulkImport={students.handleBundleImport} onIdentityLoad={students.handleIdentityLoad} importedCount={Object.keys(students.importedStudents).length} onLoadDemo={handleLoadDemo} />}
               {view === "analytics" && <AnalyticsDashboard logs={logs} groups={groups} setGroups={setGroups} onOpenProfile={setProfileStu} ollamaOnline={ollama.ollamaOnline} ollamaLoading={ollama.ollamaLoading} onOllamaPatternSummary={insights.handleOllamaPatternSummary} allStudents={allStudents} />}
-              {view === "admin" && teamCtx?.isAdmin && <AdminDashboard />}
+              {view === "admin" && teamCtx?.isAdmin && (
+                <AdminDashboard
+                  allStudents={allStudents}
+                  vaultNames={Object.fromEntries(
+                    Object.values(allStudents)
+                      .filter(s => s && s.realName)
+                      .map(s => [s.id, s.realName])
+                  )}
+                />
+              )}
             </>
         }
       </main>
