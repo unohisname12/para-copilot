@@ -46,7 +46,7 @@ import OnboardingModal, { hasSeenOnboarding } from './components/OnboardingModal
 import RealNamesControls from './components/RealNamesControls';
 import AdminDashboard from './components/AdminDashboard';
 import BugReportButton from './components/BugReportButton';
-import AssignmentFileImport from './components/AssignmentFileImport';
+import FindMyStudentsModal from './components/FindMyStudentsModal';
 import { claimPendingAssignments } from './services/paraAssignments';
 import SubLockedScreen from './components/SubLockedScreen';
 import { VaultProvider, useVault, enrichStudentsWithNames } from './context/VaultProvider';
@@ -162,6 +162,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
   const [view, setView] = useState("dashboard");
   const [simpleMode, setSimpleMode] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [findStudentsOpen, setFindStudentsOpen] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(() => !hasSeenOnboarding());
   const [sampleDataClearedToast, setSampleDataClearedToast] = useState(false);
 
@@ -859,10 +860,21 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
                 🧹 Reset data on this computer
               </button>
               <div style={{ marginTop: 8 }}>
-                <AssignmentFileImport
-                  collapsed={sidebarCollapsed}
-                  onIdentityLoad={students.handleIdentityLoad}
-                />
+                <button
+                  type="button"
+                  onClick={() => setFindStudentsOpen(true)}
+                  className="nav-btn"
+                  title="Load your students so you see real names + IEP info"
+                  style={sidebarCollapsed ? { justifyContent: 'center', padding: '8px 6px' } : {
+                    background: 'var(--accent-glow)',
+                    border: '1px solid var(--accent-border)',
+                    color: 'var(--accent-hover)',
+                    fontWeight: 600,
+                  }}
+                >
+                  <span style={{ fontSize: 14 }}>🎯</span>
+                  {!sidebarCollapsed && <span style={{ marginLeft: 8 }}>Find my students</span>}
+                </button>
               </div>
               <div style={{ marginTop: 4 }}>
                 <BugReportButton collapsed={sidebarCollapsed} />
@@ -944,6 +956,12 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
       {fullscreenTool && (<FullscreenTool tool={toolboxTools.find(t => t.id === fullscreenTool) || toolboxTools[0]} onClose={() => setFullscreenTool(null)} />)}
       {stealthMode && (<StealthScreen activeTool={stealthTool} toolboxTools={toolboxTools} onSelectTool={setStealthTool} onExit={() => setStealthMode(false)} />)}
       {onboardingOpen && <OnboardingModal onClose={() => setOnboardingOpen(false)} />}
+      <FindMyStudentsModal
+        open={findStudentsOpen}
+        onClose={() => setFindStudentsOpen(false)}
+        onIdentityLoad={students.handleIdentityLoad}
+      />
+
       {sampleDataClearedToast && (
         <div style={{
           position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)',

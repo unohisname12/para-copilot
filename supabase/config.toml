@@ -14,4 +14,7 @@ additional_redirect_urls = ["http://localhost:3000"]
 
 [auth.external.google]
 enabled = true
-# client_id and secret set via Supabase dashboard env
+# Real values live in the cloud project's auth settings (dashboard).
+# These env-var placeholders satisfy the CLI's local validator only.
+client_id = "env(GOOGLE_CLIENT_ID)"
+secret    = "env(GOOGLE_CLIENT_SECRET)"
