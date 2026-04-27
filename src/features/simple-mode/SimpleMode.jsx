@@ -497,17 +497,29 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
               const label = resolveLabel(s, "compact");
               const flashCat = isFlashing ? CATEGORIES.find(c => c.id === flashState.category) : null;
               const showQuickNote = quickNoteFor?.studentId === id;
+              const isFocused = focusedStudentId === id;
+              const isDimmed = focusedStudentId !== null && !isFocused;
               return (
                 <div key={id}
                   style={{
                     borderRadius: "var(--radius-lg)",
-                    border: `2px solid ${isFlashing && flashCat ? flashCat.color : (health === 'red' ? '#7f1d1d' : s.color + '30')}`,
+                    border: `${isFocused ? 3 : 2}px solid ${isFlashing && flashCat ? flashCat.color : (isFocused ? s.color : (health === 'red' ? '#7f1d1d' : s.color + '30'))}`,
                     background: isFlashing && flashCat
                       ? `linear-gradient(90deg, ${flashCat.color}20, var(--bg-surface) 40%)`
+                      : isFocused
+                      ? `linear-gradient(180deg, ${s.color}10, var(--bg-surface))`
                       : "var(--bg-surface)",
                     overflow: "hidden",
                     transition: "all 200ms cubic-bezier(0.16,1,0.3,1)",
-                    boxShadow: isFlashing ? `0 0 24px ${flashCat.color}40` : "none",
+                    boxShadow: isFlashing
+                      ? `0 0 24px ${flashCat.color}40`
+                      : isFocused
+                      ? `0 0 32px ${s.color}55, 0 6px 20px rgba(0,0,0,0.35)`
+                      : "none",
+                    opacity: isDimmed ? 0.55 : 1,
+                    transform: isFocused ? "scale(1.01)" : "scale(1)",
+                    transformOrigin: "center top",
+                    gridColumn: isFocused ? "1 / -1" : "auto",
                   }}
                 >
                   {/* Alert banner (BIP / active alert) */}
@@ -533,13 +545,22 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                       style={{ flex: "1 1 220px", minWidth: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}
                     >
                       <div style={{
-                        width: 18, height: 18, borderRadius: "50%",
+                        width: isFocused ? 24 : 18,
+                        height: isFocused ? 24 : 18,
+                        borderRadius: "50%",
                         background: s.color,
-                        boxShadow: `0 0 10px ${s.color}70`,
+                        boxShadow: `0 0 ${isFocused ? 16 : 10}px ${s.color}${isFocused ? '90' : '70'}`,
                         flexShrink: 0,
+                        transition: "all 200ms cubic-bezier(0.16,1,0.3,1)",
                       }} />
                       <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ fontSize: 17, fontWeight: 700, color: s.color, lineHeight: 1.15 }}>
+                        <div style={{
+                          fontSize: isFocused ? 22 : 17,
+                          fontWeight: isFocused ? 800 : 700,
+                          color: s.color,
+                          lineHeight: 1.15,
+                          transition: "all 200ms cubic-bezier(0.16,1,0.3,1)",
+                        }}>
                           {hdot(health)} {label}
                         </div>
                         <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 1 }}>
