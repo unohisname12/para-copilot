@@ -79,6 +79,7 @@ export function TrainingGapPanel({ students, studentsMap, logs }) {
   const [generated, setGenerated] = useState(false);
   const [topics, setTopics] = useState([]);
   const [expanded, setExpanded] = useState({}); // { topicKey: bool }
+  const [showHelp, setShowHelp] = useState(false);
 
   const generate = () => {
     const allStudentIds = students && students.length > 0 ? students : Object.keys(studentsMap || {});
@@ -97,16 +98,39 @@ export function TrainingGapPanel({ students, studentsMap, logs }) {
 
   return (
     <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
-      <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.5 }}>
-        Generate a short list of EBP topics worth bringing up at your next check-in
-        with your sped teacher. Patterns only — no single log ever surfaces a topic.
-        You and your sped teacher see the same view.
-      </div>
-
       {!generated && (
-        <button className="btn btn-primary" onClick={generate}>
-          Generate Topics for Next Check-in
-        </button>
+        <>
+          <div style={{ display: "flex", gap: 6, alignItems: "stretch" }}>
+            <button className="btn btn-primary" onClick={generate} style={{ flex: 1 }}>
+              Generate Topics for Next Check-in
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowHelp(s => !s)}
+              aria-label="What is this?"
+              title="What is this?"
+              style={{
+                background: "transparent", border: "1px solid #334155",
+                color: "#94a3b8", borderRadius: 6, padding: "0 12px",
+                cursor: "pointer", fontSize: 14,
+              }}
+            >
+              ?
+            </button>
+          </div>
+
+          {showHelp && (
+            <div style={{
+              fontSize: 12, color: "#cbd5e1", lineHeight: 1.5,
+              background: "#0f172a", padding: 10, borderRadius: 6,
+              border: "1px solid #1e293b",
+            }}>
+              Pulls patterns from your recent logs that are worth bringing up at
+              your next check-in. Only patterns — never a single log. You and
+              your sped teacher see the same thing.
+            </div>
+          )}
+        </>
       )}
 
       {generated && (
