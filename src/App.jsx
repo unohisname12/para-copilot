@@ -31,7 +31,7 @@ import { logsInLastHours } from './features/analytics/getStudentPatterns';
 
 // Components
 import { VisualTimer, CalculatorTool, MultChart, CEROrganizer, BreathingExercise, GroundingExercise } from './components/tools';
-import { SupportCardPanel, QuickActionPanel, ABCBuilder, GoalTracker, HandoffBuilder, ParaChecklist, StrategyLibrary, SituationPicker } from './components/panels';
+import { SupportCardPanel, QuickActionPanel, ABCBuilder, GoalTracker, HandoffBuilder, ParaChecklist, StrategyLibrary, SituationPicker, TrainingGapPanel } from './components/panels';
 import { StudentProfileModal, EmailModal, SituationResponseModal, OllamaInsightModal } from './components/modals';
 import { Tip, FloatingToolWindow, FullscreenTool, StealthScreen, RosterPanel } from './components/windows';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
@@ -323,6 +323,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
     { id: "abc", label: "📊 ABC Builder", tip: "Build structured behavior records: Antecedent, Behavior, Consequence.", component: <ABCBuilder students={effectivePeriodStudents} studentsMap={allStudents} onSave={addLog} periodLabel={period.label} currentDate={currentDate} /> },
     { id: "goals", label: "🎯 Goal Tracker", tip: "Mark IEP goal progress for any student with one tap.", component: <GoalTracker students={effectivePeriodStudents} studentsMap={allStudents} onSave={addLog} /> },
     { id: "handoff", label: "📤 Handoff Notes", tip: "Write notes for the next para, teacher, or end-of-day.", component: <HandoffBuilder students={effectivePeriodStudents} studentsMap={allStudents} onSave={addLog} ollamaOnline={ollama.ollamaOnline} ollamaLoading={ollama.ollamaLoading} onOllamaHandoff={insights.handleOllamaHandoff} /> },
+    { id: "trainingGap", label: "🔖 Topics for Next Check-in", tip: "Generate EBP topics worth bringing up at your next sped-teacher meeting. Patterns only — no single log surfaces a topic.", component: <TrainingGapPanel students={effectivePeriodStudents} studentsMap={allStudents} logs={logs} /> },
     { id: "checklist", label: "✅ Checklist", tip: "Before/during/after class checklist.", component: <ParaChecklist /> },
     { id: "strategies", label: "📖 Strategies", tip: "Searchable strategy library with step-by-step guides.", component: <StrategyLibrary /> },
     ...(!simpleMode ? [
