@@ -71,6 +71,22 @@ export function buildStudentRows(effectivePeriodStudents, allStudents, logs, cur
 }
 
 // Default sort: red first, yellow next, green last. Secondary: alphabetical.
+// Auto-save the focus-row draft as a normal Simple-Mode log. Called on
+// student-swap, Esc, click-outside, and explicit Save in the focus row.
+// Returns true if a log was created. Empty/whitespace drafts are no-ops.
+export function commitFocusedDraft({ draft, studentId, allStudents, addLog }) {
+  const text = (draft || '').trim();
+  if (!text || !studentId || typeof addLog !== 'function') return false;
+  const s = (allStudents || {})[studentId];
+  addLog(studentId, text, 'General Observation', {
+    source: 'simple_mode_focus',
+    category: 'general',
+    tags: [],
+    pseudonym: s?.pseudonym,
+  });
+  return true;
+}
+
 function sortRows(rows, mode) {
   const sorted = [...rows];
   if (mode === "needs") {
@@ -107,6 +123,39 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
 
   // v3: filter for "show only students who haven't gotten [category] today"
   const [summaryFilter, setSummaryFilter] = useState(null);
+
+  // Focus row — tap a student's name or 📝 Note to expand that row in place.
+  // The textarea grows, quick-actions stay visible, accommodations + the first
+  // goal show as reminders. Switching to another student auto-saves the
+  // current draft (so notes are never lost).
+  const [focusedStudentId, setFocusedStudentId] = useState(null);
+  const [focusedDraft, setFocusedDraft] = useState('');
+
+  const swapFocus = (newStudentId) => {
+    if (focusedStudentId && focusedDraft.trim()) {
+      commitFocusedDraft({
+        draft: focusedDraft,
+        studentId: focusedStudentId,
+        allStudents: studentsMap,
+        addLog,
+      });
+    }
+    setFocusedStudentId(newStudentId);
+    setFocusedDraft('');
+  };
+
+  const closeFocus = () => {
+    if (focusedStudentId && focusedDraft.trim()) {
+      commitFocusedDraft({
+        draft: focusedDraft,
+        studentId: focusedStudentId,
+        allStudents: studentsMap,
+        addLog,
+      });
+    }
+    setFocusedStudentId(null);
+    setFocusedDraft('');
+  };
 
   const period = DB.periods[activePeriod];
   const studentsMap = allStudents || {};
@@ -479,8 +528,8 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                     <div
                       role="button"
                       tabIndex={0}
-                      onClick={() => { setSelectedStudent(id); setStep("note"); }}
-                      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { setSelectedStudent(id); setStep("note"); } }}
+                      onClick={() => swapFocus(id)}
+                      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") swapFocus(id); }}
                       style={{ flex: "1 1 220px", minWidth: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}
                     >
                       <div style={{
@@ -563,17 +612,17 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                         );
                       })}
 
-                      {/* +note opens the full note-entry screen */}
+                      {/* +note opens the focus-row expansion in place */}
                       <button
-                        onClick={() => { setSelectedStudent(id); setStep("note"); }}
-                        title="Write a longer note"
+                        onClick={() => swapFocus(id)}
+                        title="Expand this row to write a longer note"
                         style={{
                           height: 48, minHeight: 48,
                           padding: "0 14px",
                           borderRadius: "var(--radius-md)",
-                          border: "1px solid var(--border-light)",
-                          background: "var(--bg-dark)",
-                          color: "var(--text-secondary)",
+                          border: focusedStudentId === id ? `1px solid ${s.color}` : "1px solid var(--border-light)",
+                          background: focusedStudentId === id ? `${s.color}20` : "var(--bg-dark)",
+                          color: focusedStudentId === id ? s.color : "var(--text-secondary)",
                           cursor: "pointer", fontSize: 13, fontWeight: 600,
                           fontFamily: "inherit",
                           display: "flex", alignItems: "center", gap: 6,
@@ -583,6 +632,87 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                       </button>
                     </div>
                   </div>
+
+                  {/* Focus-row expansion — opens when a student's name or 📝 Note
+                      is tapped. Larger textarea + accommodation/goal reminders +
+                      Save/Done. Switching students auto-saves the current draft. */}
+                  {focusedStudentId === id && (
+                    <div
+                      style={{
+                        padding: "12px 14px",
+                        borderTop: `2px solid ${s.color}40`,
+                        background: `${s.color}08`,
+                        display: "flex", flexDirection: "column", gap: 10,
+                      }}
+                      onKeyDown={e => {
+                        if (e.key === "Escape") { e.preventDefault(); closeFocus(); }
+                      }}
+                    >
+                      {/* Reminders strip */}
+                      {(Array.isArray(s.accs) && s.accs.length > 0) || (Array.isArray(s.goals) && s.goals.length > 0) ? (
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                          {Array.isArray(s.accs) && s.accs.slice(0, 2).map(a => (
+                            <span key={`acc-${a}`} className="pill pill-accent" style={{ fontSize: 10 }}>
+                              {a}
+                            </span>
+                          ))}
+                          {Array.isArray(s.goals) && s.goals[0] && (
+                            <span style={{
+                              fontSize: 11, color: "var(--text-muted)", fontStyle: "italic",
+                              marginLeft: 4,
+                            }}>
+                              Goal: {(typeof s.goals[0] === 'string' ? s.goals[0] : s.goals[0].text || '').slice(0, 90)}
+                              {((typeof s.goals[0] === 'string' ? s.goals[0] : s.goals[0].text) || '').length > 90 ? '…' : ''}
+                            </span>
+                          )}
+                        </div>
+                      ) : null}
+
+                      <textarea
+                        autoFocus
+                        value={focusedDraft}
+                        onChange={e => setFocusedDraft(e.target.value)}
+                        placeholder={`What happened with ${label}? Type freely — saves automatically when you switch students.`}
+                        style={{
+                          width: "100%",
+                          minHeight: 140,
+                          padding: "12px 14px",
+                          background: "var(--bg-dark)",
+                          border: `1px solid ${s.color}40`,
+                          borderRadius: "var(--radius-md)",
+                          color: "var(--text-primary)",
+                          fontSize: 14, lineHeight: 1.5, fontFamily: "inherit",
+                          resize: "vertical",
+                        }}
+                      />
+
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                        <button
+                          type="button"
+                          onClick={closeFocus}
+                          className="btn btn-primary btn-sm"
+                          style={{ minHeight: 36 }}
+                          title="Save this note and close the focus area (Esc also works)"
+                        >
+                          Save & Done
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setFocusedDraft(''); setFocusedStudentId(null); }}
+                          className="btn btn-ghost btn-sm"
+                          style={{ minHeight: 36, color: "var(--text-muted)" }}
+                          title="Discard the draft and close"
+                        >
+                          Cancel (no save)
+                        </button>
+                        {focusedDraft.trim() && (
+                          <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 4 }}>
+                            Saves as a General Observation log when you tap Save or switch students.
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Inline quick-note bar — appears for 5s after any one-tap log.
                       User can type a short note and hit Enter to attach it to the
