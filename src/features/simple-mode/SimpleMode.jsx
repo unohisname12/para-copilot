@@ -275,7 +275,7 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg-deep)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <div style={{ height: "100%", background: "var(--bg-deep)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
       {/* ── Top bar ── */}
       <div style={{
@@ -354,7 +354,12 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
 
       {/* ── Step: Students ── */}
       {step === "students" && (
-        <div style={{ flex: 1, overflowY: "auto", padding: "var(--space-4) var(--space-5) 120px" }}>
+        <div style={{
+          flex: 1, minHeight: 0, overflowY: "auto",
+          WebkitOverflowScrolling: "touch", overscrollBehaviorY: "contain",
+          touchAction: "pan-y",
+          padding: "var(--space-4) var(--space-5) 120px",
+        }}>
 
           {/* Today's summary strip — totals + click-to-filter per category */}
           <div style={{
@@ -656,7 +661,7 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
         if (!s) return null;
         const noteAlertText = s.alertText || (s.flags?.alert ? "Alert flag set" : null);
         return (
-          <div style={{ flex: 1, overflowY: "auto", padding: "var(--space-5)" }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "var(--space-5)" }}>
             {noteAlertText && (
               <div style={{
                 padding: "10px 14px", borderRadius: "var(--radius-md)",
