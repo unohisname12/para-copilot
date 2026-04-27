@@ -6,3 +6,4 @@ export { HandoffBuilder } from './HandoffBuilder';
 export { ParaChecklist } from './ParaChecklist';
 export { StrategyLibrary } from './StrategyLibrary';
 export { SituationPicker } from './SituationPicker';
+export { TrainingGapPanel } from './TrainingGapPanel';

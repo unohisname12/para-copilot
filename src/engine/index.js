@@ -252,3 +252,52 @@ export function isHelpWorthy(text) {
 }
 
 // callClaude removed — all AI now runs through src/engine/ollama.js (local Ollama)
+
+// ══════════════════════════════════════════════════════════════
+// TRAINING-GAP RULES ENGINE
+// Runs JSON rule descriptors against a log set, returns fired topics.
+// See docs/superpowers/specs/2026-04-26-training-gap-agenda-design.md
+// ══════════════════════════════════════════════════════════════
+import { TRAINING_GAP_RULES, NEW_STUDENT_MIN_LOGS } from './trainingGapRules';
+import { PREDICATES } from './trainingGapPredicates';
+
+export function runTrainingGapRules(logs, studentIds) {
+  const topics = [];
+
+  studentIds.forEach(studentId => {
+    const studentLogs = logs.filter(l => l.studentId === studentId);
+    if (studentLogs.length < NEW_STUDENT_MIN_LOGS) return;
+
+    TRAINING_GAP_RULES.forEach(rule => {
+      const predicateFn = PREDICATES[rule.fires.predicate];
+      if (!predicateFn) return;
+
+      const result = predicateFn({
+        logs,
+        studentId,
+        windowDays: rule.window.days,
+        presenceTags: rule.fires.presence.tags,
+        presenceMin: rule.fires.presence.min,
+        counterTags: rule.fires.counter.tags,
+        counterMax: rule.fires.counter.max,
+      });
+
+      if (result.fired) {
+        topics.push({
+          ruleId: rule.id,
+          studentId,
+          topicTitle: rule.topicTitle,
+          topicExplainer: rule.topicExplainer,
+          alternatives: rule.alternatives,
+          plainEnglishRule: rule.plainEnglishRule,
+          window: rule.window,
+          presenceCount: result.presenceCount,
+          counterCount: result.counterCount,
+          evidenceLogs: result.evidenceLogs,
+        });
+      }
+    });
+  });
+
+  return { topics };
+}

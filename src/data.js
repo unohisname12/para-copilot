@@ -97,6 +97,8 @@ export const QUICK_ACTIONS = [
   { id:"qa_deescal", label:"De-escalation Used", icon:"🌊", category:"behavior", logType:"Behavior Note", defaultNote:"De-escalation strategies used per BIP.", tags:["deescalation","bip","behavior"], suggestedSituations:["sit_escalating"] },
   { id:"qa_verbal", label:"Verbal Narration", icon:"🗣️", category:"academic", logType:"Accommodation Used", defaultNote:"Verbally narrated visual content for student.", tags:["narration","low-vision","autism"], suggestedSituations:["sit_science","sit_reading"] },
   { id:"qa_headphones", label:"Headphones Allowed", icon:"🎧", category:"regulation", logType:"Accommodation Used", defaultNote:"Student using headphones as regulation tool per IEP.", tags:["sensory","headphones","regulation"], suggestedSituations:[] },
+  { id:"qa_break_requested", label:"Student Asked for Break (used break card)", icon:"🙋", category:"regulation", logType:"Positive Note", defaultNote:"Student self-initiated break using break card / FCT.", tags:["break","fct","replacement_skill","regulation","positive"], suggestedSituations:["sit_escalating","sit_offtask"] },
+  { id:"qa_skill_taught", label:"Taught Replacement Skill", icon:"🌱", category:"academic", logType:"Skill Teaching", defaultNote:"Modeled or practiced a replacement skill with student.", tags:["skill_teaching","replacement","positive"], suggestedSituations:[] },
 ];
 
 // ── Situations ───────────────────────────────────────────────
