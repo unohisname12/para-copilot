@@ -37,8 +37,8 @@ The para and the sped teacher see the **identical export view.** No teacher dash
 
 1. **Only patterns trigger topics.** Single log = no topic, no marker, ever. (Threshold: 3+ similar logs within a window, default 7 days, configurable.)
 2. **No per-incident callouts.** Markers on individual logs only exist as *pattern membership* ("this log is part of pattern X"), never as *quality judgments* ("this log is wrong").
-3. **No para name on topics.** Topics are tied to student pseudonyms and intervention types, not to the para.
-4. **Para and sped teacher see identical export.** Same content, same markers, same resources. No redacted version for either side.
+3. **No para name on topics in the para's own view.** From the para's perspective, topics are tied to student pseudonyms and intervention types, not to themselves. (See v2 sped-teacher view below: para names *do* appear in the sped-teacher's coaching list because the whole purpose there is "which para should I bring this tip to.")
+4. **Para and sped teacher see identical topic content.** Same explainers, same alternatives, same audit information. The sped teacher's view adds para-name attribution; nothing else differs.
 5. **Markers only appear in the export view.** The para is NOT interrupted in the live logging UI. Reasoning: this should lead to a *teacher↔para conversation*, not be silently self-corrected by the para in the moment.
 6. **Sped teacher's only actions:** "discuss in next meeting" and "share resource." There is NO complaint field, NO performance-note field, NO "flag for follow-up" UI. The output surface cannot generate a report on the para.
 7. **Language audit.** Never "flagged," "non-compliant," "audit," "review required." Always "topic," "tip," "another approach to try," "training available."
@@ -182,6 +182,76 @@ These rules were drafted but require schema changes too large to bundle into thi
 - Tangible/access function rules.
 - Sensory function rules.
 - Sped-teacher-authored custom rules (Approach A path from the original brainstorm).
+
+---
+
+## v2 — Sped-teacher coaching view (added 2026-04-26)
+
+Adds a triage section inside the existing `AdminDashboard` (already gated to `isAdmin = owner || sped_teacher`) so sped teachers walk into check-ins with prepared coaching tips instead of having to ask paras to surface gaps themselves.
+
+**Product principle (from the original spec, reinforced):** the app exists to make paras' lives better. The sped-teacher view is a tool for the sped teacher to *support paras better*, not a separate product. Anything that doesn't translate into "the sped teacher walks into the check-in better-prepared to help the para" gets cut.
+
+### Mode — auto-detect from team-synced logs
+
+Sped teacher's view runs `runTrainingGapRules` on `team.sharedLogs` (already populated via `pullSharedTeamLogs`/`subscribeSharedLogs` in `TeamProvider`). Topics appear in the sped-teacher list whenever rules fire — no para action required.
+
+**Why auto-detect over para-share-required:** the whole reason this feature exists is paras don't always know when something isn't best practice. Requiring them to *share* gaps they don't recognize as gaps filters out the most valuable cases. Logs are already cloud-synced — the sped teacher could read every log line manually if they wanted. The training-gap rules are a new lens on data the sped teacher already has access to, not new data exposure.
+
+### UI — minimal triage list inside AdminDashboard
+
+A new section labeled **"Coaching topics from your team"** (gated by the existing `isAdmin` flag).
+
+Each row shows:
+- Topic title (plain English, no jargon)
+- Para name (from the team membership — the whole point is "who should I bring this to")
+- Student pseudonym
+- Relative age (e.g., "2 days ago")
+- One action: **"Share a tip with [Para name]"** → opens existing `EmailModal` pre-filled with topic explainer + alternatives, addressed to the para
+
+Empty state: *"Nothing to discuss right now — your team's logs look good."*
+
+What is **deliberately not** in this view:
+- No charts, graphs, or visualizations.
+- No per-para "scoreboards" or counts of "how many topics each para has."
+- No "discuss in next meeting" button (it doesn't actually help the para — collapses into "Share a tip").
+- No "marked as addressed" / dismiss state. If logs change such that the rule no longer fires, the topic disappears on its own.
+- No drill-down into per-para or per-student detail. (The triage list IS the surface.)
+
+### Topic-level dedup behavior
+
+If the same topic fires for the same student across multiple paras, **show separately per para.** Each is its own coaching moment — Para A and Para B with the same kid likely need different coaching context. Pooling would collapse useful nuance.
+
+### Para-side disclosure
+
+The para's own panel adds a one-line disclosure (under the `?` help): *"Topics here are also visible to your sped teacher so they can come ready with tips."* No surprise — the para knows the data flow.
+
+### Refinement of Hard Rule #3
+
+Rule #3 was originally "No para name on topics." The sharper rule is: **"No para name on topics in the para's own view."** The sped teacher's coaching list does include para names because actionability requires it. The spirit of the original rule — keep paras feeling like tool-users, not flagged records — is preserved on the para's side. The sped teacher always had access to who logged what (cloud sync makes that visible regardless); the rule was always about the para's experience.
+
+### What the sped teacher does NOT get (still bound by the original Hard Rules)
+
+- No "flag this para for follow-up" UI.
+- No "complaint" or "performance note" field.
+- No way to author records *about* the para from this view — only "share a tip *with* the para."
+- No language like "non-compliant," "audit," "review required."
+- No para-side surveillance (e.g., live notifications when a topic fires — only their own panel + the disclosure copy).
+
+### Implementation surface (v2 additions)
+
+| Area | Change |
+|---|---|
+| `src/components/AdminDashboard.jsx` | Add a "Coaching topics from your team" section. Calls `runTrainingGapRules(team.sharedLogs, allTeamStudentIds)`. Renders rows with para name + student + age + share-tip button. |
+| `src/components/panels/TrainingGapPanel.jsx` | Add disclosure line under `?` help: *"Topics here are also visible to your sped teacher…"* |
+| Email-modal integration | Reuse existing `EmailModal` for the share-tip flow. Pre-fill recipient = para's display name, body = topic explainer + alternatives. |
+| `src/engine/trainingGapRules.js` + `src/data.js` | Jargon scrub on topic explainers, alternatives, `plainEnglishRule`, and `qa_break_requested` / `qa_skill_taught` `defaultNote` strings. No EBP / FCT / DRA / DRO / "functional communication" / "extinction" / "reinforcer" — plain English only. (See "Para-facing copy rule" below.)
+| Tests | Update copy assertions if any; add a test that confirms the engine works against `team.sharedLogs`-shaped data (per-para attribution surfaces correctly). |
+
+### Para-facing copy rule
+
+All strings that appear in the para's UI — including topic titles, explainers, alternatives, `plainEnglishRule`, audit panel labels, and the `defaultNote` of any QUICK_ACTION — must be plain English with no specialist vocabulary. No EBP, FCT, DRA, DRO, ABA, "extinction," "satiation," "reinforcer," "function-maintained," "planned ignoring" (as a labeled term), "antecedent" (in user-facing copy; fine as a field name).
+
+Use plain descriptions of what to do and why instead. Internal IDs, code comments, and this spec are exempt — they're for engineers/designers, not paras.
 
 ---
 
