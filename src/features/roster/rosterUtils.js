@@ -48,17 +48,22 @@ export function extractIdentityEntries(json, allStudents = {}) {
     json.privateRosterMap.privateRosterMap.forEach(e => {
       if (!e.realName) return;
       const key = e.realName.trim();
+      const incomingParaAppNumber = e.paraAppNumber ?? e.externalKey ?? e.externalStudentKey ?? null;
       if (!byRealName.has(key)) {
         byRealName.set(key, {
           realName: key, pseudonym: e.pseudonym || "",
           color: colorByPseudonym[e.pseudonym] || "",
           periodIds: [], classLabels: {},
+          ...(incomingParaAppNumber ? { paraAppNumber: String(incomingParaAppNumber) } : {}),
         });
       }
       const rec = byRealName.get(key);
       if (e.periodId && !rec.periodIds.includes(e.periodId)) {
         rec.periodIds.push(e.periodId);
         rec.classLabels[e.periodId] = e.classLabel || "";
+      }
+      if (!rec.paraAppNumber && incomingParaAppNumber) {
+        rec.paraAppNumber = String(incomingParaAppNumber);
       }
     });
     raw = [...byRealName.values()];
@@ -91,17 +96,17 @@ export function partitionByResolved(studentIds, nameById) {
 // Resolves registry entries to studentIds ONCE and returns stable id-keyed maps.
 // All downstream display code uses studentId keys instead of pseudonym strings.
 //
-// Resolution strategy (Phase C):
-//   1. Prefer e.studentId directly (v3.0+ artifacts — stable, collision-safe)
-//   2. Fall back to pseudonym lookup for older artifacts without studentId
-//   3. If e.studentId is present but not found in allStudents — skip safely;
-//      a stale/wrong id is a data problem, not a missing-id problem.
+// Resolution strategy (Phase D — paraAppNumber-aware):
+//   1. e.studentId — direct lookup, no fallback if stale (data integrity issue).
+//   2. e.paraAppNumber — FERPA-safe stable bridge that survives pseudonym
+//      regeneration on roster re-upload.
+//   3. e.pseudonym — backward compat for pre-v3.0 artifacts.
 export function buildRosterLookups(allStudents, identityRegistry) {
-  // Pseudonym-keyed lookup retained for backward compat with pre-v3.0 artifacts
-  // that were exported before studentId was added to the private roster schema.
   const stuByPseudonym = {};
+  const stuByParaAppNumber = {};
   Object.values(allStudents).forEach(s => {
     if (s.pseudonym) stuByPseudonym[s.pseudonym] = s;
+    if (s.paraAppNumber) stuByParaAppNumber[String(s.paraAppNumber)] = s;
   });
 
   const nameById = {};
@@ -109,12 +114,11 @@ export function buildRosterLookups(allStudents, identityRegistry) {
   identityRegistry.forEach(e => {
     let stu;
     if (e.studentId) {
-      // Phase C: studentId-first — direct lookup, no pseudonym needed.
-      // If the id is present but stale (not in allStudents), skip — do not fall
-      // back to pseudonym, as that could silently join to the wrong student.
+      // studentId-first — direct lookup, no fallback if stale.
       stu = allStudents[e.studentId];
+    } else if (e.paraAppNumber && stuByParaAppNumber[String(e.paraAppNumber)]) {
+      stu = stuByParaAppNumber[String(e.paraAppNumber)];
     } else {
-      // Fallback for pre-v3.0 artifacts that carry no studentId field.
       stu = stuByPseudonym[e.pseudonym];
     }
     if (!stu) return;

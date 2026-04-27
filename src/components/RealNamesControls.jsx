@@ -7,15 +7,46 @@ import { useEscape } from '../hooks/useEscape';
 export default function RealNamesControls() {
   const {
     hasVault, showRealNames, persisted, expiredBanner, inactivityDays,
-    confirmPersistOpen,
+    confirmPersistOpen, reconnectStatus, unresolvedNames,
     toggleShowRealNames,
     requestEnablePersistence, confirmEnablePersistence, cancelEnablePersistence,
-    purgeVault, dismissExpiredBanner,
+    purgeVault, dismissExpiredBanner, dismissReconnectStatus,
   } = useVault();
   useEscape(confirmPersistOpen ? cancelEnablePersistence : () => {});
 
+  const reconnectMessage =
+    reconnectStatus === 'no_match'
+      ? "We loaded your name list but couldn't match any students. Double-check the file has the 6-digit Para App Numbers."
+      : reconnectStatus === 'partial'
+      ? `Loaded names, but ${unresolvedNames.length} couldn't be matched: ${unresolvedNames.slice(0, 3).join(', ')}${unresolvedNames.length > 3 ? '…' : ''}`
+      : null;
+
   return (
     <>
+      {reconnectMessage && (
+        <div style={{
+          padding: 'var(--space-3)', marginTop: 'var(--space-2)',
+          background: 'var(--yellow-muted)',
+          border: '1px solid rgba(251,191,36,0.45)',
+          borderRadius: 'var(--radius-md)',
+          fontSize: 11, color: 'var(--yellow)',
+          display: 'flex', flexDirection: 'column', gap: 6,
+        }}>
+          <div style={{ fontWeight: 700 }}>Some names didn't match</div>
+          <div style={{ lineHeight: 1.5, opacity: 0.9 }}>
+            {reconnectMessage}
+          </div>
+          <button
+            type="button"
+            onClick={dismissReconnectStatus}
+            className="btn btn-ghost btn-sm"
+            style={{ fontSize: 10, color: 'var(--yellow)', alignSelf: 'flex-start' }}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {expiredBanner && (
         <div style={{
           padding: 'var(--space-3)', marginTop: 'var(--space-2)',

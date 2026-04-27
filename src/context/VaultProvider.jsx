@@ -34,6 +34,11 @@ export function VaultProvider({ identityRegistry, onPurgeIdentityRegistry, child
   const [persisted, setPersisted] = useState(false);
   const [expiredBanner, setExpiredBanner] = useState(false);
   const [confirmPersistOpen, setConfirmPersistOpen] = useState(false);
+  // 'idle' before any roster load; after a load: 'matched' (every entry resolved),
+  // 'partial' (some unresolved), 'no_match' (0 resolved). Drives the missing-names
+  // warning banner so reconnect failures aren't silent.
+  const [reconnectStatus, setReconnectStatus] = useState('idle');
+  const [unresolvedNames, setUnresolvedNames] = useState([]);
 
   // On mount: hydrate from IndexedDB if user previously opted in
   useEffect(() => {
@@ -62,10 +67,24 @@ export function VaultProvider({ identityRegistry, onPurgeIdentityRegistry, child
   }, []);
 
   // When identityRegistry changes (new bundle imported, roster JSON loaded),
-  // merge those names into the vault. Persist if enabled.
+  // merge those names into the vault. Persist if enabled. Also compute the
+  // reconnect status so a banner can surface partial/no-match situations.
   useEffect(() => {
     if (!identityRegistry || identityRegistry.length === 0) return;
     const fresh = buildVaultFromRegistry(identityRegistry);
+    const provided = identityRegistry.length;
+    const resolved = identityRegistry.filter((e) => e.studentId).length;
+    const unresolved = identityRegistry
+      .filter((e) => !e.studentId && e.realName)
+      .map((e) => e.realName);
+    if (resolved === 0 && provided > 0) {
+      setReconnectStatus('no_match');
+    } else if (resolved < provided) {
+      setReconnectStatus('partial');
+    } else {
+      setReconnectStatus('matched');
+    }
+    setUnresolvedNames(unresolved);
     if (Object.keys(fresh).length === 0) return;
     setVault((prev) => {
       const next = { ...prev, ...fresh };
@@ -75,6 +94,11 @@ export function VaultProvider({ identityRegistry, onPurgeIdentityRegistry, child
     // First-time roster load auto-enables the toggle
     setShowRealNames((s) => s || Object.keys(fresh).length > 0);
   }, [identityRegistry, persisted]);
+
+  const dismissReconnectStatus = useCallback(() => {
+    setReconnectStatus('idle');
+    setUnresolvedNames([]);
+  }, []);
 
   const hasVault = Object.keys(vault).length > 0;
 
@@ -148,19 +172,22 @@ export function VaultProvider({ identityRegistry, onPurgeIdentityRegistry, child
     expiredBanner,
     inactivityDays: INACTIVITY_DAYS,
     confirmPersistOpen,
+    reconnectStatus,
+    unresolvedNames,
     toggleShowRealNames,
     requestEnablePersistence,
     confirmEnablePersistence,
     cancelEnablePersistence,
     purgeVault,
     dismissExpiredBanner,
+    dismissReconnectStatus,
     mergeVault,
   }), [
     showRealNames, vault, hasVault, persisted, expiredBanner,
-    confirmPersistOpen,
+    confirmPersistOpen, reconnectStatus, unresolvedNames,
     toggleShowRealNames, requestEnablePersistence,
     confirmEnablePersistence, cancelEnablePersistence,
-    purgeVault, dismissExpiredBanner, mergeVault,
+    purgeVault, dismissExpiredBanner, dismissReconnectStatus, mergeVault,
   ]);
 
   return <VaultContext.Provider value={value}>{children}</VaultContext.Provider>;

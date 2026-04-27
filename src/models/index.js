@@ -143,26 +143,27 @@ export function buildIdentityRegistry(bundleData) {
 // Converts raw private-roster entries (any schema version) into the v3.0 registry
 // shape: [{ realName, pseudonym, color, periodIds, classLabels, identity, studentId? }]
 //   • identity  — added via migrateIdentity() (no-op if already present)
-//   • studentId — resolved via studentId-first strategy:
-//       1. Use entry.studentId directly when present (v3.0+ artifacts)
-//       2. Fall back to pseudonym lookup for older artifacts without studentId
-//     Absent if neither path resolves.
+//   • studentId — resolved in this priority order:
+//       1. entry.studentId directly when present (v3.0+ artifacts)
+//       2. paraAppNumber → studentId (the cloud-safe stable key — survives
+//          pseudonym regeneration when a roster is re-uploaded)
+//       3. pseudonym lookup for older artifacts without either of the above
+//     Absent if no path resolves.
 // Called by handleIdentityLoad in App.jsx; the single point of normalization.
 export function normalizeIdentityEntries(rawEntries, allStudents = {}) {
-  // Pseudonym-keyed lookup retained for backward compat with pre-v3.0 artifacts
-  // that were exported before studentId was added to the private roster schema.
   const stuIdByPseudonym = {};
+  const stuIdByParaAppNumber = {};
   Object.values(allStudents).forEach(s => {
     if (s.pseudonym) stuIdByPseudonym[s.pseudonym] = s.id;
+    if (s.paraAppNumber) stuIdByParaAppNumber[String(s.paraAppNumber)] = s.id;
   });
 
   return (rawEntries || [])
-    .filter(e => e.realName && (e.pseudonym || e.displayLabel))
+    // An entry needs a real name + at least one usable matching key.
+    // paraAppNumber alone is sufficient (the FERPA-safe stable bridge).
+    .filter(e => e.realName && (e.pseudonym || e.displayLabel || e.paraAppNumber || e.externalKey || e.externalStudentKey || e.studentId))
     .map(e => {
       const pseudonym = e.pseudonym || e.displayLabel || "";
-      // Preserve paraAppNumber (and legacy externalKey variants) so the
-      // real-name vault can key on it. Without this, the vault never learns
-      // about any student and the "Show real names" toggle has nothing to do.
       const paraAppNumber = e.paraAppNumber
         ?? e.externalKey
         ?? e.externalStudentKey
@@ -173,14 +174,14 @@ export function normalizeIdentityEntries(rawEntries, allStudents = {}) {
         color:       e.color       || "",
         periodIds:   e.periodIds   || [],
         classLabels: e.classLabels || {},
-        // carry through identity if already present so migrateIdentity is a no-op
         ...(e.identity ? { identity: e.identity } : {}),
-        ...(paraAppNumber ? { paraAppNumber } : {}),
+        ...(paraAppNumber ? { paraAppNumber: String(paraAppNumber) } : {}),
       };
       const withIdentity = migrateIdentity(base);
-      // Phase C: prefer entry.studentId (stable, collision-safe).
-      // Fall back to pseudonym lookup only for older artifacts that lack studentId.
-      const studentId = e.studentId || stuIdByPseudonym[pseudonym];
+      const studentId =
+        e.studentId ||
+        (paraAppNumber && stuIdByParaAppNumber[String(paraAppNumber)]) ||
+        stuIdByPseudonym[pseudonym];
       return studentId ? { ...withIdentity, studentId } : withIdentity;
     });
 }
