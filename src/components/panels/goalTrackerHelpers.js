@@ -117,6 +117,55 @@ export function pickNextBestSupport({ student, goal, strategies }) {
   return scored[0]?.strategy || null;
 }
 
+// Aggregate stats across ALL of a student's goals in a window. Drives the
+// per-student hero "mini dashboard" — donut, today count, trend arrow,
+// total logs.
+export function summarizeStudentGoals(logs, student, windowDays = 14) {
+  const empty = {
+    total: 0, positive: 0, neutral: 0, negative: 0,
+    today: 0, trend: 'flat', priorTotal: 0,
+  };
+  if (!student || !Array.isArray(logs)) return empty;
+  const goalIds = (student.goals || []).map(g => g.id).filter(Boolean);
+  if (goalIds.length === 0) return empty;
+
+  const now = Date.now();
+  const cutoff = now - windowDays * 86400000;
+  const priorCutoff = now - 2 * windowDays * 86400000;
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  let total = 0, positive = 0, neutral = 0, negative = 0, today = 0;
+  let priorTotal = 0;
+
+  logs.forEach(l => {
+    if (!goalIds.includes(l.goalId)) return;
+    const ts = l.timestamp ? new Date(l.timestamp).getTime() : 0;
+    if (ts >= cutoff) {
+      total++;
+      const optTag = (l.tags || []).find(t => t && t.startsWith('gp_'));
+      if (optTag === 'gp_progress' || optTag === 'gp_support' || optTag === 'gp_mastery') positive++;
+      else if (optTag === 'gp_concern' || optTag === 'gp_notattempt') negative++;
+      else neutral++;
+      if ((l.date || l.timestamp || '').slice(0, 10) === todayStr) today++;
+    } else if (ts >= priorCutoff) {
+      priorTotal++;
+    }
+  });
+
+  let trend = 'flat';
+  if (total > priorTotal) trend = 'up';
+  else if (total < priorTotal) trend = 'down';
+
+  return { total, positive, neutral, negative, today, trend, priorTotal };
+}
+
+// Formats a trend symbol for the hero — used inline.
+export function trendSymbol(trend) {
+  if (trend === 'up') return '↑';
+  if (trend === 'down') return '↓';
+  return '→';
+}
+
 // Bundles the per-student render data for the visual tracker.
 // Returns: [{ student, goals: [{ goal, summary, latestOption, recentSupports, suggestion }] }]
 export function buildVisualGoalData({ studentIds, studentsMap, logs, strategies, windowDays = 14 }) {

@@ -4,6 +4,8 @@ import {
   recentSupportTagsForStudent,
   pickNextBestSupport,
   buildVisualGoalData,
+  summarizeStudentGoals,
+  trendSymbol,
 } from '../components/panels/goalTrackerHelpers';
 
 function log({ studentId = 'stu_a', goalId = null, tags = [], daysAgo = 0 } = {}) {
@@ -139,6 +141,77 @@ describe('pickNextBestSupport', () => {
   test('handles missing input safely', () => {
     expect(pickNextBestSupport({})).toBeNull();
     expect(pickNextBestSupport({ student: {}, goal: {}, strategies: null })).toBeNull();
+  });
+});
+
+describe('summarizeStudentGoals', () => {
+  const student = {
+    id: 'stu_a',
+    goals: [{ id: 'g1' }, { id: 'g2' }],
+  };
+
+  test('returns zeroed shape when student has no goals', () => {
+    const out = summarizeStudentGoals([], { id: 'stu_a', goals: [] }, 14);
+    expect(out).toEqual({ total: 0, positive: 0, neutral: 0, negative: 0, today: 0, trend: 'flat', priorTotal: 0 });
+  });
+
+  test('counts positive/neutral/negative across all student goals', () => {
+    const logs = [
+      log({ goalId: 'g1', tags: ['gp_progress'], daysAgo: 1 }),
+      log({ goalId: 'g2', tags: ['gp_concern'], daysAgo: 2 }),
+      log({ goalId: 'g1', tags: ['gp_prompt'], daysAgo: 3 }),
+      log({ goalId: 'g2', tags: ['gp_mastery'], daysAgo: 4 }),
+    ];
+    const out = summarizeStudentGoals(logs, student, 14);
+    expect(out.total).toBe(4);
+    expect(out.positive).toBe(2);
+    expect(out.negative).toBe(1);
+    expect(out.neutral).toBe(1);
+  });
+
+  test('today count uses todayʼs YYYY-MM-DD', () => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const logs = [
+      { ...log({ goalId: 'g1', tags: ['gp_progress'], daysAgo: 0 }), date: todayStr },
+      { ...log({ goalId: 'g1', tags: ['gp_progress'], daysAgo: 5 }), date: '2020-01-01' },
+    ];
+    const out = summarizeStudentGoals(logs, student, 14);
+    expect(out.today).toBe(1);
+  });
+
+  test('trend = up when this window has more logs than prior', () => {
+    const logs = [
+      log({ goalId: 'g1', tags: ['gp_progress'], daysAgo: 1 }),
+      log({ goalId: 'g1', tags: ['gp_progress'], daysAgo: 2 }),
+      log({ goalId: 'g1', tags: ['gp_progress'], daysAgo: 16 }), // prior window
+    ];
+    expect(summarizeStudentGoals(logs, student, 14).trend).toBe('up');
+  });
+
+  test('trend = down when this window has fewer logs than prior', () => {
+    const logs = [
+      log({ goalId: 'g1', tags: ['gp_progress'], daysAgo: 16 }),
+      log({ goalId: 'g1', tags: ['gp_progress'], daysAgo: 17 }),
+      log({ goalId: 'g1', tags: ['gp_progress'], daysAgo: 18 }),
+      log({ goalId: 'g1', tags: ['gp_progress'], daysAgo: 1 }),
+    ];
+    expect(summarizeStudentGoals(logs, student, 14).trend).toBe('down');
+  });
+
+  test('ignores logs for goals not on this student', () => {
+    const logs = [
+      log({ goalId: 'g_other', tags: ['gp_progress'], daysAgo: 1 }),
+    ];
+    expect(summarizeStudentGoals(logs, student, 14).total).toBe(0);
+  });
+});
+
+describe('trendSymbol', () => {
+  test('maps trends to arrows', () => {
+    expect(trendSymbol('up')).toBe('↑');
+    expect(trendSymbol('down')).toBe('↓');
+    expect(trendSymbol('flat')).toBe('→');
+    expect(trendSymbol('garbage')).toBe('→');
   });
 });
 
