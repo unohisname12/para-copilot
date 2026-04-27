@@ -11,6 +11,16 @@ A para uses SupaPara to:
 - Get one-tap support strategies for situations like meltdowns, work refusal, transitions
 - Talk to an AI copilot that already knows each student's plan
 - Hand off notes to the next para with one click
+- Generate **Topics for Next Check-in** — a short list of patterns from their own recent logs worth bringing up with their sped teacher
+
+An owner or sped teacher uses SupaPara to:
+- Create a school team and invite paras/subs with a code
+- Assign students to specific paras or pre-register assignments by school email
+- Manage roles, pause/resume members, remove members, and transfer ownership
+- Toggle all sub access off when needed
+- Regenerate invite codes
+- Add private parent notes that paras cannot see
+- Open the **Coaching tab** in the Admin Dashboard to see training-gap topics auto-detected from team-shared logs and send a friendly "share a tip" message to the right para
 
 It is built and maintained by **Deandre ("Dre") Sample**, a paraprofessional at Fairview Middle School in Washington State. He built it because the existing tools (paper, Google Docs, district software) all failed in the same way: they either leaked student names everywhere, or they took too long to use during a real classroom situation.
 
@@ -29,6 +39,16 @@ It is built and maintained by **Deandre ("Dre") Sample**, a paraprofessional at 
 
 A "team" in SupaPara = one school's special-ed support team (typically 1 sped teacher + 3–8 paras + occasional subs). Most schools will have one team.
 
+## Student assignment model
+
+Admins can assign specific students to specific paras/subs. This matters because paras should be able to work quickly without seeing more student data than they need.
+
+- **Admins / sped teachers** see the full team roster.
+- **Paras / subs** see students assigned to them, plus student rows they personally added.
+- **Paras can still add students** for their active team. They are not blocked from building their working roster.
+- Paras can maintain rows they created, but they cannot edit other people's roster rows or browse unassigned admin-created students.
+- Pending assignments can be pre-registered by email; when that para joins the team with that email, the assignment is claimed.
+
 ## The one load-bearing rule (FERPA)
 
 **Real student names never leave the user's computer.**
@@ -40,7 +60,7 @@ SupaPara solves this by separating identity from data:
 - **On the cloud:** every student is just a 6-digit number called a **Para App Number** (e.g. 847293). That's all that ever syncs to Supabase, ever shows up in shared handoffs, ever touches the AI.
 - **On the para's computer only:** there's a local "Real Names" file that maps Para App Numbers back to actual student names. This file can be saved or remembered (opt-in) but it never uploads anywhere.
 
-This split is what lets SupaPara legitimately claim "FERPA-safe" without lawyers. The names physically cannot leak because the cloud has never seen them.
+This split is what lets SupaPara make a stronger FERPA/privacy argument than ordinary shared docs: the most sensitive identifier, the real student name, is not stored in Supabase because the cloud never receives it.
 
 ## Three modes a para uses every day
 
@@ -56,6 +76,10 @@ React 19 (Create React App) frontend, Supabase Postgres + Auth + Realtime backen
 
 - **Production:** `supapara.vercel.app`
 - **Pilot school:** Fairview Middle School (free through June 2026)
-- **Pricing plan:** $300/year per school starting Sept 2026 ("Founding School" rate)
-- **Tests:** 327 passing (Jest + Playwright)
+- **Pricing plan:** $300/year per school starting Sept 2026 ("Founding School" rate, locked for 3 years for early-adopter districts)
+- **Tests:** 346 unit tests passing across 28 suites (Jest); Playwright e2e covers the major flows
 - **Codebase size:** ~19,000 lines of app code, ~24,000 total including styles, SQL, and tests
+
+## Para-facing copy rule
+
+All strings paras see in the UI — labels, default notes on quick actions, topic explainers, alternatives, audit-panel text — must be plain English. **No specialist behavior-analysis vocabulary** (no EBP, FCT, DRA, DRO, ABA, "extinction," "satiation," "reinforcer," "function-maintained," "planned ignoring" used as a labeled term, "antecedent" used in user copy). The training-gap feature in particular started with clinical wording and was rewritten end-to-end after a review pass — paras come from many backgrounds, and assuming they know that vocabulary excludes the actual users.

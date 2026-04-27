@@ -226,6 +226,34 @@ The codebase enforces a style: **no tech jargon in any string a para sees.**
 
 The vocabulary the app actually uses: **name list, student file, real names, saved notes, Para App Number, this computer, the cloud, the team, real names stay on this computer.**
 
+### No specialist behavior-analysis vocabulary either
+
+Beyond tech jargon, **specialist behavior-analysis vocabulary is also banned in para-facing copy.** Paras come from many backgrounds — assuming they know that vocabulary excludes the actual users.
+
+| Banned term | Why it fails | Replace with |
+|---|---|---|
+| EBP / "evidence-based practice" | Acronym most paras don't know | "best-known practice," "good teaching practice," or just describe the action |
+| FCT / "functional communication training" | ABA jargon | "teach the student to ask for it" / "teach a break card or signal" |
+| DRA / DRO | ABA acronyms | "catch them being good," "praise the right behavior" |
+| ABA | Field name unfamiliar to many paras | (don't reference the field — describe the move) |
+| extinction / satiation / reinforcer | Clinical | describe what's happening: "the redirect is what they were after," "the kid earns it by asking, not by escalating" |
+| function-maintained behavior | Clinical | "kids act out specifically because they want X" |
+| planned ignoring | Term-of-art | "ignore the behavior while staying close" |
+| antecedent (in user-facing copy) | OK as a field name in code; not in copy | "what was happening right before" |
+
+The Training-Gap Agenda's topic explainers and alternatives went through a copy pass to apply this rule. The internal IDs (`escape_reinforcement_pattern`, `attention_loop_pattern`, `reactive_without_skill_building_pattern`) keep the technical names because those are for engineers; the para-facing strings are plain English (e.g., *"When breaks help vs. when they backfire"*, *"What we want them to do instead"*).
+
+## Toolbox redesign (commit `798ac7f`)
+
+The sidebar Toolbox was redesigned to:
+
+- **Group by audience.** Two groups: **For your work** (panels the para uses to log/work) and **For your student** (tools the para can pop out and turn toward the kid).
+- **Add inline search + category chips on Support Cards.** Fast filter by category color.
+- **Auto-widen** the toolbox panel from 320px to **380px** when active so longer panel UIs fit without horizontal scroll.
+- **Remove inline hex literals** from `SupportCardPanel`; uses CSS variables consistently.
+
+The "studentSafe" flag on a tool entry (`studentSafe: true`) is what places it in the "For your student" group and enables the screen-turning UX expectation. The 6 tools currently flagged: Visual Timer, Breathing, Grounding, Calculator, Multiplication Chart, CER Organizer.
+
 ## Accessibility
 
 - Min font size: 11px (used sparingly for metadata — body is 13.5–15px).

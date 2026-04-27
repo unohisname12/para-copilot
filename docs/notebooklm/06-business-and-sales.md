@@ -17,6 +17,10 @@ Existing options for paras logging IEP-related observations:
 
 **The gap SupaPara fills:** a fast, FERPA-safe tool built specifically for **paras** to use during the day, with the **sped teacher** as a stakeholder, NOT for a procurement officer to evaluate.
 
+Recent product positioning point: SupaPara now supports **assigned rosters**. A sped teacher can assign students to specific paras/subs, while paras can still add students they work with. This makes the app easier to defend in schools because it avoids unnecessary student-data exposure without blocking real para workflow.
+
+**Newer positioning point — the Training-Gap Agenda:** the app surfaces specific patterns from team logs (e.g. "3+ break-passes for the same student in a week with no break-card requests" → topic "When breaks help vs. when they backfire") on both the para's own toolbox panel **🔖 Topics for Next Check-in** and the sped teacher's **🔖 Coaching** tab. The sped teacher's only action is "share a tip with the para" — pre-filled friendly coaching message, copy/paste into their normal email or chat. Structurally cannot become a per-para performance scoreboard or "flag for follow-up" record. This turns the sped-teacher's check-in from "what should I bring up?" into "here's a tip your para can try this week" — which is the kind of value prop that turns sped teachers into champions.
+
 ## Target customer
 
 ### Primary
@@ -118,6 +122,8 @@ The differentiator: SupaPara is the only tool where the **product surface and th
 >
 > It works on Chromebooks, no install. Paras can log a note in 5 seconds with one tap, or they can write detail when they have time. Goals from each kid's IEP show up next to their name. The team sees handoffs in real time.
 >
+> Sped teachers can assign students to each para, so people only see the students they need — but paras can still add a student when real life changes during the day.
+>
 > I'm offering it free to your school through June. If you like it, it's $300 for the year starting in September — locked for 3 years if you sign as a Founding School. I'd love to come in for 30 minutes and show your sped team. When works for you?"
 
 That's the whole thing. No deck, no demo URL, no signup form needed for the first conversation.
@@ -128,6 +134,7 @@ That's the whole thing. No deck, no demo URL, no signup form needed for the firs
 |---|---|
 | "We already have [Frontline/IEPPro]." | "That's an IEP team tool. SupaPara is for paras during the day. Different use case. Want me to show you side-by-side?" |
 | "What about FERPA?" | "Real names never leave the computer. Only a 6-digit number syncs. I can show you the data flow on one screen." |
+| "Can paras see every student?" | "Admins see the full roster. Paras see assigned students and students they personally add. That keeps access practical but limited." |
 | "Our IT won't approve new software." | "Nothing to install — it's a website. Same level of approval as Google Docs. Happy to send the privacy doc to IT." |
 | "How do we know it'll still exist in a year?" | "Locked-in 3-year price for Founding Schools. And if it goes away, your data exports as a CSV — you own it." |
 | "We don't have budget right now." | "Free through June. You can decide in September after you've used it." |
