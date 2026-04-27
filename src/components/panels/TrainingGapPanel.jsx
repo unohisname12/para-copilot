@@ -126,8 +126,11 @@ export function TrainingGapPanel({ students, studentsMap, logs }) {
               border: "1px solid #1e293b",
             }}>
               Pulls patterns from your recent logs that are worth bringing up at
-              your next check-in. Only patterns — never a single log. You and
-              your sped teacher see the same thing.
+              your next check-in. Only patterns — never a single log.
+              <div style={{ marginTop: 8, color: "#94a3b8", fontSize: 11 }}>
+                Topics here are also visible to your sped teacher so they can
+                come ready with tips.
+              </div>
             </div>
           )}
         </>

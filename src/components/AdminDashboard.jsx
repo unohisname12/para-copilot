@@ -8,7 +8,7 @@
 //
 // Everything here goes through RPCs that re-verify admin on the server.
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useTeam } from '../context/TeamProvider';
 import {
   listTeamMembers,
@@ -18,6 +18,7 @@ import {
   setTeamAllowSubs,
 } from '../services/teamSync';
 import ParaAssignmentPanel from './ParaAssignmentPanel';
+import { runTrainingGapRules } from '../engine';
 
 const ROLE_META = {
   owner:        { label: 'Owner',         tone: '#a78bfa', desc: 'Full control. Can add, remove, and change anyone. Multiple owners allowed — good for co-leads.' },
@@ -57,6 +58,7 @@ export default function AdminDashboard({ allStudents = {}, vaultNames = {} } = {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
   const [working, setWorking] = useState(null); // userId currently being acted on
+  const [shareTip, setShareTip] = useState(null); // { topic, paraName, studentLabel }
 
   const refresh = useCallback(async () => {
     if (!activeTeamId) return;
@@ -116,6 +118,7 @@ export default function AdminDashboard({ allStudents = {}, vaultNames = {} } = {
       }}>
         {[
           ['start',       '🤝 Get paras started'],
+          ['coaching',    '🔖 Coaching'],
           ['members',     '👥 Members'],
           ['assignments', '🎯 Assign Students'],
           ['access',      '🔐 Access'],
@@ -315,6 +318,15 @@ export default function AdminDashboard({ allStudents = {}, vaultNames = {} } = {
         <ParaSetupGuide onGoToAssignments={() => setTab('assignments')} />
       )}
 
+      {/* ── Coaching tab ─────────────────────────────────── */}
+      {tab === 'coaching' && (
+        <CoachingTopicsSection
+          team={team}
+          members={members}
+          onShareTip={setShareTip}
+        />
+      )}
+
       {/* ── Assignments tab ──────────────────────────────── */}
       {tab === 'assignments' && (
         <ParaAssignmentPanel
@@ -400,6 +412,180 @@ export default function AdminDashboard({ allStudents = {}, vaultNames = {} } = {
           </div>
         </div>
       )}
+
+      {shareTip && (
+        <ShareTipModal
+          topic={shareTip.topic}
+          paraName={shareTip.paraName}
+          studentLabel={shareTip.studentLabel}
+          onClose={() => setShareTip(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Coaching Topics Section ─────────────────────────────────
+// Sped-teacher triage: which para has a pattern worth bringing
+// up at the next check-in, plus a one-click "share a tip" path.
+// Runs the rules engine on team.sharedLogs, attributes each topic
+// to the para whose logs surfaced it.
+function CoachingTopicsSection({ team, members, onShareTip }) {
+  const sharedLogs = team?.sharedLogs || [];
+  const teamStudents = team?.teamStudents || [];
+
+  const topics = useMemo(() => {
+    const studentIds = teamStudents.map(s => s.id);
+    if (studentIds.length === 0 || sharedLogs.length === 0) return [];
+
+    const paraMembers = (members || []).filter(
+      m => m.active && (m.role === 'para' || m.role === 'sub')
+    );
+
+    const all = paraMembers.flatMap(member => {
+      const adapted = sharedLogs
+        .filter(l => l.user_id === member.user_id)
+        .map(l => ({ ...l, studentId: l.student_id }));
+      const result = runTrainingGapRules(adapted, studentIds);
+      return result.topics.map(t => ({
+        ...t,
+        paraDisplayName: member.display_name,
+        paraUserId: member.user_id,
+      }));
+    });
+
+    return all.sort((a, b) => {
+      const aTime = a.evidenceLogs?.[0]?.timestamp || 0;
+      const bTime = b.evidenceLogs?.[0]?.timestamp || 0;
+      return new Date(bTime).getTime() - new Date(aTime).getTime();
+    });
+  }, [sharedLogs, teamStudents, members]);
+
+  if (topics.length === 0) {
+    return (
+      <div className="card-elevated" style={{ padding: 'var(--space-6)', textAlign: 'center' }}>
+        <div style={{ fontSize: 28, marginBottom: 8 }}>👍</div>
+        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>
+          Nothing to discuss right now
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 6, lineHeight: 1.6 }}>
+          Your team's logs look good. When patterns worth a coaching conversation
+          show up, they'll appear here.
+        </div>
+      </div>
+    );
+  }
+
+  const studentLookup = Object.fromEntries(teamStudents.map(s => [s.id, s]));
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+      <div style={{
+        fontSize: 11, fontWeight: 700, color: 'var(--text-muted)',
+        textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 4,
+      }}>
+        Coaching topics from your team · {topics.length}
+      </div>
+      <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.55, marginBottom: 'var(--space-3)' }}>
+        Patterns from your team's recent logs that are worth bringing up. Each one
+        is a chance to share a tip — not a record on the para.
+      </div>
+      {topics.map(t => {
+        const student = studentLookup[t.studentId];
+        const studentLabel = student?.pseudonym || 'Student';
+        return (
+          <div key={`${t.ruleId}::${t.paraUserId}::${t.studentId}`} className="panel" style={{
+            padding: 'var(--space-4) var(--space-5)',
+            display: 'flex', alignItems: 'flex-start', gap: 'var(--space-4)',
+            flexWrap: 'wrap',
+          }}>
+            <div style={{ fontSize: 22, lineHeight: 1, paddingTop: 2 }}>🔖</div>
+            <div style={{ flex: 1, minWidth: 220 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
+                {t.topicTitle}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4, lineHeight: 1.55 }}>
+                Para: <strong style={{ color: 'var(--text-primary)' }}>{t.paraDisplayName || 'Unknown para'}</strong>
+                {' · '}Student: {studentLabel}
+                {' · '}{relativeAge(t.evidenceLogs?.[0]?.timestamp)}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.55 }}>
+                {t.plainEnglishRule}
+              </div>
+            </div>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => onShareTip({ topic: t, paraName: t.paraDisplayName || 'para', studentLabel })}
+            >
+              Share a tip with {t.paraDisplayName ? t.paraDisplayName.split(' ')[0] : 'para'}
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function relativeAge(ts) {
+  if (!ts) return '';
+  const ms = Date.now() - new Date(ts).getTime();
+  const days = Math.floor(ms / 86400000);
+  if (days <= 0) return 'today';
+  if (days === 1) return '1 day ago';
+  return `${days} days ago`;
+}
+
+// ── Share-a-tip Modal ───────────────────────────────────────
+// Pre-fills a friendly coaching message the sped teacher can copy
+// and send via their normal email/messaging tool. No "flag," no
+// "follow-up required" — just a tip.
+function ShareTipModal({ topic, paraName, studentLabel, onClose }) {
+  const firstName = paraName ? paraName.split(' ')[0] : 'there';
+  const altLines = (topic.alternatives || []).map(a => `• ${a}`).join('\n');
+  const draft =
+    `Hey ${firstName},\n\n` +
+    `I noticed something in the recent logs for ${studentLabel || 'one of our students'} that might be worth trying — wanted to share a tip in case it helps.\n\n` +
+    `${topic.topicTitle}\n\n` +
+    `${topic.topicExplainer}\n\n` +
+    `A few things to try:\n${altLines}\n\n` +
+    `Want to talk through it at our next check-in?`;
+
+  const [text, setText] = useState(draft);
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" style={{ width: 560 }} onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 16 }}>Share a tip with {paraName || 'para'}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              Edit and copy — paste into your normal email or messaging app.
+            </div>
+          </div>
+          <button className="close-btn" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <textarea
+            value={text}
+            onChange={e => setText(e.target.value)}
+            className="data-textarea"
+            style={{ height: 320, fontFamily: 'inherit', lineHeight: 1.6 }}
+          />
+        </div>
+        <div className="modal-footer">
+          <button
+            className="btn btn-primary"
+            style={{ flex: 1 }}
+            onClick={() => {
+              navigator.clipboard.writeText(text);
+              alert('Copied — paste it into your email or chat to send to your para.');
+            }}
+          >
+            Copy to clipboard
+          </button>
+          <button className="btn btn-secondary" onClick={onClose}>Close</button>
+        </div>
+      </div>
     </div>
   );
 }
