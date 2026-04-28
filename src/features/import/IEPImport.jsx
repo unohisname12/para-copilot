@@ -147,6 +147,8 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
     }
 
     try {
+      let bundle = null;
+
       // JSON path — must be the only file
       if (byExt.json) {
         if (byExt.md || byExt.csv) {
@@ -156,36 +158,41 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
         const json = JSON.parse(await byExt.json.text());
         const err = validateBundle(json);
         if (err) { setBundleError(err); e.target.value = ""; return; }
-        setBundleData(json);
-        e.target.value = ""; return;
-      }
-
-      // MD / CSV path — assemble a bundle in memory
-      if (byExt.md || byExt.csv) {
+        bundle = json;
+      } else if (byExt.md || byExt.csv) {
+        // MD / CSV path — assemble a bundle in memory
         const md = byExt.md ? await byExt.md.text() : null;
         const csv = byExt.csv ? await byExt.csv.text() : null;
-        const bundle = assembleBundleFromFiles({ md, csv });
+        bundle = assembleBundleFromFiles({ md, csv });
         if (!bundle.normalizedStudents.students.length) {
           setBundleError("No students found. MD needs `## Student Name` headings; CSV needs Name + 6-digit number columns.");
           e.target.value = ""; return;
         }
-        setBundleData(bundle);
+      } else {
+        setBundleError("Unsupported file type. Use .json, .md, or .csv.");
         e.target.value = ""; return;
       }
 
-      setBundleError("Unsupported file type. Use .json, .md, or .csv.");
+      // Show the preview + auto-import in one shot. The preview tile
+      // becomes a "what just landed" recap; user doesn't need a 2nd click.
+      setBundleData(bundle);
+      doBundleImport(bundle);
     } catch (err) {
       setBundleError("Could not parse file: " + err.message);
     }
     e.target.value = "";
   };
 
-  const doBundleImport = () => {
-    if (!bundleData || !onBulkImport) return;
+  // Accepts an optional bundle arg so it can be invoked inline right after
+  // assembly (when React state hasn't flushed yet). Falls back to bundleData
+  // when called from the click handler.
+  const doBundleImport = (bundleArg) => {
+    const data = bundleArg || bundleData;
+    if (!data || !onBulkImport) return;
 
-    if (bundleData.privateRosterMap?.privateRosterMap?.length > 0) {
+    if (data.privateRosterMap?.privateRosterMap?.length > 0) {
       // Combined JSON with real names — build identity registry
-      const { registry, importStudents, periodMap } = buildIdentityRegistry(bundleData);
+      const { registry, importStudents, periodMap } = buildIdentityRegistry(data);
       const studentList = Object.values(importStudents);
       onBulkImport(studentList, periodMap);
       syncStudentsToCloud(studentList);
@@ -200,7 +207,7 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
       }
     } else {
       // Plain bundle without privateRosterMap — import with bundle pseudonyms, no real names
-      const rawStudents = bundleData.normalizedStudents.students;
+      const rawStudents = data.normalizedStudents.students;
       const normalized  = rawStudents.map(s => normalizeImportedStudent(s));
       const periodMapUpdates = {};
       normalized.forEach(s => {
