@@ -15,6 +15,7 @@ import { resolveLabel } from '../../privacy/nameResolver';
 import { VisualTimer, BreathingExercise } from '../../components/tools';
 import { getStudentPatterns } from '../analytics/getStudentPatterns';
 import PatternsCard from '../analytics/PatternsCard';
+import { SimpleModeQuickViews } from './SimpleModeQuickViews';
 
 // Category order matters: arranged left-to-right from most-positive to most-critical.
 const CATEGORIES = [
@@ -345,9 +346,16 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
               {period.teacher} · {rows.length} / {periodStudentIds.length} students
             </div>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <button onClick={() => setActiveTool("timer")} title="Visual Timer" className="btn btn-secondary" style={{ fontSize: 16, padding: "8px 14px" }}>⏱️</button>
             <button onClick={() => setActiveTool("breathing")} title="Breathing Exercise" className="btn btn-secondary" style={{ fontSize: 16, padding: "8px 14px" }}>🫁</button>
+            <SimpleModeQuickViews
+              students={periodStudentIds}
+              studentsMap={studentsMap}
+              logs={logs}
+              addLog={addLog}
+              currentDate={currentDate}
+            />
           </div>
         </div>
 
