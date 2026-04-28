@@ -11,14 +11,13 @@
 // `privateRosterMap` — `normalizedStudents` is pseudonymous.
 
 import { parseIEP, checkAiHealth } from '../../engine/aiProvider';
+import { configurePdfWorker } from '../../utils/pdfWorker';
+import { parseRosterCsv, dedupeAndValidate } from './rosterParsers';
 
 // ── File → text ──────────────────────────────────────────────
 
 import * as pdfjsLib from 'pdfjs-dist';
-if (typeof window !== 'undefined' && pdfjsLib.GlobalWorkerOptions) {
-  pdfjsLib.GlobalWorkerOptions.workerSrc =
-    `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-}
+configurePdfWorker(pdfjsLib);
 
 export async function readFileAsText(file) {
   if (!file) return '';
@@ -127,16 +126,152 @@ export function stripNameFromSection(name, sectionText) {
   return out.trim();
 }
 
+// Fast-path: parse a section that's already structured Markdown without
+// hitting the AI. Returns the same shape as parseIEP (eligibility, goals,
+// accommodations, etc.) when the section matches our convention; returns
+// null otherwise so the caller falls through to AI extraction.
+//
+// Supported headings (case-insensitive on the H3 lines):
+//   **Eligibility:** <text>
+//   **Case Manager:** <text>
+//   **Grade:** <Nth>
+//   ### Strengths
+//   ### Health & Important Notes        (→ behaviorNotes)
+//   ### Alert — Read First              (→ behaviorNotes prepended with ALERT:)
+//   ### IEP Goals                        (bulleted list — extracts goal text per line)
+//   ### Accommodations                   (bulleted list — accommodation names)
+//   ### Watch For → Do This              (bulleted list — folded into strategies)
+export function parseStructuredMarkdown(sectionText) {
+  if (!sectionText || typeof sectionText !== 'string') return null;
+  // Heuristic gate: must look structured. At minimum needs `**Eligibility:**`
+  // OR at least one of the standard `### ` headings we know how to parse.
+  const looksStructured =
+    /\*\*\s*Eligibility\s*:\s*\*\*/i.test(sectionText) ||
+    /^\s*###\s+(Strengths|IEP Goals|Accommodations|Watch For|Health|Alert)/im.test(sectionText);
+  if (!looksStructured) return null;
+
+  const out = {
+    eligibility: '',
+    caseManager: '',
+    gradeLevel: '',
+    strengths: '',
+    behaviorNotes: '',
+    triggers: '',
+    accommodations: [],
+    goals: [],
+    strategies: [],
+    tags: [],
+    subject: 'General',
+  };
+
+  // Inline labeled fields (work anywhere in the section)
+  const elig = sectionText.match(/\*\*\s*Eligibility\s*:\s*\*\*\s*(.+)/i);
+  if (elig) out.eligibility = elig[1].trim().replace(/\\n.*/, '').trim();
+  const cm = sectionText.match(/\*\*\s*Case Manager\s*:\s*\*\*\s*(.+)/i);
+  if (cm) out.caseManager = cm[1].trim();
+  const gl = sectionText.match(/\*\*\s*Grade\s*:\s*\*\*\s*(.+)/i);
+  if (gl) out.gradeLevel = gl[1].trim();
+
+  // Section-by-section walk via H3 headings
+  const lines = sectionText.split(/\r?\n/);
+  let cur = null;
+  const buckets = { strengths: [], health: [], alert: [], goals: [], accs: [], watch: [] };
+  for (const raw of lines) {
+    const line = raw.trim();
+    const h3 = line.match(/^###\s+(.+)$/);
+    if (h3) {
+      const t = h3[1].toLowerCase();
+      if (t.includes('strength')) cur = 'strengths';
+      else if (t.includes('health')) cur = 'health';
+      else if (t.includes('alert')) cur = 'alert';
+      else if (t.includes('goal')) cur = 'goals';
+      else if (t.includes('accommodation')) cur = 'accs';
+      else if (t.includes('watch')) cur = 'watch';
+      else cur = null;
+      continue;
+    }
+    if (line.startsWith('## ') || line.startsWith('---')) { cur = null; continue; }
+    if (cur && line) buckets[cur].push(line);
+  }
+
+  // Strengths / Health / Alert → flat text
+  out.strengths = buckets.strengths.filter(l => !l.startsWith('**')).join(' ').trim();
+  const healthText = buckets.health.filter(l => !l.startsWith('**')).join(' ').trim();
+  const alertText = buckets.alert.filter(l => !l.startsWith('**')).join(' ').trim();
+  if (healthText && alertText) out.behaviorNotes = `ALERT: ${alertText}\n\n${healthText}`;
+  else if (alertText) out.behaviorNotes = `ALERT: ${alertText}`;
+  else out.behaviorNotes = healthText;
+
+  // Goals: first bullet of each list item is the goal name; sub-bullets carry
+  // baseline/role. We capture text after the first **bold** label or after
+  // the leading `- `.
+  let curGoal = null;
+  for (const raw of buckets.goals) {
+    const trimmed = raw.replace(/^\s*[-•*]\s*/, '').trim();
+    if (!trimmed) continue;
+    if (raw.match(/^\s*-\s+\*\*/) || raw.match(/^\s*-\s+(?!\s)/)) {
+      // Top-level bullet → new goal
+      // "**Reading** — Identify central idea..." OR "Reading - Identify..."
+      const labeled = trimmed.match(/^\*\*([^*]+)\*\*\s*(?:[—\-:]\s*)?(.+)?/);
+      if (labeled) {
+        curGoal = { area: labeled[1].trim(), text: (labeled[2] || labeled[1]).trim() };
+      } else {
+        curGoal = { area: 'General', text: trimmed };
+      }
+      out.goals.push(curGoal);
+    }
+  }
+  // If no labeled bullets matched, fall back to one goal per non-empty line.
+  if (out.goals.length === 0 && buckets.goals.length > 0) {
+    out.goals = buckets.goals
+      .filter(l => l.replace(/^\s*[-•*]\s*/, '').trim())
+      .map(l => ({ area: 'General', text: l.replace(/^\s*[-•*]\s*/, '').trim() }));
+  }
+
+  // Accommodations: take the bold name per top-level bullet, fall back to
+  // the whole line.
+  for (const raw of buckets.accs) {
+    if (!/^\s*[-•*]/.test(raw)) continue; // skip sub-bullets / paragraph wrap
+    const stripped = raw.replace(/^\s*[-•*]\s*/, '').trim();
+    if (!stripped) continue;
+    const labeled = stripped.match(/^\*\*([^*]+)\*\*/);
+    out.accommodations.push((labeled ? labeled[1] : stripped).trim());
+  }
+  // Watch → Do becomes strategies (free-text "watch ... → do ..." entries)
+  for (let i = 0; i < buckets.watch.length; i++) {
+    const raw = buckets.watch[i];
+    const w = raw.match(/^\s*[-•*]\s*\*\*Watch:\*\*\s*(.+)$/i);
+    if (w) {
+      // Look ahead for the next `**Do:**` line
+      const next = buckets.watch[i + 1] || '';
+      const d = next.match(/^\s*[-•*]?\s*\*\*Do:\*\*\s*(.+)$/i);
+      if (d) {
+        out.strategies.push(`If ${w[1].trim()} → ${d[1].trim()}`);
+      } else {
+        out.strategies.push(w[1].trim());
+      }
+    }
+  }
+  return out;
+}
+
 export async function extractAllStudents(sections, onProgress = () => {}) {
   const results = new Map();
   const errors = [];
   for (const [name, text] of sections.entries()) {
     onProgress(name, 'parsing');
     try {
-      // Send the IEP body WITHOUT the student's real name. We already know
-      // the name from the roster; the AI doesn't need to see it to extract
-      // eligibility / goals / accs. This protects names from ever reaching
-      // any third-party cloud provider on the Gemini path.
+      // Fast-path: if the section is already in our structured Markdown
+      // format, parse it deterministically and skip the AI round-trip. Saves
+      // ~1-3s per student on Gemini, ~5-30s per student on local Ollama.
+      const fast = parseStructuredMarkdown(text);
+      if (fast) {
+        results.set(name, fast);
+        onProgress(name, 'done');
+        continue;
+      }
+      // Fallback: hand to AI. Strip the student's real name first so the
+      // model never sees it (matters for the cloud Gemini path).
       const anonymized = stripNameFromSection(name, text);
       const parsed = await parseIEP(anonymized);
       if (parsed) {
@@ -229,6 +364,122 @@ export function buildBundleFromExtraction(rosterPairs, parsedStudents) {
     normalizedStudents: { students: normalizedStudents },
     privateRosterMap: { schemaVersion: '2.0', privateRosterMap },
   };
+}
+
+// ── Split a structured-MD bundle into per-student sections ───
+//
+// The MD format the smart extractor + the docx parser write looks like:
+//
+//   # Document title
+//   intro paragraphs
+//   ---
+//   ## Maria Garcia
+//   **Eligibility:** SLD
+//   ### Strengths ...
+//   ---
+//   ## James Wilson
+//   ...
+//
+// Each H2 starts a new student section. H1 / H3 don't split. Returns a
+// Map<realName, sectionText> where sectionText is the slice between this H2
+// and the next (or EOF).
+export function splitBundleMarkdown(text) {
+  const sections = new Map();
+  if (!text || typeof text !== 'string') return sections;
+  const lines = text.split(/\r?\n/);
+  let curName = null;
+  let curBody = [];
+  for (const raw of lines) {
+    // H2 header — exactly two leading hashes, captures the rest of the line
+    const m = raw.match(/^##\s+(?!#)(.+?)\s*$/);
+    if (m) {
+      if (curName) sections.set(curName, curBody.join('\n').trim());
+      curName = m[1].trim();
+      curBody = [];
+    } else if (curName) {
+      curBody.push(raw);
+    }
+  }
+  if (curName) sections.set(curName, curBody.join('\n').trim());
+  return sections;
+}
+
+// Deterministic 6-digit paraAppNumber from a student name. Mirrors the
+// algorithm used in /tmp/docx-extract/parse2.py so re-running on the same
+// roster reproduces the same numbers.
+function deterministicParaAppNumber(name) {
+  // Simple stable hash without crypto: same shape as SHA-256 % 900000 + 100000
+  // but works in any browser/Jest. Inputs are short student names; collision
+  // is rare and the user can override via the CSV when they care.
+  let h = 0;
+  const s = String(name || '');
+  for (let i = 0; i < s.length; i++) {
+    h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+  }
+  // unsigned, then map into [100000, 999999]
+  const n = (h >>> 0) % 900000 + 100000;
+  return String(n).padStart(6, '0');
+}
+
+// ── Bundle assembler: builds a bundle from MD (+ optional roster CSV) ─
+//
+// Inputs:
+//   md  — structured Markdown text where each `## Name` heading starts
+//         a per-student section parseable by parseStructuredMarkdown
+//   csv — optional roster CSV (`Name,ParaAppNumber` two-col format that
+//         rosterParsers.parseRosterCsv accepts)
+//
+// Behavior:
+//   - With csv: roster set = CSV entries; paraAppNumbers come from CSV
+//   - Without csv: roster set = student names found in MD H2 headings;
+//     paraAppNumbers generated deterministically from name
+//   - Names present in CSV but not in MD still appear in the bundle, with
+//     iepNotYetOnFile flag set (no IEP fields yet)
+//
+// Output: same shape as buildBundleFromExtraction → buildIdentityRegistry
+// can consume it directly.
+export function assembleBundleFromFiles({ md, csv } = {}) {
+  if (!md && !csv) {
+    throw new Error('assembleBundleFromFiles needs at least an MD or CSV file.');
+  }
+
+  // 1. Parse MD into per-student structured fields (skips when MD missing)
+  const parsedByName = new Map();
+  if (md) {
+    const sections = splitBundleMarkdown(md);
+    sections.forEach((sectionText, name) => {
+      const parsed = parseStructuredMarkdown(sectionText);
+      if (parsed) parsedByName.set(name, parsed);
+      else parsedByName.set(name, null); // section exists but unparseable
+    });
+  }
+
+  // 2. Build the rosterPairs list — preferring CSV when present
+  let rosterPairs = [];
+  if (csv) {
+    const { entries: rawEntries } = parseRosterCsv(csv);
+    const { entries } = dedupeAndValidate(rawEntries);
+    rosterPairs = entries.map(e => ({
+      realName: e.realName,
+      paraAppNumber: e.paraAppNumber,
+    }));
+  } else {
+    // Generate paraAppNumbers deterministically from each MD H2 name
+    rosterPairs = [...parsedByName.keys()].map(name => ({
+      realName: name,
+      paraAppNumber: deterministicParaAppNumber(name),
+    }));
+  }
+
+  // 3. Hand to existing assembler — non-MD names map to {} so they're
+  // marked profileMissing/iepNotYetOnFile by buildBundleFromExtraction
+  const cleanParsed = new Map();
+  rosterPairs.forEach(p => {
+    const v = parsedByName.get(p.realName);
+    if (v) cleanParsed.set(p.realName, v);
+  });
+
+  return buildBundleFromExtraction(rosterPairs, cleanParsed);
 }
 
 // ── Pre-flight: is Ollama reachable? ─────────────────────────

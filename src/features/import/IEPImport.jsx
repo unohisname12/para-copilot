@@ -9,6 +9,8 @@ import { ollamaParseIEP } from '../../engine/ollama';
 import { normalizeImportedStudent, buildIdentityRegistry, buildIdentityRegistryFromMasterRoster } from '../../models';
 import { useTeamOptional } from '../../context/TeamProvider';
 import { pushStudents } from '../../services/teamSync';
+import { configurePdfWorker } from '../../utils/pdfWorker';
+import { assembleBundleFromFiles } from './iepExtractor';
 import RosterOnlyImport from './RosterOnlyImport';
 import SmartImport from './SmartImport';
 import { assignIdentity, IDENTITY_PALETTE } from '../../identity';
@@ -67,9 +69,7 @@ export function resolveStudentSlot(importedCount) {
 async function extractPDFText(file) {
   try {
     const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf");
-    // Use CDN worker — avoids CRA worker config complexity
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+    configurePdfWorker(pdfjsLib);
 
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -96,6 +96,7 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
   const syncStudentsToCloud = (students) => {
     if (!team?.activeTeamId || !team?.user?.id) return;
     pushStudents(team.activeTeamId, students, team.user.id).catch((err) => {
+      team.reportCloudError?.(`Students imported locally but did not sync: ${err.message || err}`);
       // eslint-disable-next-line no-console
       console.error('[cloud] pushStudents failed', err);
     });
@@ -124,15 +125,58 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
   const [mrImportedStudentCount, setMrImportedStudentCount] = useState(0);
   const masterRosterFileRef = useRef();
 
+  // Accepts:
+  //   - one .json bundle (existing path)
+  //   - one .md file (per-student structured Markdown — paraAppNumbers
+  //     generated deterministically from name)
+  //   - one .csv file (roster only — IEP fields left blank)
+  //   - .md + .csv pair (MD provides IEP fields, CSV provides paraAppNumbers)
   const handleBundleFile = async (e) => {
-    const file = e.target.files[0]; if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
     setBundleError(""); setBundleData(null); setBundleImported(false);
+
+    const byExt = {};
+    for (const f of files) {
+      const ext = (f.name.split('.').pop() || '').toLowerCase();
+      if (byExt[ext]) {
+        setBundleError(`Got two .${ext} files. Pick one .${ext} at a time.`);
+        e.target.value = ""; return;
+      }
+      byExt[ext] = f;
+    }
+
     try {
-      const json = JSON.parse(await file.text());
-      const err  = validateBundle(json);
-      if (err) { setBundleError(err); return; }
-      setBundleData(json);
-    } catch (err) { setBundleError("Could not parse JSON: " + err.message); }
+      // JSON path — must be the only file
+      if (byExt.json) {
+        if (byExt.md || byExt.csv) {
+          setBundleError("Pick a JSON bundle alone, OR an MD file (with optional CSV roster). Not both.");
+          e.target.value = ""; return;
+        }
+        const json = JSON.parse(await byExt.json.text());
+        const err = validateBundle(json);
+        if (err) { setBundleError(err); e.target.value = ""; return; }
+        setBundleData(json);
+        e.target.value = ""; return;
+      }
+
+      // MD / CSV path — assemble a bundle in memory
+      if (byExt.md || byExt.csv) {
+        const md = byExt.md ? await byExt.md.text() : null;
+        const csv = byExt.csv ? await byExt.csv.text() : null;
+        const bundle = assembleBundleFromFiles({ md, csv });
+        if (!bundle.normalizedStudents.students.length) {
+          setBundleError("No students found. MD needs `## Student Name` headings; CSV needs Name + 6-digit number columns.");
+          e.target.value = ""; return;
+        }
+        setBundleData(bundle);
+        e.target.value = ""; return;
+      }
+
+      setBundleError("Unsupported file type. Use .json, .md, or .csv.");
+    } catch (err) {
+      setBundleError("Could not parse file: " + err.message);
+    }
     e.target.value = "";
   };
 
@@ -499,11 +543,11 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
           id="bundle"
           active={inputMode === "bundle"}
           icon="📦"
-          title="App Bundle JSON"
-          subtitle="Full IEP profiles + optional private roster"
+          title="App Bundle"
+          subtitle="JSON, Markdown, or MD + CSV roster"
           tone="#a78bfa"
-          body="A combined JSON with normalizedStudents + optional privateRosterMap. The richest import — students come in with full IEP data."
-          when="Use this when you have a complete bundle exported by SupaPara or produced by your admin."
+          body="Drop in a complete bundle (.json), a structured Markdown summary (.md), or a Markdown summary paired with a roster CSV. The richest import — students come in with full IEP data."
+          when="Use this when you have a complete bundle from SupaPara, your admin, or the docx-extractor output."
           onClick={() => { setInputMode("bundle"); setParsed(null); setParseError(""); setMasterRosterData(null); setMasterRosterError(""); setMasterRosterImported(false); setPreparedData(null); setPreparedError(""); setPreparedImported(false); }}
         />
         <ImportModeCard
@@ -689,14 +733,14 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
             🔒 <strong>Safe to use:</strong> This file has fake names only. If it also includes real names, they stay on this computer — never sent to the cloud, AI, or anyone else.
           </div>
 
-          {/* Bundle file input */}
-          <input type="file" ref={bundleFileRef} style={{ display: "none" }} accept=".json" onChange={handleBundleFile} />
+          {/* Bundle file input — accepts JSON bundle, OR MD (+optional CSV roster) */}
+          <input type="file" ref={bundleFileRef} style={{ display: "none" }} accept=".json,.md,.csv" multiple onChange={handleBundleFile} />
 
           {/* Upload button */}
           <button onClick={() => bundleFileRef.current?.click()}
             style={{ width: "100%", padding: "14px 20px", borderRadius: "10px", border: `2px solid ${bundleData ? "#6d28d9" : "var(--border-light)"}`, background: bundleData ? "#12102a" : "var(--bg-surface)", color: bundleData ? "#a78bfa" : "var(--text-primary)", fontSize: "14px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", gap: "12px", textAlign: "left" }}>
             <span style={{ fontSize: "22px" }}>📦</span>
-            <span>{bundleData ? `✓ File loaded` : "Upload your student file"}</span>
+            <span>{bundleData ? `✓ File loaded` : "Upload your student file (.json, .md, or .md + .csv)"}</span>
           </button>
 
           {/* Validation error */}
@@ -1424,4 +1468,3 @@ function SmartImportBanner({ active, onClick }) {
     </button>
   );
 }
-

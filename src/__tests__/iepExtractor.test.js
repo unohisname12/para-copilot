@@ -3,6 +3,8 @@ import {
   buildBundleFromExtraction,
   buildMatchReport,
   stripNameFromSection,
+  splitBundleMarkdown,
+  assembleBundleFromFiles,
 } from '../features/import/iepExtractor';
 
 describe('splitByStudents', () => {
@@ -116,6 +118,147 @@ describe('stripNameFromSection', () => {
   test('is safe with no name given', () => {
     const input = 'Some unrelated text.';
     expect(stripNameFromSection('', input)).toBe('Some unrelated text.');
+  });
+});
+
+describe('splitBundleMarkdown', () => {
+  test('splits per-student sections by H2 headings', () => {
+    const md = `# Mr. Dre — Student IEP Summaries
+
+intro text here
+
+---
+
+## Maria Garcia
+
+**Eligibility:** SLD
+
+### Strengths
+Hardworking
+
+---
+
+## James Wilson
+
+**Eligibility:** Speech
+
+### Strengths
+Curious
+`;
+    const sections = splitBundleMarkdown(md);
+    expect(sections.size).toBe(2);
+    expect(sections.has('Maria Garcia')).toBe(true);
+    expect(sections.has('James Wilson')).toBe(true);
+    expect(sections.get('Maria Garcia')).toContain('SLD');
+    expect(sections.get('James Wilson')).toContain('Speech');
+  });
+
+  test('ignores H1 and H3 headings — only splits on H2', () => {
+    const md = `# Title\n## Real Kid\n### IEP Goals\nGoals here\n## Other Kid\nstuff`;
+    const sections = splitBundleMarkdown(md);
+    expect([...sections.keys()]).toEqual(['Real Kid', 'Other Kid']);
+  });
+
+  test('returns empty map when no H2 sections exist', () => {
+    expect(splitBundleMarkdown('').size).toBe(0);
+    expect(splitBundleMarkdown('# Just a title').size).toBe(0);
+  });
+});
+
+describe('assembleBundleFromFiles', () => {
+  const SAMPLE_MD = `# Mr. Dre — Summaries
+
+---
+
+## Maria Garcia
+
+**Eligibility:** SLD
+**Case Manager:** Jones
+**Grade:** 7th
+
+### Strengths
+Hardworking and motivated.
+
+### IEP Goals
+- **Reading** — Identify central idea in grade-level text
+- **Writing** — Write 5-sentence paragraph
+
+### Accommodations
+- **Extended time** — 1.5x on tests
+- **Graphic organizer** — for writing
+
+---
+
+## James Wilson
+
+**Eligibility:** Speech
+**Grade:** 6th
+
+### Strengths
+Funny, social.
+
+### IEP Goals
+- **Speech** — Articulate /r/ sound
+
+### Accommodations
+- **Preferential seating** — front of room
+`;
+
+  test('builds bundle from MD only with auto-generated paraAppNumbers', () => {
+    const bundle = assembleBundleFromFiles({ md: SAMPLE_MD });
+    expect(bundle.schemaVersion).toBe('2.0');
+    expect(bundle.normalizedStudents.students).toHaveLength(2);
+    expect(bundle.privateRosterMap.privateRosterMap).toHaveLength(2);
+
+    const maria = bundle.privateRosterMap.privateRosterMap.find(p => p.realName === 'Maria Garcia');
+    expect(maria).toBeTruthy();
+    // Auto-generated paraAppNumbers must be 6-digit strings
+    expect(maria.paraAppNumber).toMatch(/^\d{6}$/);
+
+    // IEP fields parsed from the structured MD
+    const mariaStu = bundle.normalizedStudents.students.find(
+      s => s.paraAppNumber === maria.paraAppNumber
+    );
+    expect(mariaStu.eligibility).toBe('SLD');
+    expect(mariaStu.caseManager).toBe('Jones');
+    expect(mariaStu.goals.length).toBeGreaterThan(0);
+    expect(mariaStu.accs.length).toBeGreaterThan(0);
+  });
+
+  test('paraAppNumbers from MD-only mode are deterministic across runs', () => {
+    const a = assembleBundleFromFiles({ md: SAMPLE_MD });
+    const b = assembleBundleFromFiles({ md: SAMPLE_MD });
+    const aMaria = a.privateRosterMap.privateRosterMap.find(p => p.realName === 'Maria Garcia');
+    const bMaria = b.privateRosterMap.privateRosterMap.find(p => p.realName === 'Maria Garcia');
+    expect(aMaria.paraAppNumber).toBe(bMaria.paraAppNumber);
+  });
+
+  test('builds bundle from MD + CSV pair with paraAppNumbers from CSV', () => {
+    const csv = `Name,ParaAppNumber\nMaria Garcia,847293\nJames Wilson,128456\n`;
+    const bundle = assembleBundleFromFiles({ md: SAMPLE_MD, csv });
+
+    const maria = bundle.privateRosterMap.privateRosterMap.find(p => p.realName === 'Maria Garcia');
+    const james = bundle.privateRosterMap.privateRosterMap.find(p => p.realName === 'James Wilson');
+    expect(maria.paraAppNumber).toBe('847293');
+    expect(james.paraAppNumber).toBe('128456');
+
+    // IEP data still parsed from MD
+    const mariaStu = bundle.normalizedStudents.students.find(s => s.paraAppNumber === '847293');
+    expect(mariaStu.eligibility).toBe('SLD');
+  });
+
+  test('CSV entries with no MD section still appear in roster (IEP fields blank)', () => {
+    const md = `## Maria Garcia\n\n**Eligibility:** SLD\n`;
+    const csv = `Name,ParaAppNumber\nMaria Garcia,847293\nNo IEP Yet,555555\n`;
+    const bundle = assembleBundleFromFiles({ md, csv });
+    expect(bundle.privateRosterMap.privateRosterMap).toHaveLength(2);
+    const noIep = bundle.normalizedStudents.students.find(s => s.paraAppNumber === '555555');
+    expect(noIep.eligibility).toBe('');
+    expect(noIep.flags.iepNotYetOnFile).toBe(true);
+  });
+
+  test('throws if neither MD nor CSV provided', () => {
+    expect(() => assembleBundleFromFiles({})).toThrow();
   });
 });
 
