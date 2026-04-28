@@ -1,7 +1,8 @@
 // ── Goal Tracker — visual mini-dashboard per student ─────────
-// Per-student hero (animated donut + big numbers + recent supports
+// Per-student hero (polished donut + big numbers + recent supports
 // + trend) over an expandable 2-up grid of goal mini-tiles. Built
-// to read in <1 second during class.
+// to read in <1 second during class. ⛶ button per student opens a
+// fullscreen deep-dive with notes + timeline + segment-filter donut.
 import React, { useState, useEffect, useRef } from "react";
 import { GOAL_PROGRESS_OPTIONS, STRATEGIES } from '../../data';
 import { resolveLabel } from '../../privacy/nameResolver';
@@ -9,91 +10,8 @@ import {
   buildVisualGoalData, optionForId,
   summarizeStudentGoals, trendSymbol,
 } from './goalTrackerHelpers';
-
-// ── Donut chart (inline SVG, animated on mount) ──────────────
-function Donut({ positive, neutral, negative, color, size = 96 }) {
-  const total = positive + neutral + negative;
-  const radius = 36;
-  const circumference = 2 * Math.PI * radius;
-  const strokeWidth = 10;
-
-  // Reveal animation — start at 0 and grow.
-  const [revealed, setRevealed] = useState(false);
-  useEffect(() => {
-    const id = requestAnimationFrame(() => setRevealed(true));
-    return () => cancelAnimationFrame(id);
-  }, [positive, neutral, negative]);
-
-  if (total === 0) {
-    return (
-      <svg viewBox="0 0 100 100" width={size} height={size} aria-hidden="true">
-        <circle cx="50" cy="50" r={radius} fill="none"
-          stroke="var(--border)" strokeWidth={strokeWidth} opacity="0.5" />
-        <text x="50" y="48" textAnchor="middle"
-          fontSize="9" fill="var(--text-muted)" fontWeight="600">
-          no logs
-        </text>
-        <text x="50" y="62" textAnchor="middle"
-          fontSize="9" fill="var(--text-muted)">
-          yet
-        </text>
-      </svg>
-    );
-  }
-
-  const posPct = positive / total;
-  const neutralPct = neutral / total;
-  const negPct = negative / total;
-
-  // Each segment is a partial circle drawn with stroke-dasharray + offset.
-  // We draw them stacked starting from the top (rotate -90).
-  const arc = (pctSoFar, pct) => {
-    const dash = circumference * pct;
-    const gap = circumference - dash;
-    const offset = -circumference * pctSoFar;
-    return {
-      strokeDasharray: `${revealed ? dash : 0} ${revealed ? gap : circumference}`,
-      strokeDashoffset: offset,
-      transition: 'stroke-dasharray 700ms cubic-bezier(0.16,1,0.3,1)',
-    };
-  };
-
-  return (
-    <svg viewBox="0 0 100 100" width={size} height={size} aria-hidden="true"
-      style={{ transform: 'rotate(-90deg)' }}>
-      {/* track */}
-      <circle cx="50" cy="50" r={radius} fill="none"
-        stroke="var(--bg-dark)" strokeWidth={strokeWidth} opacity="0.6" />
-      {/* segments */}
-      {posPct > 0 && (
-        <circle cx="50" cy="50" r={radius} fill="none"
-          stroke="#4ade80" strokeWidth={strokeWidth} strokeLinecap="round"
-          style={arc(0, posPct)} />
-      )}
-      {neutralPct > 0 && (
-        <circle cx="50" cy="50" r={radius} fill="none"
-          stroke="#fbbf24" strokeWidth={strokeWidth} strokeLinecap="round"
-          style={arc(posPct, neutralPct)} />
-      )}
-      {negPct > 0 && (
-        <circle cx="50" cy="50" r={radius} fill="none"
-          stroke="#f87171" strokeWidth={strokeWidth} strokeLinecap="round"
-          style={arc(posPct + neutralPct, negPct)} />
-      )}
-      {/* center number */}
-      <g transform="rotate(90 50 50)">
-        <text x="50" y="48" textAnchor="middle"
-          fontSize="22" fontWeight="800" fill={color || 'var(--text-primary)'}>
-          {total}
-        </text>
-        <text x="50" y="64" textAnchor="middle"
-          fontSize="9" fill="var(--text-muted)" fontWeight="600">
-          last 14d
-        </text>
-      </g>
-    </svg>
-  );
-}
+import { Donut } from './Donut';
+import { GoalTrackerFullscreen } from './GoalTrackerFullscreen';
 
 function StatusChip({ optionId, glow = false }) {
   const opt = optionForId(optionId);
@@ -253,7 +171,7 @@ function GoalTile({ goal, summary, recentSupports, suggestion, color, onLog }) {
   );
 }
 
-function StudentDashboardCard({ student, goals, logs, allLogs, onLog }) {
+function StudentDashboardCard({ student, goals, logs, allLogs, onLog, onExpandFullscreen }) {
   const [expanded, setExpanded] = useState(true);
   const studentLabel = resolveLabel(student, 'compact');
   const aggregate = summarizeStudentGoals(allLogs, student, 14);
@@ -325,13 +243,40 @@ function StudentDashboardCard({ student, goals, logs, allLogs, onLog }) {
           )}
         </div>
 
-        <div style={{
-          fontSize: 11, color: 'var(--text-muted)',
-          padding: '4px 10px', borderRadius: 999,
-          background: 'var(--bg-dark)', border: '1px solid var(--border)',
-          flexShrink: 0,
-        }}>
-          {goals.length} goal{goals.length === 1 ? '' : 's'} {expanded ? '▾' : '▸'}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => { e.stopPropagation(); if (onExpandFullscreen) onExpandFullscreen(); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault(); e.stopPropagation();
+                if (onExpandFullscreen) onExpandFullscreen();
+              }
+            }}
+            title="Open fullscreen dashboard for this student"
+            aria-label="Open fullscreen dashboard"
+            style={{
+              cursor: 'pointer',
+              minWidth: 34, minHeight: 34,
+              borderRadius: 8,
+              border: `1px solid ${student.color}50`,
+              background: `${student.color}15`,
+              color: student.color,
+              fontSize: 16, fontWeight: 700,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'all 160ms cubic-bezier(0.16,1,0.3,1)',
+            }}
+          >
+            ⛶
+          </span>
+          <span style={{
+            fontSize: 11, color: 'var(--text-muted)',
+            padding: '4px 10px', borderRadius: 999,
+            background: 'var(--bg-dark)', border: '1px solid var(--border)',
+          }}>
+            {goals.length} goal{goals.length === 1 ? '' : 's'} {expanded ? '▾' : '▸'}
+          </span>
         </div>
       </button>
 
@@ -381,6 +326,7 @@ export function GoalTracker({ students, onSave, studentsMap, logs = [] }) {
   const [note, setNote] = useState('');
   const noteRef = useRef('');
   noteRef.current = note;
+  const [fullscreenStudentId, setFullscreenStudentId] = useState(null);
 
   if (data.length === 0) {
     return (
@@ -397,6 +343,13 @@ export function GoalTracker({ students, onSave, studentsMap, logs = [] }) {
     setNote('');
   };
 
+  // Generic onLog used by the fullscreen view (it builds its own log payloads).
+  const fullscreenOnLog = (studentId, text, type, meta) => onSave(studentId, text, type, meta);
+
+  const fullscreenEntry = fullscreenStudentId
+    ? data.find(d => d.student.id === fullscreenStudentId)
+    : null;
+
   return (
     <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 12 }}>
       {data.map(({ student, goals }) => (
@@ -406,6 +359,7 @@ export function GoalTracker({ students, onSave, studentsMap, logs = [] }) {
           goals={goals}
           allLogs={logs}
           onLog={makeOnLog(student.id)}
+          onExpandFullscreen={() => setFullscreenStudentId(student.id)}
         />
       ))}
 
@@ -416,6 +370,17 @@ export function GoalTracker({ students, onSave, studentsMap, logs = [] }) {
         placeholder="Optional note for next goal tap…"
         style={{ fontSize: 11 }}
       />
+
+      {fullscreenEntry && (
+        <GoalTrackerFullscreen
+          student={fullscreenEntry.student}
+          goals={fullscreenEntry.goals}
+          aggregate={summarizeStudentGoals(logs, fullscreenEntry.student, 14)}
+          allLogs={logs}
+          onLog={fullscreenOnLog}
+          onClose={() => setFullscreenStudentId(null)}
+        />
+      )}
     </div>
   );
 }
