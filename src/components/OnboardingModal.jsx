@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useEscape } from '../hooks/useEscape';
+import { PinEntryInline } from '../features/stealth/PinEntryModal';
 
 // First-run onboarding. Re-openable from the sidebar "?" button any time.
 // Dismissal is stored in localStorage under a non-sensitive key — only a
@@ -63,6 +64,14 @@ const SLIDES = [
       'Not a team? Skip this. The app still works great on its own.',
     ],
     tint: '#22d3ee',
+  },
+  {
+    id: 'pin',
+    icon: '🔒',
+    title: 'Lock your screen from curious kids',
+    lede: 'When you hit Stealth Mode, kids who grab your laptop see boring adult stuff. Set a 4-digit code so they can\'t sneak back to your notes.',
+    bullets: [],
+    tint: '#fbbf24',
   },
   {
     icon: '🚀',
@@ -145,27 +154,45 @@ export default function OnboardingModal({ onClose }) {
             {slide.lede}
           </p>
 
-          <ul style={{
-            listStyle: 'none',
-            display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
-            marginBottom: 'var(--space-6)',
-          }}>
-            {slide.bullets.map((b, idx) => (
-              <li key={idx} style={{
-                display: 'flex', gap: 'var(--space-2)',
-                alignItems: 'flex-start',
-                fontSize: 13.5, color: 'var(--text-primary)',
-                lineHeight: 1.55,
-                padding: 'var(--space-2) var(--space-3)',
-                background: 'var(--bg-dark)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-md)',
-              }}>
-                <span style={{ color: slide.tint, fontWeight: 700, flexShrink: 0 }}>•</span>
-                <span>{b}</span>
-              </li>
-            ))}
-          </ul>
+          {slide.id === 'pin' ? (
+            <div style={{
+              display: 'flex', flexDirection: 'column', gap: 'var(--space-3)',
+              alignItems: 'center',
+              padding: 'var(--space-4)',
+              background: 'var(--bg-dark)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-md)',
+              marginBottom: 'var(--space-6)',
+            }}>
+              <PinEntryInline
+                mode="set"
+                onSuccess={() => setI(i + 1)}
+                onSkip={() => setI(i + 1)}
+              />
+            </div>
+          ) : (
+            <ul style={{
+              listStyle: 'none',
+              display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
+              marginBottom: 'var(--space-6)',
+            }}>
+              {slide.bullets.map((b, idx) => (
+                <li key={idx} style={{
+                  display: 'flex', gap: 'var(--space-2)',
+                  alignItems: 'flex-start',
+                  fontSize: 13.5, color: 'var(--text-primary)',
+                  lineHeight: 1.55,
+                  padding: 'var(--space-2) var(--space-3)',
+                  background: 'var(--bg-dark)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-md)',
+                }}>
+                  <span style={{ color: slide.tint, fontWeight: 700, flexShrink: 0 }}>•</span>
+                  <span>{b}</span>
+                </li>
+              ))}
+            </ul>
+          )}
 
           {/* Progress dots */}
           <div style={{

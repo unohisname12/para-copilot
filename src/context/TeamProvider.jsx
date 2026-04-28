@@ -12,6 +12,7 @@ import {
   joinTeamByCode,
   regenerateInviteCode,
   getTeamStudents,
+  getMyAssignedStudents,
   subscribeTeamStudents,
   pullSharedTeamLogs,
   subscribeSharedLogs,
@@ -20,6 +21,7 @@ import {
   pullCaseMemory,
   subscribeCaseMemory,
 } from '../services/teamSync';
+import { claimPendingAssignments } from '../services/paraAssignments';
 import { supabaseConfigured } from '../services/supabaseClient';
 
 const TeamContext = createContext(null);
@@ -84,6 +86,10 @@ export function TeamProvider({ children }) {
   const subLockedOut = isSub && activeTeam && activeTeam.allowSubs === false;
 
   const [teamStudents, setTeamStudents] = useState([]);
+  const [cloudSyncError, setCloudSyncError] = useState(null);
+  const reportCloudError = useCallback((message) => {
+    setCloudSyncError(message || 'Cloud sync failed.');
+  }, []);
 
   useEffect(() => {
     if (!activeTeamId) { setTeamStudents([]); return; }
@@ -91,10 +97,13 @@ export function TeamProvider({ children }) {
     let off;
     (async () => {
       try {
-        const initial = await getTeamStudents(activeTeamId);
+        const initial = isAdmin
+          ? await getTeamStudents(activeTeamId)
+          : await getMyAssignedStudents();
         if (cancelled) return;
         setTeamStudents(initial);
       } catch (e) {
+        if (!cancelled) reportCloudError(e.message || 'Could not load cloud roster.');
         // eslint-disable-next-line no-console
         console.error('[teamStudents] initial load failed', e);
       }
@@ -116,9 +125,14 @@ export function TeamProvider({ children }) {
       });
     })();
     return () => { cancelled = true; if (off) off(); };
-  }, [activeTeamId]);
+  }, [activeTeamId, isAdmin, reportCloudError]);
 
   // ── Shared team logs ─────────────────────────────────────────
+  // Pulls every team log the signed-in user is allowed to see: shared
+  // logs from any para + the user's own logs regardless of shared flag.
+  // Including own logs is what restores the Vault after a local reset —
+  // they live in the cloud but were filtered out of the team-shared pull.
+  const ownUserId = session?.user?.id;
   const [sharedLogs, setSharedLogs] = useState([]);
   useEffect(() => {
     if (!activeTeamId) { setSharedLogs([]); return; }
@@ -126,7 +140,7 @@ export function TeamProvider({ children }) {
     let off;
     (async () => {
       try {
-        const initial = await pullSharedTeamLogs(activeTeamId);
+        const initial = await pullSharedTeamLogs(activeTeamId, ownUserId);
         if (!cancelled) setSharedLogs(initial);
       } catch (e) {
         // eslint-disable-next-line no-console
@@ -138,10 +152,10 @@ export function TeamProvider({ children }) {
           if (prev.find((l) => l.id === payload.new.id)) return prev;
           return [payload.new, ...prev];
         });
-      });
+      }, ownUserId);
     })();
     return () => { cancelled = true; if (off) off(); };
-  }, [activeTeamId]);
+  }, [activeTeamId, ownUserId]);
 
   // ── Handoffs ─────────────────────────────────────────────────
   const [handoffs, setHandoffs] = useState([]);
@@ -242,7 +256,10 @@ export function TeamProvider({ children }) {
     sharedLogs,
     handoffs,
     caseMemoryCloud,
+    cloudSyncError,
     setActiveTeamId,
+    clearCloudSyncError: () => setCloudSyncError(null),
+    reportCloudError,
     reloadTeams,
     signInWithGoogle,
     signOut: async () => {
@@ -266,6 +283,7 @@ export function TeamProvider({ children }) {
     },
     joinTeamByCode: async (code, display, requestedRole = 'para') => {
       const t = await joinTeamByCode(code, display, requestedRole);
+      await claimPendingAssignments().catch(() => {});
       // We don't know the final role without a reload (server validates and
       // may coerce to 'para' if requestedRole was invalid). Reload instead
       // of guessing.
@@ -283,7 +301,7 @@ export function TeamProvider({ children }) {
   }), [
     session, authReady, teams, activeTeam, activeTeamId, teamsLoading,
     currentRole, isAdmin, isSub, subLockedOut,
-    teamStudents, sharedLogs, handoffs, caseMemoryCloud, reloadTeams,
+    teamStudents, sharedLogs, handoffs, caseMemoryCloud, cloudSyncError, reportCloudError, reloadTeams,
   ]);
 
   return <TeamContext.Provider value={value}>{children}</TeamContext.Provider>;

@@ -9,12 +9,9 @@
 //   - PDF:     extract text with pdfjs-dist, then Markdown rules
 
 import * as pdfjsLib from 'pdfjs-dist';
+import { configurePdfWorker } from '../../utils/pdfWorker';
 
-// Worker path — match the pattern used elsewhere in the app
-if (typeof window !== 'undefined' && pdfjsLib.GlobalWorkerOptions) {
-  pdfjsLib.GlobalWorkerOptions.workerSrc =
-    `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-}
+configurePdfWorker(pdfjsLib);
 
 // ── Shared: pull a 6-digit number from any of many possible fields ──
 

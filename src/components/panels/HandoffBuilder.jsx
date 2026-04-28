@@ -35,6 +35,7 @@ export function HandoffBuilder({ students, onSave, studentsMap, ollamaOnline, ol
         urgency,
         body,
       }).catch((err) => {
+        team.reportCloudError?.(`Handoff saved locally but did not sync: ${err.message || err}`);
         // eslint-disable-next-line no-console
         console.error('[cloud] pushHandoff failed', err);
       });

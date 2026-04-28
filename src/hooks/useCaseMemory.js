@@ -30,6 +30,7 @@ export function useCaseMemory() {
         ...inc,
         studentDbId: resolveDbStudentId(data.pseudonym || data.studentId),
       }).catch((err) => {
+        team.reportCloudError?.(`Incident saved locally but did not sync: ${err.message || err}`);
         // eslint-disable-next-line no-console
         console.error('[cloud] pushIncident failed', err);
       });
@@ -51,6 +52,7 @@ export function useCaseMemory() {
         ...intv,
         studentDbId: resolveDbStudentId(data.pseudonym || data.studentId),
       }).catch((err) => {
+        team.reportCloudError?.(`Intervention saved locally but did not sync: ${err.message || err}`);
         // eslint-disable-next-line no-console
         console.error('[cloud] pushIntervention failed', err);
       });
@@ -74,6 +76,7 @@ export function useCaseMemory() {
         ...out,
         studentDbId: resolveDbStudentId(data.pseudonym || data.studentId),
       }).catch((err) => {
+        team.reportCloudError?.(`Outcome saved locally but did not sync: ${err.message || err}`);
         // eslint-disable-next-line no-console
         console.error('[cloud] pushOutcome failed', err);
       });

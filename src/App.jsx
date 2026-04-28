@@ -1026,7 +1026,22 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
                 />
               )}
               {view === "vault" && renderVault()}
-              {view === "import" && <IEPImport onImport={students.handleImport} onBulkImport={students.handleBundleImport} onIdentityLoad={students.handleIdentityLoad} importedCount={Object.keys(students.importedStudents).length} onLoadDemo={handleLoadDemo} importedStudents={students.importedStudents} vault={vaultCtx.vault} onRemoveOrphan={students.removeImportedStudent} />}
+              {view === "import" && <IEPImport
+                onImport={students.handleImport}
+                onBulkImport={students.handleBundleImport}
+                onIdentityLoad={students.handleIdentityLoad}
+                importedCount={Object.keys(students.importedStudents).length}
+                onLoadDemo={handleLoadDemo}
+                importedStudents={students.importedStudents}
+                vault={vaultCtx.vault}
+                onRemoveOrphan={students.removeImportedStudent}
+                cloudStudents={teamCtx?.teamStudents || []}
+                onRemoveCloudOrphan={async (paraAppNumber) => {
+                  const { deleteTeamStudentByExternalKey } = await import('./services/teamSync');
+                  return deleteTeamStudentByExternalKey(teamCtx?.activeTeamId, paraAppNumber);
+                }}
+                isOwnerOrAdmin={!!teamCtx?.isAdmin}
+              />}
               {view === "analytics" && <AnalyticsDashboard logs={logs} groups={groups} setGroups={setGroups} onOpenProfile={setProfileStu} ollamaOnline={ollama.ollamaOnline} ollamaLoading={ollama.ollamaLoading} onOllamaPatternSummary={insights.handleOllamaPatternSummary} allStudents={allStudents} />}
               {view === "admin" && teamCtx?.isAdmin && (
                 <AdminDashboard

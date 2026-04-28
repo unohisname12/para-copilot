@@ -163,6 +163,7 @@ export default function SmartImport({ onBulkImport, onIdentityLoad }) {
         try {
           await pushStudents(team.activeTeamId, studentList, team.user.id);
         } catch (e) {
+          team.reportCloudError?.(`Students imported locally but did not sync: ${e.message || e}`);
           // eslint-disable-next-line no-console
           console.error('[smart-import] cloud push failed', e);
         }

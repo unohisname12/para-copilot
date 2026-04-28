@@ -3,6 +3,8 @@ import { useEscape } from '../hooks/useEscape';
 import { useVault } from '../context/VaultProvider';
 import { useTeamOptional } from '../context/TeamProvider';
 import { ONBOARDING_KEY } from './OnboardingModal';
+import { hasPin, clearPin } from '../features/stealth/pinStorage';
+import { PinEntryModal } from '../features/stealth/PinEntryModal';
 
 // One place for everything a user can turn on/off. Lives behind the
 // ⚙️ Settings button in the sidebar. No deep menus — flat list of
@@ -32,6 +34,8 @@ export default function SettingsModal({ open, onClose, onReplayOnboarding }) {
 
   // Local mirror so the toggle reflects the localStorage value.
   const [bannerHidden, setBannerHidden] = React.useState(() => isFindStudentsBannerHidden());
+  const [pinExists, setPinExists] = React.useState(() => hasPin());
+  const [pinModal, setPinModal] = React.useState(false);
 
   useEscape(open ? onClose : () => {});
   if (!open) return null;
@@ -108,6 +112,34 @@ export default function SettingsModal({ open, onClose, onReplayOnboarding }) {
             )}
           </Section>
 
+          {/* STEALTH PIN */}
+          <Section label="Stealth screen PIN">
+            <ActionRow
+              icon="🔒"
+              title={pinExists ? 'Change your stealth code' : 'Set a stealth code'}
+              body={pinExists
+                ? 'A 4-digit code is set on this device. Tap to change it.'
+                : 'No code set yet. A code keeps a curious kid from sneaking back to the real app from Stealth Mode.'}
+              onClick={() => setPinModal(true)}
+              actionLabel={pinExists ? 'Change' : 'Set'}
+            />
+            {pinExists && (
+              <ActionRow
+                icon="🗑"
+                title="Forget my stealth code — I'll set a new one"
+                body="Removes the code from this device. Stealth Mode will exit without prompting until you set a new code."
+                onClick={() => {
+                  if (window.confirm('Forget the stealth code on this device?')) {
+                    clearPin();
+                    setPinExists(false);
+                  }
+                }}
+                actionLabel="Forget"
+                danger
+              />
+            )}
+          </Section>
+
           {/* HELP */}
           <Section label="Help">
             <ActionRow
@@ -142,6 +174,15 @@ export default function SettingsModal({ open, onClose, onReplayOnboarding }) {
             Done
           </button>
         </div>
+
+        {pinModal && (
+          <PinEntryModal
+            mode="set"
+            title={pinExists ? 'Change your stealth code' : 'Set your stealth code'}
+            onSuccess={() => { setPinExists(true); setPinModal(false); }}
+            onCancel={() => setPinModal(false)}
+          />
+        )}
       </div>
     </div>
   );

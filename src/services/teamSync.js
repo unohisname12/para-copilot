@@ -173,27 +173,45 @@ export function sanitize(payload, label) {
 // Map app-shape student → DB row. Intentionally drops any realName field.
 // (stripUnsafeKeys is the backstop; this function is the explicit contract.)
 function toTeamStudentRow(teamId, s, userId) {
-  return {
+  // Only include fields that have actual content. The upsert path uses
+  // ON CONFLICT DO UPDATE on the columns we send — if we send `accs: []`
+  // for a re-upload that didn't carry IEP data, Postgres overwrites the
+  // existing cloud accs with []. Omitting the column instead preserves
+  // whatever's already on the row. This is what makes a "skinny" re-upload
+  // (e.g. a name-list-only file) safe: cloud IEP data survives.
+  const row = {
     team_id: teamId,
     pseudonym: s.pseudonym,
     color: s.color,
-    period_id: s.periodId || s.period_id || null,
-    class_label: s.classLabel || s.class_label || null,
-    eligibility: s.eligibility || null,
-    accs: s.accs || [],
-    goals: s.goals || [],
-    case_manager: s.caseManager || s.case_manager || null,
-    grade_level: s.gradeLevel || s.grade_level || null,
-    tags: s.tags || [],
-    flags: s.flags || {},
-    watch_fors: s.watchFors || s.watch_fors || [],
-    do_this_actions: s.doThisActions || s.do_this_actions || [],
-    health_notes: s.healthNotes || s.health_notes || [],
-    cross_period: s.crossPeriodInfo || s.cross_period || {},
-    source_meta: s.sourceMeta || s.source_meta || {},
     external_key: s.paraAppNumber || s.externalKey || s.externalStudentKey || s.external_key || null,
     created_by: userId,
   };
+  const periodId = s.periodId || s.period_id;
+  if (periodId) row.period_id = periodId;
+  const classLabel = s.classLabel || s.class_label;
+  if (classLabel) row.class_label = classLabel;
+  if (s.eligibility) row.eligibility = s.eligibility;
+  if (Array.isArray(s.accs) && s.accs.length) row.accs = s.accs;
+  if (Array.isArray(s.goals) && s.goals.length) row.goals = s.goals;
+  const cm = s.caseManager || s.case_manager;
+  if (cm) row.case_manager = cm;
+  const gl = s.gradeLevel || s.grade_level;
+  if (gl) row.grade_level = gl;
+  if (Array.isArray(s.tags) && s.tags.length) row.tags = s.tags;
+  if (s.flags && Object.keys(s.flags).length) row.flags = s.flags;
+  const watchFors = s.watchFors || s.watch_fors;
+  if (Array.isArray(watchFors) && watchFors.length) row.watch_fors = watchFors;
+  const doThisActions = s.doThisActions || s.do_this_actions;
+  if (Array.isArray(doThisActions) && doThisActions.length) row.do_this_actions = doThisActions;
+  const healthNotes = s.healthNotes || s.health_notes;
+  if (Array.isArray(healthNotes) && healthNotes.length) row.health_notes = healthNotes;
+  const crossPeriod = s.crossPeriodInfo || s.cross_period;
+  if (crossPeriod && (crossPeriod.note || (Array.isArray(crossPeriod.otherPeriods) && crossPeriod.otherPeriods.length))) {
+    row.cross_period = crossPeriod;
+  }
+  const sourceMeta = s.sourceMeta || s.source_meta;
+  if (sourceMeta && Object.keys(sourceMeta).length) row.source_meta = sourceMeta;
+  return row;
 }
 
 export async function pushStudents(teamId, students, userId) {
@@ -202,9 +220,67 @@ export async function pushStudents(teamId, students, userId) {
   const rows = students.map((s) =>
     sanitize(toTeamStudentRow(teamId, s, userId), 'team_students row')
   );
-  const { data, error } = await supabase.from('team_students').insert(rows).select();
+  const keyed = rows.filter((row) => row.external_key);
+  const unkeyed = rows.filter((row) => !row.external_key);
+  const written = [];
+
+  if (keyed.length > 0) {
+    const { data, error } = await supabase
+      .from('team_students')
+      .upsert(keyed, { onConflict: 'team_id,external_key' })
+      .select();
+    if (error) throw new Error(error.message);
+    written.push(...(data || []));
+  }
+
+  if (unkeyed.length > 0) {
+    const { data, error } = await supabase.from('team_students').insert(unkeyed).select();
+    if (error) throw new Error(error.message);
+    written.push(...(data || []));
+  }
+
+  return written;
+}
+
+export async function getMyAssignedStudents() {
+  requireClient();
+  const { data, error } = await supabase
+    .from('my_assigned_students')
+    .select('*')
+    .order('period_id', { ascending: true });
   if (error) throw new Error(error.message);
   return data || [];
+}
+
+// Delete every student record from team_students for this team. Owner /
+// sped_teacher only — RLS enforces. Cascade rules on logs etc. fire as
+// configured (set null for observation tables, cascade for parent_notes
+// + para_assignments). Use case: starting a clean roster for a new term,
+// or recovering from an import gone wrong.
+export async function deleteAllTeamStudents(teamId) {
+  requireClient();
+  if (!teamId) throw new Error('deleteAllTeamStudents: teamId required');
+  const { data, error } = await supabase
+    .from('team_students')
+    .delete()
+    .eq('team_id', teamId)
+    .select('id');
+  if (error) throw new Error(error.message);
+  return (data || []).length;
+}
+
+// Surgical cloud cleanup — used by the Roster Health Check "Wipe cloud
+// orphans" button to remove individual stale rows by paraAppNumber rather
+// than nuking the whole team table.
+export async function deleteTeamStudentByExternalKey(teamId, externalKey) {
+  requireClient();
+  if (!teamId || !externalKey) throw new Error('deleteTeamStudentByExternalKey: teamId + externalKey required');
+  const { error } = await supabase
+    .from('team_students')
+    .delete()
+    .eq('team_id', teamId)
+    .eq('external_key', String(externalKey).trim());
+  if (error) throw new Error(error.message);
 }
 
 export async function getTeamStudents(teamId) {
@@ -271,23 +347,38 @@ export async function pullMyLogs(teamId, userId) {
   return data || [];
 }
 
-export async function pullSharedTeamLogs(teamId) {
+// Returns every team log the signed-in user is allowed to see — shared
+// logs from any para PLUS the user's own logs (any shared status). Was
+// `shared=true only` before, but that hid the user's own historical logs
+// after a local reset, breaking the Vault's "show me everything from before
+// the wipe" expectation.
+export async function pullSharedTeamLogs(teamId, userId) {
   requireClient();
-  const { data, error } = await supabase
-    .from('logs').select('*').eq('team_id', teamId).eq('shared', true)
-    .order('created_at', { ascending: false }).limit(500);
+  let q = supabase.from('logs').select('*').eq('team_id', teamId);
+  if (userId) {
+    q = q.or(`shared.eq.true,user_id.eq.${userId}`);
+  } else {
+    q = q.eq('shared', true);
+  }
+  const { data, error } = await q
+    .order('created_at', { ascending: false }).limit(1000);
   if (error) throw new Error(error.message);
   return data || [];
 }
 
-export function subscribeSharedLogs(teamId, onChange) {
+export function subscribeSharedLogs(teamId, onChange, userId) {
   requireClient();
   const channel = supabase
     .channel(`logs_shared:${teamId}`)
     .on(
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'logs', filter: `team_id=eq.${teamId}` },
-      (payload) => { if (payload.new?.shared) onChange(payload); }
+      (payload) => {
+        if (!payload.new) return;
+        if (payload.new.shared || (userId && payload.new.user_id === userId)) {
+          onChange(payload);
+        }
+      }
     )
     .subscribe();
   return () => supabase.removeChannel(channel);

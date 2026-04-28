@@ -2,20 +2,27 @@ import React, { useRef, useState } from 'react';
 import { verifyRoster } from './verifyRoster';
 
 const STATUS_META = {
-  linked:    { label: 'Linked',     icon: '✓', color: '#10b981', bg: '#052e22' },
-  missing:   { label: 'Missing',    icon: '⚠', color: '#fbbf24', bg: '#1a1505' },
-  orphan:    { label: 'Orphan',     icon: '⚠', color: '#fb923c', bg: '#1a0f05' },
-  collision: { label: 'Collision',  icon: '🔢', color: '#f87171', bg: '#1a0505' },
-  noPeriod:  { label: 'No period',  icon: '?', color: '#60a5fa', bg: '#0c1a2e' },
+  linked:      { label: 'Linked',       icon: '✓', color: '#10b981', bg: '#052e22' },
+  missing:     { label: 'Missing',      icon: '⚠', color: '#fbbf24', bg: '#1a1505' },
+  orphan:      { label: 'Orphan',       icon: '⚠', color: '#fb923c', bg: '#1a0f05' },
+  collision:   { label: 'Collision',    icon: '🔢', color: '#f87171', bg: '#1a0505' },
+  noPeriod:    { label: 'No period',    icon: '?', color: '#60a5fa', bg: '#0c1a2e' },
+  cloudOrphan: { label: 'Cloud orphan', icon: '☁', color: '#a78bfa', bg: '#12102a' },
 };
 
 // VerifyRoster — drop your roster CSV in, see what landed where.
 //
 // Props:
-//   importedStudents: { [id]: student }  — paraImportedStudentsV1 contents
-//   vault:            { [paraAppNumber]: realName } — IndexedDB vault map
-//   onRemoveOrphan:   (studentId) => void  — optional pruning callback
-export default function VerifyRoster({ importedStudents = {}, vault = {}, onRemoveOrphan }) {
+//   importedStudents:    { [id]: student }  — paraImportedStudentsV1 contents
+//   vault:               { [paraAppNumber]: realName } — IndexedDB vault map
+//   cloudStudents:       array of cloud team_students rows (optional)
+//   onRemoveOrphan:      (studentId) => void  — local pruning callback
+//   onRemoveCloudOrphan: (paraAppNumber) => Promise — cloud pruning, optional
+//   isOwnerOrAdmin:      boolean — gates the cloud-orphan delete button
+export default function VerifyRoster({
+  importedStudents = {}, vault = {}, cloudStudents = [],
+  onRemoveOrphan, onRemoveCloudOrphan, isOwnerOrAdmin = false,
+}) {
   const [csvText, setCsvText] = useState(null);
   const [csvName, setCsvName] = useState('');
   const [report, setReport] = useState(null);
@@ -35,6 +42,7 @@ export default function VerifyRoster({ importedStudents = {}, vault = {}, onRemo
       const r = verifyRoster({
         imported: importedStudents,
         vault,
+        cloud: cloudStudents,
         csvText: text,
       });
       setReport(r);
@@ -46,18 +54,33 @@ export default function VerifyRoster({ importedStudents = {}, vault = {}, onRemo
   };
 
   const orphanCount = report?.summary?.orphan || 0;
+  const cloudOrphanCount = report?.summary?.cloudOrphan || 0;
   const removeAllOrphans = () => {
     if (!report || !onRemoveOrphan) return;
     report.rows.forEach(r => { if (r.status === 'orphan' && r.studentId) onRemoveOrphan(r.studentId); });
-    // After pruning, force a fresh verification so the table updates
     if (csvText) {
       const fresh = verifyRoster({
-        imported: importedStudents, // parent re-renders with updated importedStudents
+        imported: importedStudents,
         vault,
+        cloud: cloudStudents,
         csvText,
       });
       setReport(fresh);
     }
+  };
+  const removeAllCloudOrphans = async () => {
+    if (!report || !onRemoveCloudOrphan) return;
+    if (!window.confirm(`Remove ${cloudOrphanCount} cloud orphan${cloudOrphanCount === 1 ? '' : 's'} from the team table? This affects every para on the team.`)) return;
+    const orphans = report.rows.filter(r => r.status === 'cloudOrphan');
+    for (const r of orphans) {
+      try { await onRemoveCloudOrphan(r.paraAppNumber); } catch (err) {
+        setError(`Cloud cleanup failed: ${err.message || err}`);
+        return;
+      }
+    }
+    setError('');
+    // Tell the user to reload — cloudStudents is stale until next subscription tick
+    setError('Cloud cleanup done. Reload the page to see the updated table.');
   };
 
   return (
@@ -118,7 +141,7 @@ export default function VerifyRoster({ importedStudents = {}, vault = {}, onRemo
 
       {report && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 8 }}>
             {Object.entries(STATUS_META).map(([key, meta]) => (
               <div key={key} style={{
                 background: 'var(--bg-surface)',
@@ -135,23 +158,48 @@ export default function VerifyRoster({ importedStudents = {}, vault = {}, onRemo
             ))}
           </div>
 
-          {orphanCount > 0 && onRemoveOrphan && (
-            <button
-              onClick={removeAllOrphans}
-              style={{
-                padding: '10px 14px',
-                borderRadius: 8,
-                border: '1px solid #fb923c',
-                background: '#1a0f05',
-                color: '#fb923c',
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              Remove {orphanCount} orphan{orphanCount === 1 ? '' : 's'} from the app
-            </button>
-          )}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {orphanCount > 0 && onRemoveOrphan && (
+              <button
+                onClick={removeAllOrphans}
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  border: '1px solid #fb923c',
+                  background: '#1a0f05',
+                  color: '#fb923c',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Remove {orphanCount} local orphan{orphanCount === 1 ? '' : 's'}
+              </button>
+            )}
+            {cloudOrphanCount > 0 && onRemoveCloudOrphan && isOwnerOrAdmin && (
+              <button
+                onClick={removeAllCloudOrphans}
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  border: '1px solid #a78bfa',
+                  background: '#12102a',
+                  color: '#c4b5fd',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+                title="Affects the cloud team roster — every para on this team"
+              >
+                ☁ Wipe {cloudOrphanCount} cloud orphan{cloudOrphanCount === 1 ? '' : 's'}
+              </button>
+            )}
+            {cloudOrphanCount > 0 && !isOwnerOrAdmin && (
+              <div style={{ padding: '10px 14px', fontSize: 12, color: 'var(--text-muted)', background: 'var(--bg-surface)', borderRadius: 8 }}>
+                {cloudOrphanCount} cloud orphan{cloudOrphanCount === 1 ? '' : 's'} found — ask your team owner to clean them up via Admin → Danger Zone.
+              </div>
+            )}
+          </div>
 
           <div style={{ overflowX: 'auto', maxHeight: 480, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>

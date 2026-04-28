@@ -6,7 +6,7 @@
 
 import { parseRosterCsv, dedupeAndValidate } from './rosterParsers';
 
-const STATUSES = ['linked', 'missing', 'orphan', 'collision', 'noPeriod'];
+const STATUSES = ['linked', 'missing', 'orphan', 'collision', 'noPeriod', 'cloudOrphan'];
 
 function emptySummary() {
   return STATUSES.reduce((acc, k) => { acc[k] = 0; return acc; }, {});
@@ -14,8 +14,12 @@ function emptySummary() {
 
 // imported: { [id]: student } — what's in paraImportedStudentsV1
 // vault:    { [paraAppNumber]: realName } — what's in the IndexedDB vault
+// cloud:    [{ id, paraAppNumber|external_key, periodId, ... }] — optional
+//           list of cloud team_students rows. Used to flag cloud-only
+//           orphans so paras can see why pseudonyms keep coming back
+//           after Reset Local Data. Pass [] or omit to skip cloud checks.
 // csvText:  raw text of the user-uploaded roster CSV
-export function verifyRoster({ imported, vault, csvText }) {
+export function verifyRoster({ imported, vault, cloud, csvText }) {
   const errors = [];
   const rows = [];
   const summary = emptySummary();
@@ -108,6 +112,25 @@ export function verifyRoster({ imported, vault, csvText }) {
       detail: 'loaded into the app but not in the CSV — likely from a prior import',
     });
     summary.orphan += 1;
+  });
+
+  // 3. Cloud orphans — rows that survive on the team table but aren't in the
+  // CSV. These are the source of "pseudonym kids reappear after Reset Local
+  // Data". Reported but not auto-removed (cloud is shared across paras).
+  const csvNumbers = new Set(rawEntries.map(e => String(e.paraAppNumber).trim()));
+  (cloud || []).forEach(c => {
+    const number = (c?.paraAppNumber || c?.external_key || c?.externalKey || '').toString().trim();
+    if (!number || csvNumbers.has(number)) return;
+    rows.push({
+      realName: vault?.[number] || '(cloud only — no real name on this device)',
+      paraAppNumber: number,
+      status: 'cloudOrphan',
+      studentId: c.id,
+      pseudonym: c.pseudonym,
+      periodId: c.periodId || c.period_id,
+      detail: 'in the cloud team roster but not in your CSV — leftover from an earlier test push',
+    });
+    summary.cloudOrphan += 1;
   });
 
   return { rows, summary, errors };

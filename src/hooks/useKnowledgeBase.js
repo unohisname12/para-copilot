@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { useLocalStorage } from './useLocalStorage';
+import { configurePdfWorker } from '../utils/pdfWorker';
 
 export function useKnowledgeBase({ currentDate, activePeriod }) {
   const [knowledgeBase, setKnowledgeBase] = useLocalStorage('paraKBV1', []);
@@ -23,12 +24,11 @@ export function useKnowledgeBase({ currentDate, activePeriod }) {
     const file = e.target.files[0]; if (!file) return; setKbUploading(true);
     try {
       let text = "";
-      if (file.type === "application/pdf") {
-        try {
-          const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf");
-          pdfjsLib.GlobalWorkerOptions.workerSrc =
-            `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-          const arrayBuffer = await file.arrayBuffer();
+	      if (file.type === "application/pdf") {
+	        try {
+	          const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf");
+	          configurePdfWorker(pdfjsLib);
+	          const arrayBuffer = await file.arrayBuffer();
           const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
           for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);

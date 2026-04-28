@@ -18,6 +18,7 @@ import {
   createTeam,
   joinTeamByCode,
   pushStudents,
+  getMyAssignedStudents,
 } from '../services/teamSync';
 import { supabase } from '../services/supabaseClient';
 
@@ -115,5 +116,39 @@ describe('pushStudents', () => {
   test('returns empty array when no students', async () => {
     const result = await pushStudents('t1', [], 'u1');
     expect(result).toEqual([]);
+  });
+
+  test('upserts students with stable external keys', async () => {
+    const selectMock = jest.fn().mockResolvedValue({ data: [{ id: 'db1' }], error: null });
+    const upsertMock = jest.fn(() => ({ select: selectMock }));
+    supabase.from.mockReturnValueOnce({ upsert: upsertMock });
+
+    await pushStudents('t1', [{
+      pseudonym: 'Blue 1',
+      color: '#3b82f6',
+      paraAppNumber: '123456',
+    }], 'u1');
+
+    expect(upsertMock).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ team_id: 't1', external_key: '123456' }),
+      ]),
+      { onConflict: 'team_id,external_key' }
+    );
+  });
+});
+
+describe('assigned students', () => {
+  test('reads from my_assigned_students view', async () => {
+    const orderMock = jest.fn().mockResolvedValue({ data: [{ id: 's1' }], error: null });
+    const selectMock = jest.fn(() => ({ order: orderMock }));
+    supabase.from.mockReturnValueOnce({ select: selectMock });
+
+    const rows = await getMyAssignedStudents();
+
+    expect(supabase.from).toHaveBeenCalledWith('my_assigned_students');
+    expect(selectMock).toHaveBeenCalledWith('*');
+    expect(orderMock).toHaveBeenCalledWith('period_id', { ascending: true });
+    expect(rows).toEqual([{ id: 's1' }]);
   });
 });

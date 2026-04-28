@@ -86,7 +86,7 @@ async function extractPDFText(file) {
   }
 }
 
-export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCount, onLoadDemo, importedStudents, vault, onRemoveOrphan }) {
+export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCount, onLoadDemo, importedStudents, vault, onRemoveOrphan, cloudStudents, onRemoveCloudOrphan, isOwnerOrAdmin }) {
   const [inputMode, setInputMode] = useState("prepared"); // "prepared" | "paste" | "upload" | "manual" | "bundle" | "masterRoster" | "rosterOnly" | "verify"
 
   // Cloud team context — null when app is offline-only (no Supabase env configured).
@@ -668,6 +668,9 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
           importedStudents={importedStudents || {}}
           vault={vault || {}}
           onRemoveOrphan={onRemoveOrphan}
+          cloudStudents={cloudStudents || []}
+          onRemoveCloudOrphan={onRemoveCloudOrphan}
+          isOwnerOrAdmin={!!isOwnerOrAdmin}
         />
       )}
 

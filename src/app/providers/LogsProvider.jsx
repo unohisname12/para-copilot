@@ -22,6 +22,7 @@ export function LogsProvider({ currentDate, periodLabel, activePeriod, children 
       shared: Boolean(extras?.shared),
     };
     pushLog(team.activeTeamId, team.user.id, payload).catch((err) => {
+      team.reportCloudError?.(`Log saved locally but did not sync: ${err.message || err}`);
       // eslint-disable-next-line no-console
       console.error('[cloud] pushLog failed', err);
     });

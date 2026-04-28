@@ -16,6 +16,7 @@ import {
   setMemberActive,
   removeMember,
   setTeamAllowSubs,
+  deleteAllTeamStudents,
 } from '../services/teamSync';
 import ParaAssignmentPanel from './ParaAssignmentPanel';
 import { runTrainingGapRules } from '../engine';
@@ -413,6 +414,12 @@ export default function AdminDashboard({ allStudents = {}, vaultNames = {} } = {
               </div>
             </div>
           </div>
+
+          <DangerZone
+            team={team}
+            activeTeamId={activeTeamId}
+            onError={setErr}
+          />
         </div>
       )}
 
@@ -424,6 +431,109 @@ export default function AdminDashboard({ allStudents = {}, vaultNames = {} } = {
           onClose={() => setShareTip(null)}
         />
       )}
+    </div>
+  );
+}
+
+// ── Danger Zone — destructive team-wide actions ─────────────
+// "Wipe student records" deletes every team_students row for this team.
+// Cascade rules on the database fire as configured: logs / incidents /
+// interventions / outcomes / handoffs lose their student_id (set null,
+// not deleted), parent_notes + para_assignments cascade-delete. Use case:
+// starting a clean roster for a new term, or recovering from an import
+// gone wrong.
+function DangerZone({ team, activeTeamId, onError }) {
+  const [busy, setBusy] = useState(false);
+  const [studentCount, setStudentCount] = useState(null);
+  const studentsLoaded = Array.isArray(team?.teamStudents);
+
+  useEffect(() => {
+    if (studentsLoaded) setStudentCount(team.teamStudents.length);
+  }, [studentsLoaded, team?.teamStudents]);
+
+  const handleWipe = async () => {
+    const teamName = team?.activeTeam?.name || 'this team';
+    const count = studentCount ?? '?';
+    const phrase = 'wipe roster';
+    const typed = window.prompt(
+      `WIPE ALL STUDENT RECORDS for "${teamName}"?\n\n` +
+      `This deletes ${count} student row(s) from the cloud. Every para on this team\n` +
+      `will see their roster empty out. Logs and case-memory entries lose their\n` +
+      `student attribution but the entries themselves stay (set-null, not deleted).\n` +
+      `Parent notes and para assignments tied to those students ARE deleted.\n\n` +
+      `On THIS device, your local imports / logs / case memory / knowledge base\n` +
+      `are also cleared so you start clean. Real-name vault stays — it's per-device,\n` +
+      `not per-team.\n\n` +
+      `This cannot be undone.\n\n` +
+      `Type the exact phrase below to confirm:\n\n` +
+      `   ${phrase}`
+    );
+    if (typed !== phrase) {
+      if (typed !== null) alert('Phrase did not match. Nothing was deleted.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const deleted = await deleteAllTeamStudents(activeTeamId);
+      // Local cleanup — Supabase bulk-delete realtime events are unreliable, so
+      // we don't trust the subscription to update teamStudents in time. Wipe
+      // the localStorage keys that hold student-shaped state, then reload so
+      // the admin sees the clean state immediately.
+      const LOCAL_KEYS = [
+        'paraImportedStudentsV1', 'paraImportedPeriodMapV1', 'paraDemoModeV1',
+        'paraLogsV1',
+        'paraIncidentsV1', 'paraInterventionsV1', 'paraOutcomesV1',
+        'paraKBV1',
+        'paraIdentityOverridesV1', 'paraSupportsOverridesV1',
+      ];
+      try {
+        LOCAL_KEYS.forEach(k => globalThis.localStorage?.removeItem(k));
+      } catch { /* noop */ }
+      alert(`Deleted ${deleted} student record(s) from the team and cleared local data on this device. Reloading…`);
+      setTimeout(() => globalThis.location?.reload(), 200);
+    } catch (e) {
+      onError(e.message || String(e));
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{
+      marginTop: 'var(--space-6)',
+      padding: 'var(--space-4) var(--space-5)',
+      border: '1px solid rgba(248,113,113,0.35)',
+      background: 'rgba(248,113,113,0.06)',
+      borderRadius: 'var(--radius-md)',
+      display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
+    }}>
+      <div style={{
+        fontSize: 11, fontWeight: 700,
+        textTransform: 'uppercase', letterSpacing: '0.1em',
+        color: 'var(--red)',
+      }}>
+        ⚠ Danger zone
+      </div>
+      <div style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.5 }}>
+        Wipe all student records for this team — fresh roster, clean slate.
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+        Affects every para on this team. {studentCount != null ? `Currently ${studentCount} student record${studentCount === 1 ? '' : 's'} in the cloud.` : ''}
+        Logs and case-memory entries stay (their student link goes null);
+        parent notes and assignments tied to those students are deleted.
+      </div>
+      <button
+        type="button"
+        disabled={busy || !activeTeamId || (studentCount != null && studentCount === 0)}
+        onClick={handleWipe}
+        className="btn btn-secondary btn-sm"
+        style={{
+          alignSelf: 'flex-start',
+          color: 'var(--red)',
+          borderColor: 'rgba(248,113,113,0.35)',
+        }}
+      >
+        {busy ? 'Wiping…' : '🗑 Wipe all student records'}
+      </button>
     </div>
   );
 }

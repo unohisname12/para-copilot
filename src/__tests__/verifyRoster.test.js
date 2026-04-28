@@ -66,6 +66,22 @@ describe('verifyRoster', () => {
     expect(errors.length).toBeGreaterThan(0);
   });
 
+  test('cloud team rows whose number is not in the CSV → cloudOrphan', () => {
+    const imported = {};
+    const vault = { '888888': 'Old Test Kid' };
+    const cloud = [
+      { id: 'c1', paraAppNumber: '111111', pseudonym: 'X', periodId: 'p1' }, // in CSV → ignored
+      { id: 'c2', paraAppNumber: '888888', pseudonym: 'Y', periodId: 'p2' }, // NOT in CSV → cloudOrphan
+    ];
+    const csv = 'Name,ParaAppNumber\nMaria Garcia,111111\n';
+    const { rows, summary } = verifyRoster({ imported, vault, cloud, csvText: csv });
+    const cloudOrphan = rows.find(r => r.status === 'cloudOrphan');
+    expect(cloudOrphan).toBeDefined();
+    expect(cloudOrphan.paraAppNumber).toBe('888888');
+    expect(cloudOrphan.realName).toBe('Old Test Kid');
+    expect(summary.cloudOrphan).toBe(1);
+  });
+
   test('summary aggregates across all statuses', () => {
     const imported = {
       stu_a: makeStu('stu_a', '111111'), // linked
