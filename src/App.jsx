@@ -262,6 +262,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
   const [floatingTools, setFloatingTools] = useState([]);
   const [fullscreenTool, setFullscreenTool] = useState(null);
   const [stealthMode, setStealthMode] = useState(false);
+  const [stealthPinNudge, setStealthPinNudge] = useState(false);
   const [stealthTool, setStealthTool] = useState("timer");
   const [situationModal, setSituationModal] = useState(null);
   const [rosterPanelOpen, setRosterPanelOpen] = useState(false);
@@ -367,16 +368,47 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
   // RENDER — Vault
   // ══════════════════════════════════════════════════════════
   const renderVault = () => {
+    // Merge cloud-shared logs into the Vault so historical context survives
+    // a local reset. Includes the user's OWN cloud-saved logs too — after a
+    // local reset, paraLogsV1 is empty but those logs still exist in the
+    // cloud `logs` table and should re-appear when the same kid is loaded
+    // back. Dedup by (studentId + timestamp) to avoid double-counting any
+    // local copy that happens to also be in sharedLogs.
+    const localFingerprints = new Set(
+      (logs || []).map(l => `${l.studentId}__${l.timestamp}`)
+    );
+    const sharedAdapted = (teamCtx?.sharedLogs || [])
+      .filter(l => l && !localFingerprints.has(`${l.student_id}__${l.timestamp}`))
+      .map(l => ({
+        id: l.id,
+        studentId: l.student_id,
+        type: l.type,
+        category: l.category,
+        note: l.note,
+        date: l.date,
+        period: l.period_id,
+        periodId: l.period_id,
+        timestamp: l.timestamp,
+        tags: l.tags || [],
+        flagged: Boolean(l.flagged),
+        source: l.source || 'cloud_sync',
+        situationId: l.situation_id,
+        strategyUsed: l.strategy_used,
+        goalId: l.goal_id,
+        sharedFromTeammate: l.user_id !== teamCtx?.user?.id,
+      }));
+    const vaultLogs = sharedAdapted.length ? [...logs, ...sharedAdapted] : logs;
+
     const allStu = Object.entries(allStudents);
-    const counts = { green: allStu.filter(([id]) => getHealth(id, logs, currentDate) === "green").length, yellow: allStu.filter(([id]) => getHealth(id, logs, currentDate) === "yellow").length, red: allStu.filter(([id]) => getHealth(id, logs, currentDate) === "red").length };
+    const counts = { green: allStu.filter(([id]) => getHealth(id, vaultLogs, currentDate) === "green").length, yellow: allStu.filter(([id]) => getHealth(id, vaultLogs, currentDate) === "yellow").length, red: allStu.filter(([id]) => getHealth(id, vaultLogs, currentDate) === "red").length };
     // Students with >3 logs in the last 24h — surface as "needs attention"
     // next to the byStudent filter so nothing gets lost in a busy day.
     const needsAttention = new Set(
       allStu
         .map(([id]) => id)
-        .filter(id => logsInLastHours(id, logs, 24) > 3)
+        .filter(id => logsInLastHours(id, vaultLogs, 24) > 3)
     );
-    let filteredLogs = logs;
+    let filteredLogs = vaultLogs;
     // Tab-based filters
     if (vaultTab === "byStudent" && vaultFilter !== "all") filteredLogs = filteredLogs.filter(l => l.studentId === vaultFilter);
     if (vaultTab === "byPeriod" && vaultFilter !== "all") filteredLogs = filteredLogs.filter(l => l.periodId === vaultFilter);
@@ -901,31 +933,30 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
               </button>
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   if (!window.confirm(
-                    'Reset local working data only?\n\n' +
-                    'THIS CLEARS (on this device):\n' +
+                    'Reset everything on THIS COMPUTER?\n\n' +
+                    'CLEARS (this device only):\n' +
                     '  • All logs\n' +
-                    '  • All imported students and rosters\n' +
+                    '  • All imported students and roster files\n' +
                     '  • Case memory (incidents, interventions, outcomes)\n' +
                     '  • Knowledge base documents\n' +
-                    '  • Identity overrides\n\n' +
-                    'THIS KEEPS (cloud + device):\n' +
-                    '  • Cloud team records keyed by Para App Number\n' +
-                    '    (that\'s how the app builds a knowledge base for\n' +
-                    '    each student across paras and sessions)\n' +
-                    '  • Real-name vault (separate Purge button above)\n' +
+                    '  • Identity + supports overrides\n' +
+                    '  • Real-name vault on this computer\n\n' +
+                    'KEEPS:\n' +
+                    '  • Cloud team roster (other paras + your team data on the server)\n' +
                     '  • Google sign-in / team membership\n\n' +
-                    'Use this to start a clean demo. Your accumulated cloud\n' +
-                    'data for each student is safe.'
+                    'To wipe the cloud team roster too, use Admin Dashboard → Settings → Danger Zone.\n\n' +
+                    'This local reset cannot be undone.'
                   )) return;
                   logsBag.setLogs([]);
                   students.resetImports();
                   caseMemory.clearCaseMemory();
                   kb.setKnowledgeBase([]);
-                  setTimeout(() => window.alert('Local working data cleared. Cloud records untouched.'), 50);
+                  try { await vaultCtx.purgeVault(); } catch { /* noop */ }
+                  setTimeout(() => window.alert('This computer cleared. Cloud roster untouched. Reload to see the demo state.'), 50);
                 }}
-                title="Clear local working data. Cloud team records (keyed by Para App Number) stay — that's the student knowledge base."
+                title="Clear everything on THIS device — logs, imports, case memory, knowledge base, real-name vault. Cloud team data stays. For a cloud wipe, use Admin → Danger Zone."
                 style={{
                   width: "100%", padding: "7px",
                   borderRadius: "var(--radius-md)",
@@ -995,7 +1026,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
                 />
               )}
               {view === "vault" && renderVault()}
-              {view === "import" && <IEPImport onImport={students.handleImport} onBulkImport={students.handleBundleImport} onIdentityLoad={students.handleIdentityLoad} importedCount={Object.keys(students.importedStudents).length} onLoadDemo={handleLoadDemo} />}
+              {view === "import" && <IEPImport onImport={students.handleImport} onBulkImport={students.handleBundleImport} onIdentityLoad={students.handleIdentityLoad} importedCount={Object.keys(students.importedStudents).length} onLoadDemo={handleLoadDemo} importedStudents={students.importedStudents} vault={vaultCtx.vault} onRemoveOrphan={students.removeImportedStudent} />}
               {view === "analytics" && <AnalyticsDashboard logs={logs} groups={groups} setGroups={setGroups} onOpenProfile={setProfileStu} ollamaOnline={ollama.ollamaOnline} ollamaLoading={ollama.ollamaLoading} onOllamaPatternSummary={insights.handleOllamaPatternSummary} allStudents={allStudents} />}
               {view === "admin" && teamCtx?.isAdmin && (
                 <AdminDashboard
@@ -1031,7 +1062,58 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
       {floatingTools.map(tid => { const t = toolboxTools.find(x => x.id === tid); return t ? <FloatingToolWindow key={tid} tool={t} onClose={() => setFloatingTools(prev => prev.filter(x => x !== tid))} onFullscreen={() => { setFullscreenTool(tid); setFloatingTools(prev => prev.filter(x => x !== tid)); }} onDock={() => { setFloatingTools(prev => prev.filter(x => x !== tid)); setActiveToolbox(tid); }} /> : null; })}
 
       {fullscreenTool && (<FullscreenTool tool={toolboxTools.find(t => t.id === fullscreenTool) || toolboxTools[0]} onClose={() => setFullscreenTool(null)} />)}
-      {stealthMode && (<StealthScreen activeTool={stealthTool} toolboxTools={toolboxTools} onSelectTool={setStealthTool} onExit={() => setStealthMode(false)} />)}
+      {stealthMode && (
+        <StealthScreen
+          activeTool={stealthTool}
+          toolboxTools={toolboxTools}
+          onSelectTool={setStealthTool}
+          onExit={() => setStealthMode(false)}
+          onExitWithoutPin={() => {
+            setStealthMode(false);
+            setStealthPinNudge(true);
+          }}
+        />
+      )}
+      {stealthPinNudge && (
+        <div
+          role="status"
+          style={{
+            position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 9998,
+            maxWidth: 'min(560px, calc(100vw - 32px))',
+            padding: '10px 16px',
+            background: 'var(--panel-raised, var(--bg-surface))',
+            border: '1px solid rgba(251,191,36,0.5)',
+            borderRadius: 'var(--radius-lg)',
+            boxShadow: 'var(--shadow-lg)',
+            display: 'flex', alignItems: 'center', gap: 10,
+            fontSize: 13, fontWeight: 600, color: 'var(--text-primary)',
+          }}
+        >
+          <span style={{ fontSize: 16 }}>🔒</span>
+          <span style={{ flex: 1, color: 'var(--text-secondary)', fontWeight: 500 }}>
+            Want to lock Stealth Mode? Open Settings → Stealth screen PIN to set a 4-digit code.
+          </span>
+          <button
+            type="button"
+            onClick={() => { setStealthPinNudge(false); setSettingsOpen(true); }}
+            className="btn btn-primary btn-sm"
+            style={{ minHeight: 30, fontSize: 11 }}
+          >
+            Open Settings
+          </button>
+          <button
+            type="button"
+            onClick={() => setStealthPinNudge(false)}
+            aria-label="Dismiss"
+            style={{
+              background: 'transparent', border: 'none',
+              color: 'var(--text-muted)', cursor: 'pointer',
+              fontSize: 16, lineHeight: 1, padding: '0 4px',
+            }}
+          >×</button>
+        </div>
+      )}
       {onboardingOpen && <OnboardingModal onClose={() => setOnboardingOpen(false)} />}
       <FindMyStudentsModal
         open={findStudentsOpen}

@@ -13,6 +13,7 @@ import { configurePdfWorker } from '../../utils/pdfWorker';
 import { assembleBundleFromFiles } from './iepExtractor';
 import RosterOnlyImport from './RosterOnlyImport';
 import SmartImport from './SmartImport';
+import VerifyRoster from './VerifyRoster';
 import { assignIdentity, IDENTITY_PALETTE } from '../../identity';
 import { DEMO_INCIDENTS, DEMO_INTERVENTIONS, DEMO_OUTCOMES, DEMO_LOGS } from '../../data/demoSeedData';
 
@@ -85,8 +86,8 @@ async function extractPDFText(file) {
   }
 }
 
-export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCount, onLoadDemo }) {
-  const [inputMode, setInputMode] = useState("prepared"); // "prepared" | "paste" | "upload" | "manual" | "bundle" | "masterRoster" | "rosterOnly"
+export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCount, onLoadDemo, importedStudents, vault, onRemoveOrphan }) {
+  const [inputMode, setInputMode] = useState("prepared"); // "prepared" | "paste" | "upload" | "manual" | "bundle" | "masterRoster" | "rosterOnly" | "verify"
 
   // Cloud team context — null when app is offline-only (no Supabase env configured).
   const team = useTeamOptional();
@@ -576,6 +577,29 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
         onClick={() => setInputMode("smart")}
       />
 
+      {/* Row 3 — Roster Health Check. Para-friendly diagnostic for import issues. */}
+      <button
+        onClick={() => { setInputMode("verify"); setParsed(null); setParseError(""); setBundleError(""); setMasterRosterError(""); setPreparedError(""); }}
+        style={{
+          marginTop: "var(--space-4)", marginBottom: "var(--space-4)",
+          width: "100%", padding: "12px 16px",
+          borderRadius: "var(--radius-md)",
+          border: `1px solid ${inputMode === "verify" ? "#3b82f6" : "var(--border)"}`,
+          background: inputMode === "verify" ? "#0c1a2e" : "var(--panel-bg)",
+          color: inputMode === "verify" ? "#60a5fa" : "var(--text-secondary)",
+          fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "left",
+          display: "flex", alignItems: "center", gap: 12,
+        }}
+      >
+        <span style={{ fontSize: 18 }}>🔍</span>
+        <span style={{ flex: 1 }}>
+          <span style={{ fontWeight: 700 }}>Verify Roster</span>
+          <span style={{ fontWeight: 400, marginLeft: 8, color: "var(--text-muted)", fontSize: 12 }}>
+            See exactly which kids are loaded, flag missing or orphaned ones
+          </span>
+        </span>
+      </button>
+
       {/* Advanced — collapsed by default; single-student / demo flows */}
       <details style={{ marginBottom: "var(--space-5)" }}>
         <summary style={{
@@ -637,6 +661,15 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
 
       {/* ── ROSTER ONLY (Names + Para App Numbers; seeds the vault) ─── */}
       {inputMode === "rosterOnly" && <RosterOnlyImport />}
+
+      {/* ── VERIFY ROSTER (self-diagnostic — what landed where) ─────── */}
+      {inputMode === "verify" && (
+        <VerifyRoster
+          importedStudents={importedStudents || {}}
+          vault={vault || {}}
+          onRemoveOrphan={onRemoveOrphan}
+        />
+      )}
 
       {/* ── PREPARED PROFILES (simplified demo import) ────────── */}
       {inputMode === "prepared" && (

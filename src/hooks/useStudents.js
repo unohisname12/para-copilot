@@ -193,6 +193,24 @@ export function useStudents({ activePeriod, cloudStudents = null }) {
 
   const getStudentById = (id) => allStudents[id] || null;
 
+  // Surgical removal of a single imported student. Used by the Roster Health
+  // Check "Remove orphans" action — keeps everything else in place.
+  const removeImportedStudent = (studentId) => {
+    if (!studentId) return;
+    setImportedStudents(prev => {
+      const next = { ...prev };
+      delete next[studentId];
+      return next;
+    });
+    setImportedPeriodMap(prev => {
+      const next = {};
+      Object.entries(prev).forEach(([pid, ids]) => {
+        next[pid] = (ids || []).filter(id => id !== studentId);
+      });
+      return next;
+    });
+  };
+
   // Wipe all imports + identity back to a fresh state. Used by the
   // "Reset Local Data" action. Does NOT touch the real-name vault
   // (that has its own purge control with its own user consent).
@@ -214,6 +232,7 @@ export function useStudents({ activePeriod, cloudStudents = null }) {
     handleImport, handleBundleImport, handleIdentityLoad, handleUpdateIdentity,
     handleUpdateSupports,
     getStudentById,
+    removeImportedStudent,
     resetImports,
   };
 }
