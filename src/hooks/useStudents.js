@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useLocalStorage } from './useLocalStorage';
 import { DB, DEMO_STUDENTS } from '../data';
 import { migrateIdentity, patchIdentity } from '../identity';
@@ -41,6 +41,27 @@ export function useStudents({ activePeriod, cloudStudents = null }) {
   const [importedStudents, setImportedStudents] = useLocalStorage('paraImportedStudentsV1', {});
   const [importedPeriodMap, setImportedPeriodMap] = useLocalStorage('paraImportedPeriodMapV1', {});
   const [demoMode, setDemoMode] = useLocalStorage('paraDemoModeV1', true);
+
+  // One-time heal: previously-imported bundles wrote students to
+  // importedStudents but left importedPeriodMap empty when the source
+  // file had no period data. Those students were correctly persisted
+  // but invisible on every period tab. Rebuild the period map from
+  // student.periodId, defaulting to p1 for anything still blank.
+  React.useEffect(() => {
+    const studentList = Object.values(importedStudents || {});
+    if (!studentList.length) return;
+    const mapHasContent = Object.values(importedPeriodMap || {}).some(
+      arr => Array.isArray(arr) && arr.length > 0
+    );
+    if (mapHasContent) return;
+    const rebuilt = {};
+    studentList.forEach(s => {
+      const pid = s.periodId && String(s.periodId).trim() ? s.periodId : 'p1';
+      if (!rebuilt[pid]) rebuilt[pid] = [];
+      rebuilt[pid].push(s.id);
+    });
+    setImportedPeriodMap(rebuilt);
+  }, []); // run once on mount
   const [identityOverrides, setIdentityOverrides] = useLocalStorage('paraIdentityOverridesV1', {});
   const [supportsOverrides, setSupportsOverrides] = useLocalStorage('paraSupportsOverridesV1', {});
   // identityRegistry is intentionally NOT persisted — entries carry realName
@@ -111,21 +132,25 @@ export function useStudents({ activePeriod, cloudStudents = null }) {
   }, [allStudentsBase, identityOverrides, supportsOverrides]);
 
   const effectivePeriodStudents = useMemo(() => {
+    const importedIds = importedPeriodMap[activePeriod] || [];
     if (cloudStudentList) {
       const cloudIds = cloudStudentList
         .filter((s) => !activePeriod || s.periodId === activePeriod)
         .map((s) => s.id);
-      // Mirror allStudentsBase: when demoMode is on we still want the sample
-      // kids visible alongside the cloud roster.
+      // Always include locally-imported students. Excluding them in cloud
+      // mode is what made every dashboard go blank after a Smart Import or
+      // Master Roster upload — local imports never made it into the cloud
+      // (and don't have to: paraAppNumber alone is FERPA-safe to sync, the
+      // pseudonym IS the local view).
       if (demoMode) {
-        return [...new Set([...period.students, ...cloudIds, ...(importedPeriodMap[activePeriod] || [])])];
+        return [...new Set([...period.students, ...cloudIds, ...importedIds])];
       }
-      return cloudIds;
+      return [...new Set([...cloudIds, ...importedIds])];
     }
     if (demoMode) {
-      return [...new Set([...period.students, ...(importedPeriodMap[activePeriod] || [])])];
+      return [...new Set([...period.students, ...importedIds])];
     }
-    return [...new Set([...(importedPeriodMap[activePeriod] || [])])];
+    return [...new Set([...importedIds])];
   }, [cloudStudentList, demoMode, period.students, importedPeriodMap, activePeriod]);
 
   const handleImport = (studentObj, periodId) => {
