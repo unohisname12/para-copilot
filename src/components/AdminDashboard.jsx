@@ -19,6 +19,7 @@ import {
 } from '../services/teamSync';
 import ParaAssignmentPanel from './ParaAssignmentPanel';
 import { runTrainingGapRules } from '../engine';
+import { tailorAdvice } from '../engine/trainingGapTailoring';
 
 const ROLE_META = {
   owner:        { label: 'Owner',         tone: '#a78bfa', desc: 'Full control. Can add, remove, and change anyone. Multiple owners allowed — good for co-leads.' },
@@ -442,16 +443,21 @@ function CoachingTopicsSection({ team, members, onShareTip }) {
       m => m.active && (m.role === 'para' || m.role === 'sub')
     );
 
+    const studentLookupForTailor = Object.fromEntries(teamStudents.map(s => [s.id, s]));
+
     const all = paraMembers.flatMap(member => {
       const adapted = sharedLogs
         .filter(l => l.user_id === member.user_id)
         .map(l => ({ ...l, studentId: l.student_id }));
       const result = runTrainingGapRules(adapted, studentIds);
-      return result.topics.map(t => ({
-        ...t,
-        paraDisplayName: member.display_name,
-        paraUserId: member.user_id,
-      }));
+      return result.topics.map(t => {
+        const tailored = tailorAdvice(t, studentLookupForTailor[t.studentId]);
+        return {
+          ...tailored,
+          paraDisplayName: member.display_name,
+          paraUserId: member.user_id,
+        };
+      });
     });
 
     return all.sort((a, b) => {

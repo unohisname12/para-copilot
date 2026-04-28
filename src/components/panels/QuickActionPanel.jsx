@@ -6,11 +6,13 @@ import React, { useState, useRef, useEffect } from "react";
 import { QUICK_ACTIONS } from '../../data';
 import { resolveLabel } from '../../privacy/nameResolver';
 import { buildQuickActionGroups } from './quickActionGroups';
+import { ClarifierModal, hasClarifier, resolveClarifierLog } from '../modals/ClarifierModal';
 
 export function QuickActionPanel({ students, onLog, studentsMap }) {
   const lookup = studentsMap || {};
   const [pickingFor, setPickingFor] = useState(null); // action.id | null
   const [recentLog, setRecentLog] = useState(null);   // { actionId, studentLabel } | null
+  const [clarifying, setClarifying] = useState(null); // { action, studentId } | null
   const recentTimer = useRef();
 
   const groups = buildQuickActionGroups(QUICK_ACTIONS);
@@ -18,10 +20,10 @@ export function QuickActionPanel({ students, onLog, studentsMap }) {
 
   useEffect(() => () => clearTimeout(recentTimer.current), []);
 
-  const fireLog = (action, studentId) => {
-    onLog(studentId, action.defaultNote, action.logType, {
+  const completeLog = (action, studentId, note, tags) => {
+    onLog(studentId, note, action.logType, {
       source: 'quick_action',
-      tags: action.tags,
+      tags,
     });
     const studentLabel = resolveLabel(lookup[studentId], 'compact');
     setRecentLog({ actionId: action.id, studentLabel });
@@ -31,6 +33,22 @@ export function QuickActionPanel({ students, onLog, studentsMap }) {
       () => setRecentLog(r => (r?.actionId === action.id ? null : r)),
       1500
     );
+  };
+
+  const fireLog = (action, studentId) => {
+    if (hasClarifier(action.id)) {
+      setClarifying({ action, studentId });
+      return;
+    }
+    completeLog(action, studentId, action.defaultNote, action.tags);
+  };
+
+  const handleClarifierPick = (variantId) => {
+    if (!clarifying) return;
+    const { action, studentId } = clarifying;
+    const { note, tags } = resolveClarifierLog(action, variantId);
+    completeLog(action, studentId, note, tags);
+    setClarifying(null);
   };
 
   if (studentList.length === 0) {
@@ -43,6 +61,14 @@ export function QuickActionPanel({ students, onLog, studentsMap }) {
 
   return (
     <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {clarifying && (
+        <ClarifierModal
+          action={clarifying.action}
+          studentLabel={resolveLabel(lookup[clarifying.studentId], 'compact')}
+          onPick={handleClarifierPick}
+          onCancel={() => setClarifying(null)}
+        />
+      )}
       <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
         Tap an action, then tap the student.
       </div>

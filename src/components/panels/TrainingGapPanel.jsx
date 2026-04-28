@@ -5,6 +5,7 @@
 // Spec: docs/superpowers/specs/2026-04-26-training-gap-agenda-design.md
 import React, { useState } from "react";
 import { runTrainingGapRules } from "../../engine";
+import { tailorAdvice } from "../../engine/trainingGapTailoring";
 import { resolveLabel } from "../../privacy/nameResolver";
 
 const lbl = { fontSize: "11px", color: "#94a3b8", display: "block", marginBottom: "3px" };
@@ -84,7 +85,8 @@ export function TrainingGapPanel({ students, studentsMap, logs }) {
   const generate = () => {
     const allStudentIds = students && students.length > 0 ? students : Object.keys(studentsMap || {});
     const result = runTrainingGapRules(logs || [], allStudentIds);
-    setTopics(result.topics);
+    const tailored = result.topics.map(t => tailorAdvice(t, (studentsMap || {})[t.studentId]));
+    setTopics(tailored);
     setGenerated(true);
   };
 

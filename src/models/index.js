@@ -4,6 +4,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { generateIdentitySet, migrateIdentity, IDENTITY_PALETTE } from '../identity';
+import { defaultSupports, migrateSupports } from './supports';
 
 // ── Pseudonym palette — backward-compatible alias of IDENTITY_PALETTE ──────
 export const PSEUDONYM_PALETTE = IDENTITY_PALETTE.map(({ hex, name }) => ({ hex, name }));
@@ -310,6 +311,7 @@ export function createStudent(data) {
     flags: data.flags || { alert: false, iepNotYetOnFile: false, profileMissing: false, crossPeriod: false },
     crossPeriodInfo: data.crossPeriodInfo || { note: null, otherPeriods: [] },
     sourceMeta: data.sourceMeta || { importType: "manual", schemaVersion: "1.0" },
+    supports: migrateSupports(data.supports),
   };
 }
 
@@ -386,6 +388,7 @@ export function normalizeImportedStudent(raw) {
       importType:    String(raw.sourceMeta?.importType    || "bundle_import"),
       schemaVersion: String(raw.sourceMeta?.schemaVersion || "2.0"),
     },
+    supports:   migrateSupports(raw.supports),
     imported:   true,
     importedAt: raw.importedAt || new Date().toISOString(),
   };

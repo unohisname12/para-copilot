@@ -2,6 +2,10 @@ import React, { useState, useMemo } from "react";
 import { GOAL_PROGRESS_OPTIONS } from '../../data';
 import { getHealth, hdot } from '../../models';
 import { migrateIdentity, getDefaultIdentity, isIdentityCustomized } from '../../identity';
+import {
+  BREAK_ACCESS_TYPES, TRINARY_OPTIONS, REINFORCEMENT_SYSTEMS,
+  migrateSupports, breakAccessLabel, reinforcementLabel,
+} from '../../models/supports';
 import { resolveLabel } from '../../privacy/nameResolver';
 import { matchCaseKeywords, isHelpWorthy } from '../../engine';
 import { createIncident, createIntervention, createOutcome } from '../../models';
@@ -89,7 +93,7 @@ function OrphanStudentModal({ studentId, logs, onClose }) {
   );
 }
 
-function StudentProfileModalInner({ studentId, logs, currentDate, activePeriod, onClose, onLog, onDraftEmail, studentData, onUpdateIdentity, caseMemory }) {
+function StudentProfileModalInner({ studentId, logs, currentDate, activePeriod, onClose, onLog, onDraftEmail, studentData, onUpdateIdentity, onUpdateSupports, caseMemory }) {
   const s = studentData;
   const stuLogs = logs.filter(l => l.studentId === studentId);
   const health = getHealth(studentId, logs, currentDate);
@@ -182,6 +186,7 @@ function StudentProfileModalInner({ studentId, logs, currentDate, activePeriod, 
     { id: "goals",     label: "Goals" },
     { id: "accs",      label: "Accommodations" },
     { id: "strategies",label: "Strategies" },
+    { id: "tools",     label: "Tools & Supports" },
     ...(hasV2 ? [{ id: "support", label: "Support Info" }] : []),
     { id: "logs",      label: `Logs (${stuLogs.length})` },
     // Parent notes tab — visible only to admins (server RLS also enforces).
@@ -398,6 +403,15 @@ function StudentProfileModalInner({ studentId, logs, currentDate, activePeriod, 
           })}{(s.goals || []).length === 0 && <div style={{ color: "var(--text-muted)", padding: "20px", textAlign: "center" }}>No goals listed.</div>}</div>)}
           {tab === "accs" && (<div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>{(s.accs || []).map((a, i) => (<div key={i} style={{ background: "rgba(0,0,0,.2)", borderRadius: "8px", padding: "10px 14px", display: "flex", alignItems: "center", gap: "10px", borderLeft: `3px solid ${c}30` }}><span style={{ fontSize: "16px", color: c }}>✓</span><span style={{ fontSize: "13px" }}>{a}</span></div>))}{(s.accs || []).length === 0 && <div style={{ color: "var(--text-muted)", padding: "20px", textAlign: "center" }}>No accommodations listed.</div>}</div>)}
           {tab === "strategies" && (<div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>{(s.strategies || []).map((st, i) => (<div key={i} style={{ background: "rgba(0,0,0,.2)", borderRadius: "8px", padding: "12px 14px", borderLeft: `3px solid ${c}60` }}><span style={{ fontSize: "13px", lineHeight: "1.6" }}>{st}</span></div>))}{(s.strategies || []).length === 0 && <div style={{ color: "var(--text-muted)", padding: "20px", textAlign: "center" }}>No strategies listed.</div>}</div>)}
+
+          {tab === "tools" && (
+            <ToolsAndSupportsSection
+              student={s}
+              color={c}
+              onUpdate={(partial) => onUpdateSupports && onUpdateSupports(studentId, partial)}
+            />
+          )}
+
           {tab === "support" && (
             <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
               {(s.watchFors || []).length > 0 && (
@@ -434,6 +448,102 @@ function StudentProfileModalInner({ studentId, logs, currentDate, activePeriod, 
             />
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ── Tools & Supports section ────────────────────────────────
+// Para-editable fact base for what this kid actually has in place.
+// The training-gap rule engine reads this to tailor coaching tips.
+function ToolsAndSupportsSection({ student, color, onUpdate }) {
+  const supports = migrateSupports(student.supports);
+
+  const updateBreakAccess = (type) =>
+    onUpdate({ ...supports, breakAccess: { ...supports.breakAccess, type } });
+  const updateBreakNotes = (notes) =>
+    onUpdate({ ...supports, breakAccess: { ...supports.breakAccess, notes } });
+  const updateBip = (val) =>
+    onUpdate({ ...supports, bipActive: val });
+  const updateReinforcement = (val) =>
+    onUpdate({ ...supports, reinforcementSystem: val });
+
+  const sectionStyle = {
+    background: 'var(--bg-surface)',
+    border: '1px solid var(--border)',
+    borderRadius: 8,
+    padding: '12px 14px',
+    display: 'flex', flexDirection: 'column', gap: 10,
+  };
+  const labelStyle = {
+    fontSize: 11, fontWeight: 700,
+    color: 'var(--text-muted)',
+    textTransform: 'uppercase', letterSpacing: '0.08em',
+  };
+  const optBtn = (active) => ({
+    fontSize: 11, padding: '6px 12px', borderRadius: 6,
+    border: `1px solid ${active ? color : 'var(--border)'}`,
+    background: active ? `${color}25` : 'transparent',
+    color: active ? color : 'var(--text-secondary)',
+    cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600,
+    minHeight: 32,
+  });
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+        Tell the app what's actually in place for this student. The Coaching tab uses
+        these facts to tailor tips — without them, suggestions are guesses.
+      </div>
+
+      {/* Break access */}
+      <div style={sectionStyle}>
+        <div style={labelStyle}>Break request system</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {BREAK_ACCESS_TYPES.map(t => (
+            <button key={t.id} onClick={() => updateBreakAccess(t.id)} style={optBtn(supports.breakAccess.type === t.id)}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <input
+          type="text"
+          value={supports.breakAccess.notes}
+          onChange={e => updateBreakNotes(e.target.value)}
+          placeholder="Notes (e.g. 'card kept on her desk', 'BIP says to offer at level 2')"
+          className="chat-input"
+          style={{ fontSize: 11 }}
+        />
+      </div>
+
+      {/* BIP active */}
+      <div style={sectionStyle}>
+        <div style={labelStyle}>Active BIP on file?</div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {TRINARY_OPTIONS.map(t => (
+            <button key={t.id} onClick={() => updateBip(t.id)} style={optBtn(supports.bipActive === t.id)}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Reinforcement system */}
+      <div style={sectionStyle}>
+        <div style={labelStyle}>Reinforcement system</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {REINFORCEMENT_SYSTEMS.map(r => (
+            <button key={r.id} onClick={() => updateReinforcement(r.id)} style={optBtn(supports.reinforcementSystem === r.id)}>
+              {r.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.5, fontStyle: 'italic' }}>
+        Saved on this device only. The cloud doesn't see this — it's your private fact
+        base for tailoring coaching tips.
       </div>
     </div>
   );
