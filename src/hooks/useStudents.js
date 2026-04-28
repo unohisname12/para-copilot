@@ -33,11 +33,19 @@ function fromCloudRow(row) {
 }
 
 export function useStudents({ activePeriod, cloudStudents = null }) {
-  const [importedStudents, setImportedStudents] = useState({});
-  const [importedPeriodMap, setImportedPeriodMap] = useState({});
-  const [demoMode, setDemoMode] = useState(true);
+  // FERPA: imported student records are pseudonyms + paraAppNumbers only —
+  // real names live in the IndexedDB vault (separate persistence) and never
+  // touch localStorage. So persisting these here is safe and is what fixes
+  // "I clicked Remember, reloaded, my kids vanished." Real names re-attach
+  // to the persisted students via paraAppNumber on hydration.
+  const [importedStudents, setImportedStudents] = useLocalStorage('paraImportedStudentsV1', {});
+  const [importedPeriodMap, setImportedPeriodMap] = useLocalStorage('paraImportedPeriodMapV1', {});
+  const [demoMode, setDemoMode] = useLocalStorage('paraDemoModeV1', true);
   const [identityOverrides, setIdentityOverrides] = useLocalStorage('paraIdentityOverridesV1', {});
   const [supportsOverrides, setSupportsOverrides] = useLocalStorage('paraSupportsOverridesV1', {});
+  // identityRegistry is intentionally NOT persisted — entries carry realName
+  // strings directly. Real names belong in the IndexedDB vault, not in
+  // localStorage. The vault re-merges back onto students on reload.
   const [identityRegistry, setIdentityRegistry] = useState([]);
 
   const period = DB.periods[activePeriod];
