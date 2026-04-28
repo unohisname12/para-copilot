@@ -61,8 +61,35 @@ export function useStudents({ activePeriod, cloudStudents = null }) {
     [cloudStudentList]
   );
 
+  // Dedup imported students against cloud students by paraAppNumber. When in
+  // team mode, the cloud is the source of truth — locally-imported records
+  // (with regenerated `stu_imp_*` IDs) for the same kid would otherwise stack
+  // alongside the cloud row. Drop the local import for any kid the cloud
+  // already has.
+  const importedFiltered = useMemo(() => {
+    if (!cloudStudentsById) return importedStudents;
+    const cloudKeys = new Set(
+      Object.values(cloudStudentsById)
+        .map(s => s?.paraAppNumber)
+        .filter(Boolean)
+        .map(k => String(k).trim())
+    );
+    if (cloudKeys.size === 0) return importedStudents;
+    return Object.fromEntries(
+      Object.entries(importedStudents).filter(([, s]) => {
+        const key = (s?.paraAppNumber || s?.externalKey || '').toString().trim();
+        return !key || !cloudKeys.has(key);
+      })
+    );
+  }, [importedStudents, cloudStudentsById]);
+
+  // Demo students should appear whenever demoMode is on — cloud connection
+  // is orthogonal. Without this branch, joining a team silently hides every
+  // sample student and the "Load Demo" button does nothing visible.
   const allStudentsBase = cloudStudentsById
-    ? { ...cloudStudentsById, ...importedStudents }
+    ? (demoMode
+        ? { ...DEMO_STUDENTS, ...cloudStudentsById, ...importedFiltered }
+        : { ...cloudStudentsById, ...importedFiltered })
     : demoMode
     ? { ...DEMO_STUDENTS, ...importedStudents }
     : { ...importedStudents };
@@ -85,9 +112,15 @@ export function useStudents({ activePeriod, cloudStudents = null }) {
 
   const effectivePeriodStudents = useMemo(() => {
     if (cloudStudentList) {
-      return cloudStudentList
+      const cloudIds = cloudStudentList
         .filter((s) => !activePeriod || s.periodId === activePeriod)
         .map((s) => s.id);
+      // Mirror allStudentsBase: when demoMode is on we still want the sample
+      // kids visible alongside the cloud roster.
+      if (demoMode) {
+        return [...new Set([...period.students, ...cloudIds, ...(importedPeriodMap[activePeriod] || [])])];
+      }
+      return cloudIds;
     }
     if (demoMode) {
       return [...new Set([...period.students, ...(importedPeriodMap[activePeriod] || [])])];
