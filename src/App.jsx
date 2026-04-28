@@ -105,17 +105,41 @@ export default function App() {
 
 function CloudGate({ children }) {
   const { authReady, session, teams, teamsLoading, subLockedOut } = useTeam();
+  const [stuck, setStuck] = React.useState(false);
   // Auto-claim any pending email assignments the moment a session is live.
   // Idempotent — safe to fire on every sign-in.
   React.useEffect(() => {
     if (session) { claimPendingAssignments().catch(() => {}); }
   }, [session?.user?.id]);
+  // If sign-in or team load takes longer than 10s, show a recovery option.
+  React.useEffect(() => {
+    if (authReady && !teamsLoading) { setStuck(false); return; }
+    const t = setTimeout(() => setStuck(true), 10000);
+    return () => clearTimeout(t);
+  }, [authReady, teamsLoading]);
+  const StuckScreen = ({ what }) => (
+    <div style={{ padding: 40, color: 'white', background: '#04080f', minHeight: '100vh' }}>
+      <div style={{ maxWidth: 420 }}>
+        <div style={{ fontSize: 14, marginBottom: 8 }}>{what}</div>
+        <div style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.55, marginBottom: 16 }}>
+          This is taking longer than usual. Check your internet, then try reloading.
+        </div>
+        <button onClick={() => window.location.reload()} className="btn btn-primary" style={{ fontSize: 12 }}>
+          Reload
+        </button>
+      </div>
+    </div>
+  );
   if (!authReady) {
-    return <div style={{ padding: 40, color: 'white', background: '#04080f', minHeight: '100vh' }}>Loading…</div>;
+    return stuck
+      ? <StuckScreen what="Still signing you in…" />
+      : <div style={{ padding: 40, color: 'white', background: '#04080f', minHeight: '100vh' }}>Loading…</div>;
   }
   if (!session) return <SignInScreen />;
   if (teamsLoading) {
-    return <div style={{ padding: 40, color: 'white', background: '#04080f', minHeight: '100vh' }}>Loading your teams…</div>;
+    return stuck
+      ? <StuckScreen what="Still loading your teams…" />
+      : <div style={{ padding: 40, color: 'white', background: '#04080f', minHeight: '100vh' }}>Loading your teams…</div>;
   }
   if (teams.length === 0) return <TeamOnboardingModal mustChoose />;
   if (subLockedOut) return <SubLockedScreen />;
@@ -728,7 +752,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
       <BrandHeader right={
         <>
           {supabaseConfigured && <TeamSwitcher />}
-          <OllamaStatusBadge online={ollama.ollamaOnline} model={ollama.ollamaModel} />
+          <OllamaStatusBadge online={ollama.ollamaOnline} modelName={ollama.ollamaModel} />
         </>
       } />
 

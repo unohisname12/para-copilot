@@ -94,6 +94,7 @@ function OrphanStudentModal({ studentId, logs, onClose }) {
 }
 
 function StudentProfileModalInner({ studentId, logs, currentDate, activePeriod, onClose, onLog, onDraftEmail, studentData, onUpdateIdentity, onUpdateSupports, caseMemory }) {
+  useEscape(onClose);
   const s = studentData;
   const stuLogs = logs.filter(l => l.studentId === studentId);
   const health = getHealth(studentId, logs, currentDate);
@@ -193,7 +194,7 @@ function StudentProfileModalInner({ studentId, logs, currentDate, activePeriod, 
     ...(isAdmin ? [{ id: "parent",  label: "🔒 Parent Notes" }] : []),
   ];
   // Student color theming — only affects this modal's detail area
-  const c = s.color;
+  const c = s.color || '#3b82f6';
   const cFaint = c + "12";
   const cBorder = c + "40";
   return (
@@ -326,14 +327,14 @@ function StudentProfileModalInner({ studentId, logs, currentDate, activePeriod, 
                   </div>
                   {/* Save guided */}
                   <div style={{ display: 'flex', gap: '6px' }}>
-                    <button onClick={handleSaveGuided} style={{ padding: '6px 14px', borderRadius: '6px', border: `1px solid ${c}`, background: c, color: '#000', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>Save with Details</button>
-                    <button onClick={handleSaveNote} style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #1e293b', background: 'transparent', color: '#8fa3c4', fontSize: '11px', cursor: 'pointer' }}>Just save note</button>
+                    <button onClick={handleSaveGuided} disabled={!logNote.trim()} style={{ padding: '6px 14px', borderRadius: '6px', border: `1px solid ${c}`, background: c, color: '#000', fontSize: '11px', fontWeight: '700', cursor: logNote.trim() ? 'pointer' : 'not-allowed', opacity: logNote.trim() ? 1 : 0.5 }}>Save with Details</button>
+                    <button onClick={handleSaveNote} disabled={!logNote.trim()} style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #1e293b', background: 'transparent', color: '#8fa3c4', fontSize: '11px', cursor: logNote.trim() ? 'pointer' : 'not-allowed', opacity: logNote.trim() ? 1 : 0.5 }}>Just save note</button>
                   </div>
                 </div>
               )}
               {/* Default save button — hidden when guided flow is active or prompt is showing */}
               {helpPhase === "note" && !(helpWorthy && logNote.trim().length > 0) && (
-                <button className="btn btn-primary" style={{ background: c, borderColor: c, color: "#000" }} onClick={handleSaveNote}>Save note</button>
+                <button className="btn btn-primary" disabled={!logNote.trim()} style={{ background: c, borderColor: c, color: "#000", opacity: logNote.trim() ? 1 : 0.5, cursor: logNote.trim() ? 'pointer' : 'not-allowed' }} onClick={handleSaveNote}>Save note</button>
               )}
             </div>
             {onUpdateIdentity && (

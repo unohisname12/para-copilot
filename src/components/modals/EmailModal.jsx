@@ -1,8 +1,10 @@
 import React from "react";
 import { getStudentLabel } from '../../identity';
+import { useEscape } from '../../hooks/useEscape';
 
 // ── Email Modal ──────────────────────────────────────────────
 export function EmailModal({ studentId, emailLoading, emailDraft, setEmailDraft, onClose, studentData }) {
+  useEscape(onClose);
   const s = studentData;
   return (
     <div className="modal-overlay" onClick={onClose}>

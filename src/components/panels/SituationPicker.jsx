@@ -7,12 +7,15 @@ export function SituationPicker({ onSelect }) {
     <div style={{ padding: "10px", display: "flex", flexDirection: "column", gap: "6px" }}>
       <div style={{ fontSize: "11px", color: "#64748b", marginBottom: "4px" }}>Tap a situation for instant recommendations:</div>
       {SITUATIONS.map(s => (
-        <button key={s.id} onClick={() => onSelect(s)} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", background: "#0f172a", border: "1px solid #1e293b", borderRadius: "8px", cursor: "pointer", textAlign: "left" }}>
+        <button key={s.id} onClick={() => onSelect(s)} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", background: "#0f172a", border: "1px solid #1e293b", borderRadius: "8px", cursor: "pointer", textAlign: "left", minHeight: 44 }}>
           <span style={{ fontSize: "20px" }}>{s.icon}</span>
           <div><div style={{ fontSize: "13px", fontWeight: "600", color: "#e2e8f0" }}>{s.title}</div>
             <div style={{ fontSize: "11px", color: "#64748b" }}>{s.tags.join(" · ")}</div></div>
         </button>
       ))}
+      <div style={{ marginTop: 4, padding: "8px 12px", fontSize: 11, color: "#64748b", textAlign: "center", background: "#0f172a", border: "1px dashed #1e293b", borderRadius: 8, lineHeight: 1.5 }}>
+        Don't see it? Open Quick Actions to log it anyway, or tap a student card to add a free note.
+      </div>
     </div>
   );
 }

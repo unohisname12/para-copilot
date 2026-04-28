@@ -5,7 +5,7 @@ import React, { useState } from "react";
 import { DB } from '../../data';
 import { resolveLabel } from '../../privacy/nameResolver';
 
-export function AnalyticsDashboard({ logs, groups, setGroups, onOpenProfile, ollamaOnline, ollamaLoading, onOllamaPatternSummary, allStudents = DB.students }) {
+export function AnalyticsDashboard({ logs, groups = [], setGroups, onOpenProfile, ollamaOnline, ollamaLoading, onOllamaPatternSummary, allStudents = DB.students }) {
   const [range, setRange] = useState("week"), [customStart, setCustomStart] = useState(""), [customEnd, setCustomEnd] = useState("");
   const [focusStudent, setFocusStudent] = useState(null), [focusGroup, setFocusGroup] = useState(null);
   const [newGroupName, setNewGroupName] = useState(""), [newGroupStudents, setNewGroupStudents] = useState([]);
@@ -69,8 +69,9 @@ export function AnalyticsDashboard({ logs, groups, setGroups, onOpenProfile, oll
 
   const StudentAnalytics = ({ id }) => {
     const s = allStudents[id], sl = logsFor([id]), tc = typeCounts(sl), dc = dailyCounts(sl);
+    if (!s) return null;
     return (
-      <div className="panel" style={{ padding: "14px", borderLeft: `3px solid ${s.color}` }}>
+      <div className="panel" style={{ padding: "14px", borderLeft: `3px solid ${s.color || 'var(--accent)'}` }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
           <div>
             <div style={{ fontWeight: "700", fontSize: "14px", color: s.color, cursor: "pointer" }} onClick={() => onOpenProfile(id)}>{resolveLabel(s, "compact")}</div>

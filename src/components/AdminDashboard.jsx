@@ -260,18 +260,20 @@ export default function AdminDashboard({ allStudents = {}, vaultNames = {} } = {
                         🪄 Transfer ownership
                       </button>
                     )}
-                    <button
-                      type="button"
-                      disabled={isBusy}
-                      onClick={() => handleAction(
-                        () => setMemberActive(activeTeamId, m.user_id, !m.active),
-                        m.user_id
-                      )}
-                      className="btn btn-secondary btn-sm"
-                      style={{ color: m.active ? 'var(--yellow)' : 'var(--green)' }}
-                    >
-                      {m.active ? '⏸ Pause' : '▶ Resume'}
-                    </button>
+                    {!isSelf && (
+                      <button
+                        type="button"
+                        disabled={isBusy}
+                        onClick={() => handleAction(
+                          () => setMemberActive(activeTeamId, m.user_id, !m.active),
+                          m.user_id
+                        )}
+                        className="btn btn-secondary btn-sm"
+                        style={{ color: m.active ? 'var(--yellow)' : 'var(--green)' }}
+                      >
+                        {m.active ? '⏸ Pause' : '▶ Resume'}
+                      </button>
+                    )}
                     {!isSelf && (
                       <button
                         type="button"

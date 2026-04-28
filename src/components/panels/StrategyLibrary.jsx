@@ -19,8 +19,13 @@ export function StrategyLibrary() {
   );
   return (
     <div style={{ padding: "10px" }}>
-      <input value={search} onChange={e => setSearch(e.target.value)} className="chat-input" placeholder="Search strategies..." style={{ marginBottom: "10px", fontSize: "12px" }} />
-      {filtered.map(s => (
+      <input value={search} onChange={e => setSearch(e.target.value)} className="chat-input" placeholder="Search by title or tag..." style={{ marginBottom: "10px", fontSize: "12px" }} />
+      {filtered.length === 0 ? (
+        <div style={{ padding: "16px 12px", textAlign: "center", background: "#0f172a", border: "1px dashed #1e293b", borderRadius: 8 }}>
+          <div style={{ fontSize: 13, color: "#cbd5e1", marginBottom: 6 }}>No strategies match "{search}".</div>
+          <button onClick={() => setSearch("")} style={{ fontSize: 11, color: "#60a5fa", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>Clear search</button>
+        </div>
+      ) : filtered.map(s => (
         <div key={s.id} onClick={() => setSelected(s)} style={{ padding: "10px", background: "#0f172a", borderRadius: "8px", marginBottom: "6px", cursor: "pointer", borderLeft: `3px solid ${s.category === "academic" ? "#3b82f6" : s.category === "behavior" ? "#f87171" : s.category === "transition" ? "#fbbf24" : "#4ade80"}` }}>
           <div style={{ fontSize: "13px", fontWeight: "600", color: "#e2e8f0" }}>{s.title}</div>
           <div style={{ fontSize: "11px", color: "#64748b", marginTop: "2px" }}>{s.category} · {s.subjects.join(", ")}</div>

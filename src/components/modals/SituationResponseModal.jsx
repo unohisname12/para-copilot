@@ -1,9 +1,11 @@
 import React from "react";
 import { SUPPORT_CARDS, QUICK_ACTIONS, REG_TOOLS } from '../../data';
 import { getStudentLabel } from '../../identity';
+import { useEscape } from '../../hooks/useEscape';
 
 // ── Situation Response Modal ─────────────────────────────────
 export function SituationResponseModal({ situation, students, onClose, onLog, onOpenCard, studentsMap }) {
+  useEscape(onClose);
   const cards = situation.recommendedCards.map(id => SUPPORT_CARDS.find(c => c.id === id)).filter(Boolean);
   const actions = situation.recommendedActions.map(id => QUICK_ACTIONS.find(a => a.id === id)).filter(Boolean);
   const tools = situation.recommendedTools.map(id => REG_TOOLS.find(t => t.id === id)).filter(Boolean);

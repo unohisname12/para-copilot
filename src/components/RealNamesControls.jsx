@@ -2,6 +2,8 @@ import React from 'react';
 import { useVault } from '../context/VaultProvider';
 import { useEscape } from '../hooks/useEscape';
 
+const INACTIVITY_DAYS_LABEL = '14 days';
+
 // Sidebar real-name controls. Renders nothing when the vault is empty
 // (nothing to show / persist).
 export default function RealNamesControls() {
@@ -59,7 +61,7 @@ export default function RealNamesControls() {
           <div style={{ fontWeight: 700 }}>Stored names expired</div>
           <div style={{ lineHeight: 1.5, opacity: 0.9 }}>
             Device sat unused for {inactivityDays}+ days. Names have been wiped.
-            Re-load your private roster JSON to restore.
+            Re-load your private name list file to restore.
           </div>
           <button
             type="button"
@@ -126,46 +128,59 @@ export default function RealNamesControls() {
 
           {/* Persistence line */}
           {persisted ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
-              <span className="pill pill-green" style={{ fontSize: 9 }}>Remembered</span>
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+                <span className="pill pill-green" style={{ fontSize: 9 }}>Remembered</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm(
+                      'Forget all real names on this computer?\n\n' +
+                      'You\'ll need to reload the name list file next session.'
+                    )) purgeVault();
+                  }}
+                  className="btn btn-ghost btn-sm"
+                  style={{ fontSize: 10, color: 'var(--red)', padding: '2px 8px' }}
+                >
+                  Forget
+                </button>
+              </div>
+              <div style={{
+                fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.5, marginTop: 2,
+              }}>
+                Auto-wipes after {inactivityDays} days of inactivity.
+              </div>
+            </>
+          ) : (
+            <div style={{
+              marginTop: 6,
+              padding: 'var(--space-3)',
+              background: 'var(--yellow-muted)',
+              border: '1px solid rgba(251,191,36,0.5)',
+              borderRadius: 'var(--radius-md)',
+              display: 'flex', flexDirection: 'column', gap: 8,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                <span style={{ fontSize: 18, lineHeight: 1 }}>💾</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--yellow)', marginBottom: 2 }}>
+                    Names will be wiped when you close this browser
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                    Save them to this computer so you don't have to re-import every time you open the app.
+                  </div>
+                </div>
+              </div>
               <button
                 type="button"
-                onClick={() => {
-                  if (window.confirm(
-                    'Purge all real names from this device?\n\n' +
-                    'You\'ll need to reload the name list file next session.'
-                  )) purgeVault();
-                }}
-                className="btn btn-ghost btn-sm"
-                style={{ fontSize: 10, color: 'var(--red)', padding: '2px 8px' }}
+                onClick={requestEnablePersistence}
+                className="btn btn-primary btn-sm"
+                style={{ fontSize: 12, fontWeight: 700, width: '100%' }}
               >
-                Purge
+                Yes, remember on this computer
               </button>
             </div>
-          ) : (
-            <button
-              type="button"
-              onClick={requestEnablePersistence}
-              className="btn btn-ghost btn-sm"
-              style={{
-                fontSize: 11,
-                color: 'var(--text-secondary)',
-                justifyContent: 'flex-start',
-                width: '100%',
-              }}
-              title="Keep real names on this device across refreshes (opt-in)"
-            >
-              💾 Remember on this device
-            </button>
           )}
-
-          <div style={{
-            fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.5, marginTop: 2,
-          }}>
-            {persisted
-              ? `Auto-purges after ${inactivityDays} days of inactivity.`
-              : 'Names stay only for this session.'}
-          </div>
         </div>
       )}
 
@@ -256,4 +271,3 @@ export default function RealNamesControls() {
   );
 }
 
-const INACTIVITY_DAYS_LABEL = '14 days';

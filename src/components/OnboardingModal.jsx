@@ -87,10 +87,15 @@ export default function OnboardingModal({ onClose }) {
     markOnboarded();
     if (onClose) onClose();
   }
-  useEscape(finish);
+  // Esc + backdrop click only close — they don't mark onboarding "seen forever".
+  // Only Skip and Get-started commit that, so a misclick is reversible.
+  function dismissWithoutMarking() {
+    if (onClose) onClose();
+  }
+  useEscape(dismissWithoutMarking);
 
   return (
-    <div className="modal-overlay" onClick={finish}>
+    <div className="modal-overlay" onClick={dismissWithoutMarking}>
       <div
         className="modal-content"
         style={{ maxWidth: 560, width: '100%' }}

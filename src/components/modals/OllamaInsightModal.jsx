@@ -1,9 +1,11 @@
 import React, { useState } from "react";
+import { useEscape } from '../../hooks/useEscape';
 
 // ── Ollama Insight Modal ──────────────────────────────────────
 // Displays AI-generated results from local Ollama.
 // feature: "patterns" | "handoff" | "suggestions"
 export function OllamaInsightModal({ feature, text, studentId, onClose, onLog }) {
+  useEscape(onClose);
   const [copied, setCopied] = useState(false);
 
   const featureMeta = {
