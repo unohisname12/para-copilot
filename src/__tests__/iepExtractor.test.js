@@ -260,6 +260,27 @@ Funny, social.
   test('throws if neither MD nor CSV provided', () => {
     expect(() => assembleBundleFromFiles({})).toThrow();
   });
+
+  test('extracts periods from MD and stamps onto normalizedStudent + privateRosterMap', () => {
+    const md = `## Maria Garcia\n\n**Eligibility:** SLD\n\n- Period 1 — Language Arts 7 — Ms. Lambard\n\n### Strengths\nHardworking.\n`;
+    const bundle = assembleBundleFromFiles({ md });
+    const stu = bundle.normalizedStudents.students[0];
+    expect(stu.periodId).toBe('p1');
+    expect(stu.classLabel).toBe('Language Arts 7');
+    expect(stu.teacherName).toBe('Ms. Lambard');
+    const pr = bundle.privateRosterMap.privateRosterMap[0];
+    expect(pr.periodId).toBe('p1');
+    expect(pr.classLabel).toBe('Language Arts 7');
+  });
+
+  test('cross-period kid gets one privateRosterMap row per period', () => {
+    const md = `## Multi Kid\n\n**Eligibility:** SLD\n\n- Period 1 — ELA 7 — Mr. A\n- Period 4 — Science 8 — Ms. B\n`;
+    const bundle = assembleBundleFromFiles({ md });
+    expect(bundle.normalizedStudents.students).toHaveLength(1);
+    expect(bundle.privateRosterMap.privateRosterMap).toHaveLength(2);
+    const periodIds = bundle.privateRosterMap.privateRosterMap.map(r => r.periodId).sort();
+    expect(periodIds).toEqual(['p1', 'p4']);
+  });
 });
 
 describe('buildMatchReport', () => {

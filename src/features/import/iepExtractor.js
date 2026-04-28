@@ -162,7 +162,22 @@ export function parseStructuredMarkdown(sectionText) {
     strategies: [],
     tags: [],
     subject: 'General',
+    // periods: [{ periodId: 'p1', classLabel: 'ELA 7', teacherName: 'Ms. X' }, ...]
+    // Cross-period kids have multiple entries; single-period kids have one.
+    periods: [],
   };
+
+  // Extract `- Period N — Class — Teacher` lines anywhere in the section.
+  // Matches both em-dash and hyphen separators; teacher segment is optional.
+  const periodLineRe = /^\s*[-•*]\s*Period\s*(\d+)\s*[—\-:]\s*([^—\-\n]+?)(?:\s*[—\-]\s*(.+))?\s*$/gim;
+  let pm;
+  while ((pm = periodLineRe.exec(sectionText)) !== null) {
+    out.periods.push({
+      periodId: `p${pm[1].trim()}`,
+      classLabel: (pm[2] || '').trim(),
+      teacherName: (pm[3] || '').trim(),
+    });
+  }
 
   // Inline labeled fields (work anywhere in the section)
   const elig = sectionText.match(/\*\*\s*Eligibility\s*:\s*\*\*\s*(.+)/i);
@@ -479,7 +494,40 @@ export function assembleBundleFromFiles({ md, csv } = {}) {
     if (v) cleanParsed.set(p.realName, v);
   });
 
-  return buildBundleFromExtraction(rosterPairs, cleanParsed);
+  const bundle = buildBundleFromExtraction(rosterPairs, cleanParsed);
+
+  // Stamp period info onto each normalizedStudent + privateRosterMap entry.
+  // buildBundleFromExtraction left periodId blank; the MD has it.
+  // For cross-period kids, expand the privateRosterMap into one entry per
+  // period so buildIdentityRegistry adds them to every period they belong to.
+  const expandedRoster = [];
+  bundle.normalizedStudents.students.forEach((stu, i) => {
+    const parsed = cleanParsed.get(rosterPairs[i].realName);
+    const periods = (parsed && parsed.periods) || [];
+    if (periods.length > 0) {
+      // Stamp primary period onto the normalizedStudent
+      stu.periodId = periods[0].periodId;
+      stu.classLabel = periods[0].classLabel;
+      stu.teacherName = periods[0].teacherName;
+      // Emit one privateRosterMap row per period appearance
+      periods.forEach(p => {
+        expandedRoster.push({
+          studentId: stu.id,
+          realName: rosterPairs[i].realName,
+          pseudonym: '',
+          periodId: p.periodId,
+          classLabel: p.classLabel,
+          paraAppNumber: rosterPairs[i].paraAppNumber,
+        });
+      });
+    } else {
+      // No period info — keep the single empty roster row buildBundleFromExtraction produced
+      expandedRoster.push(bundle.privateRosterMap.privateRosterMap[i]);
+    }
+  });
+  bundle.privateRosterMap.privateRosterMap = expandedRoster;
+
+  return bundle;
 }
 
 // ── Pre-flight: is Ollama reachable? ─────────────────────────
