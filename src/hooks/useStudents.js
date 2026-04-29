@@ -232,6 +232,16 @@ export function useStudents({ activePeriod, cloudStudents = null }) {
 
   const getStudentById = (id) => allStudents[id] || null;
 
+  // Wipe every imported student + their period assignments. Used right
+  // before a bundle import so re-uploading replaces the imported set
+  // instead of stacking pseudonym ghosts from old imports. Does NOT
+  // touch demoMode, identity overrides, or the vault — those have
+  // their own controls.
+  const clearImports = () => {
+    setImportedStudents({});
+    setImportedPeriodMap({});
+  };
+
   // Surgical removal. Pass `{ periodId }` to drop the student from that
   // class only — cross-period kids stay visible in their other classes.
   // Without options, removes globally (used by Verify Roster orphan cleanup).
@@ -271,6 +281,7 @@ export function useStudents({ activePeriod, cloudStudents = null }) {
     handleUpdateSupports,
     getStudentById,
     removeImportedStudent,
+    clearImports,
     resetImports,
   };
 }

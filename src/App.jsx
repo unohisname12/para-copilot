@@ -1065,6 +1065,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
                 importedStudents={students.importedStudents}
                 vault={vaultCtx.vault}
                 onRemoveOrphan={students.removeImportedStudent}
+                onClearImports={students.clearImports}
                 cloudStudents={teamCtx?.teamStudents || []}
                 onRemoveCloudOrphan={async (paraAppNumber) => {
                   const { deleteTeamStudentByExternalKey } = await import('./services/teamSync');
