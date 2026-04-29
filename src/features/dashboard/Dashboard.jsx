@@ -438,14 +438,47 @@ export function Dashboard({
                 </button>
               ))}
             </div>
-            <button
-              onClick={() => setExportOpen(true)}
-              className="btn btn-secondary btn-sm"
-              title="Format today's plan + logs as text to paste into your Class Notes doc"
-              style={{ whiteSpace: "nowrap" }}
-            >
-              📋 Export today
-            </button>
+            <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+              <button
+                onClick={async () => {
+                  try {
+                    const { buildTodayWorkbook, downloadWorkbook } = await import('../export/exportWorkbook');
+                    // Build periodMap from each student's stamped periodId so
+                    // both demo + imported students land in the right tab.
+                    const periodMap = {};
+                    Object.values(allStudents).forEach(s => {
+                      if (!s?.periodId) return;
+                      if (!periodMap[s.periodId]) periodMap[s.periodId] = [];
+                      periodMap[s.periodId].push(s.id);
+                    });
+                    const wb = await buildTodayWorkbook({
+                      periods: DB.periods,
+                      periodMap,
+                      allStudents,
+                      logs,
+                      currentDate,
+                    });
+                    await downloadWorkbook(wb, `supapara-${currentDate}.xlsx`);
+                    showToast("📊 Sheet downloaded");
+                  } catch (e) {
+                    showToast(`Export failed: ${e.message}`);
+                  }
+                }}
+                className="btn btn-secondary btn-sm"
+                title="Download an .xlsx with one tab per period — opens cleanly in Google Sheets or Excel"
+                style={{ whiteSpace: "nowrap" }}
+              >
+                📊 Sheet
+              </button>
+              <button
+                onClick={() => setExportOpen(true)}
+                className="btn btn-secondary btn-sm"
+                title="Format today's plan + logs as text to paste into your Class Notes doc"
+                style={{ whiteSpace: "nowrap" }}
+              >
+                📋 Export today
+              </button>
+            </div>
           </div>
 
           {/* Body — conditional on mode */}
