@@ -105,6 +105,11 @@ function normalizePeriodCell(raw) {
   return `p${parseInt(m[1], 10)}`;
 }
 
+// Common log-export headers — if a CSV starts with these, it's almost
+// certainly a SupaPara today-export, not a roster. Tell the user instead
+// of dumping a row-by-row "missing 6-digit number" wall of errors.
+const LOG_EXPORT_HEADERS = ['date', 'action', 'type', 'pseudonym', 'reason', 'strategy', 'note'];
+
 export function parseRosterCsv(text) {
   const errors = [];
   const lines = text.split(/\r?\n/).filter(l => l.trim());
@@ -113,6 +118,20 @@ export function parseRosterCsv(text) {
   // Detect header row: if any column is a 6-digit number, it's data, not a header.
   const firstCols = splitCsvLine(lines[0]);
   const looksLikeHeader = !firstCols.some(c => isSixDigit(c));
+
+  // Log-export sniff: 2+ header cells match known log-export column names AND
+  // no cell in the first data row is a 6-digit number. That's not a roster.
+  if (looksLikeHeader) {
+    const lowerCols = firstCols.map(c => c.trim().toLowerCase());
+    const matchedLogHeaders = LOG_EXPORT_HEADERS.filter(h => lowerCols.includes(h)).length;
+    if (matchedLogHeaders >= 2) {
+      return {
+        entries: [],
+        errors: ['This looks like a log export, not a roster. Please upload your roster CSV — the one with Name + ParaAppNumber columns (and optional Period column).'],
+      };
+    }
+  }
+
   const dataLines = looksLikeHeader ? lines.slice(1) : lines;
 
   // If the header has a third "Period" column (case-insensitive), capture which

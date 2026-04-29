@@ -94,6 +94,21 @@ describe('parseRosterCsv', () => {
   });
 });
 
+describe('parseRosterCsv — friendly errors', () => {
+  test('log-export upload gets one helpful error, not a row-by-row dump', () => {
+    const logExport = [
+      '"Date","Period","Pseudonym","Action","Reason","Strategy","Note"',
+      '"2026-04-28","Period 3 — Math 2","🍊 Tangerine 1","Accommodation Used","break","No","Needed Break"',
+      '"2026-04-28","Period 3 — Math 2","🍀 Clover 96","Accommodation Used","break","No","Needed Break"',
+    ].join('\n');
+    const { entries, errors } = parseRosterCsv(logExport);
+    expect(entries).toHaveLength(0);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatch(/log export/i);
+    expect(errors[0]).toMatch(/roster/i);
+  });
+});
+
 describe('dedupeAndValidate with multi-period rows', () => {
   test('keeps cross-period rows for the same kid (different periodIds)', () => {
     const { entries, errors } = dedupeAndValidate([

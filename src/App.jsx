@@ -264,6 +264,28 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
     // on the transition, not every time logs or case memory update.
   }, [students.demoMode]);
 
+  // One-time mount sweep: if demoMode is already false (e.g. user closed
+  // the tab after importing real students), the transition effect above
+  // never fires on the next reload — so any source:'demo' logs that were
+  // written previously linger in localStorage forever. This catches that
+  // stale state once at boot.
+  React.useEffect(() => {
+    if (students.demoMode) return;
+    const hasStaleDemoLogs = (logsBag.logs || []).some(l => l.source === 'demo');
+    const hasStaleDemoCase =
+      (caseMemory.incidents || []).some(i => String(i.id || '').startsWith('inc_demo_')) ||
+      (caseMemory.interventions || []).some(i => String(i.id || '').startsWith('intv_demo_')) ||
+      (caseMemory.outcomes || []).some(o => String(o.id || '').startsWith('out_demo_'));
+    if (hasStaleDemoLogs) logsBag.clearDemoLogs();
+    if (hasStaleDemoCase && caseMemory.clearDemoOnly) caseMemory.clearDemoOnly();
+    if (hasStaleDemoLogs || hasStaleDemoCase) {
+      setSampleDataClearedToast(true);
+      setTimeout(() => setSampleDataClearedToast(false), 4200);
+    }
+    // Run once at mount; deliberately empty deps.
+    // eslint-disable-next-line
+  }, []);
+
   // ── UI state ───────────────────────────────────────────────
   const [profileStu, setProfileStu] = useState(null);
   const [activeToolbox, setActiveToolbox] = useState(null);
