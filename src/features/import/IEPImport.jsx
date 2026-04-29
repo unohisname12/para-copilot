@@ -113,6 +113,9 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
   const [bundleData,          setBundleData]          = useState(null);
   const [bundleError,         setBundleError]         = useState("");
   const [bundleImported,      setBundleImported]      = useState(false);
+  // Two-slot upload: paras can drop one file, then add the other (or skip).
+  // Cleared after a successful JSON import or after a slot-based assemble.
+  const [bundleSlots, setBundleSlots] = useState({ md: null, csv: null });
   // Post-import save prompt: auto-extracts real names from bundle before normalizing.
   const [showRosterSaveModal,   setShowRosterSaveModal]   = useState(false);
   const [showMissingNamesModal, setShowMissingNamesModal] = useState(false);
@@ -126,63 +129,76 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
   const [mrImportedStudentCount, setMrImportedStudentCount] = useState(0);
   const masterRosterFileRef = useRef();
 
-  // Accepts:
-  //   - one .json bundle (existing path)
-  //   - one .md file (per-student structured Markdown — paraAppNumbers
-  //     generated deterministically from name)
-  //   - one .csv file (roster only — IEP fields left blank)
-  //   - .md + .csv pair (MD provides IEP fields, CSV provides paraAppNumbers)
+  // Two-step bundle upload:
+  //   - .json bundle    → single-shot, auto-imports immediately
+  //   - .md  / .csv     → drops into a slot. Both slots filled? auto-assemble +
+  //                       auto-import. One slot? wait — UI prompts for the
+  //                       other or lets the para proceed with what they have.
   const handleBundleFile = async (e) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-    setBundleError(""); setBundleData(null); setBundleImported(false);
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
 
-    const byExt = {};
-    for (const f of files) {
-      const ext = (f.name.split('.').pop() || '').toLowerCase();
-      if (byExt[ext]) {
-        setBundleError(`Got two .${ext} files. Pick one .${ext} at a time.`);
-        e.target.value = ""; return;
-      }
-      byExt[ext] = f;
-    }
+    setBundleError("");
 
-    try {
-      let bundle = null;
-
-      // JSON path — must be the only file
-      if (byExt.json) {
-        if (byExt.md || byExt.csv) {
-          setBundleError("Pick a JSON bundle alone, OR an MD file (with optional CSV roster). Not both.");
-          e.target.value = ""; return;
-        }
-        const json = JSON.parse(await byExt.json.text());
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    if (ext === 'json') {
+      try {
+        const json = JSON.parse(await file.text());
         const err = validateBundle(json);
-        if (err) { setBundleError(err); e.target.value = ""; return; }
-        bundle = json;
-      } else if (byExt.md || byExt.csv) {
-        // MD / CSV path — assemble a bundle in memory
-        const md = byExt.md ? await byExt.md.text() : null;
-        const csv = byExt.csv ? await byExt.csv.text() : null;
-        bundle = assembleBundleFromFiles({ md, csv });
-        if (!bundle.normalizedStudents.students.length) {
-          setBundleError("No students found. MD needs `## Student Name` headings; CSV needs Name + 6-digit number columns.");
-          e.target.value = ""; return;
-        }
-      } else {
-        setBundleError("Unsupported file type. Use .json, .md, or .csv.");
-        e.target.value = ""; return;
+        if (err) { setBundleError(err); return; }
+        setBundleSlots({ md: null, csv: null }); // clear partial slots if any
+        setBundleData(json);
+        doBundleImport(json);
+      } catch (err) { setBundleError("Could not parse JSON: " + err.message); }
+      return;
+    }
+    if (ext === 'md' || ext === 'csv') {
+      try {
+        const text = await file.text();
+        setBundleData(null);
+        setBundleImported(false);
+        setBundleSlots(prev => ({ ...prev, [ext]: { name: file.name, text } }));
+      } catch (err) {
+        setBundleError(`Could not read ${file.name}: ${err.message}`);
       }
+      return;
+    }
+    setBundleError("Unsupported file type. Use .json, .md, or .csv.");
+  };
 
-      // Show the preview + auto-import in one shot. The preview tile
-      // becomes a "what just landed" recap; user doesn't need a 2nd click.
+  // Assemble a bundle from whatever slots are filled and import it.
+  const importFromSlots = () => {
+    setBundleError("");
+    try {
+      const bundle = assembleBundleFromFiles({
+        md: bundleSlots.md?.text || null,
+        csv: bundleSlots.csv?.text || null,
+      });
+      if (!bundle.normalizedStudents.students.length) {
+        setBundleError("No students found. MD needs `## Student Name` headings; CSV needs Name + 6-digit number columns.");
+        return;
+      }
       setBundleData(bundle);
       doBundleImport(bundle);
     } catch (err) {
-      setBundleError("Could not parse file: " + err.message);
+      setBundleError("Could not assemble bundle: " + err.message);
     }
-    e.target.value = "";
   };
+
+  const clearBundleSlot = (which) => {
+    setBundleSlots(prev => ({ ...prev, [which]: null }));
+    setBundleData(null);
+    setBundleImported(false);
+  };
+
+  // Auto-assemble + auto-import the moment both slots are full.
+  React.useEffect(() => {
+    if (bundleSlots.md && bundleSlots.csv && !bundleImported) {
+      importFromSlots();
+    }
+    // eslint-disable-next-line
+  }, [bundleSlots.md, bundleSlots.csv]);
 
   // Accepts an optional bundle arg so it can be invoked inline right after
   // assembly (when React state hasn't flushed yet). Falls back to bundleData
@@ -776,15 +792,82 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
             🔒 <strong>Safe to use:</strong> This file has fake names only. If it also includes real names, they stay on this computer — never sent to the cloud, AI, or anyone else.
           </div>
 
-          {/* Bundle file input — accepts JSON bundle, OR MD (+optional CSV roster) */}
-          <input type="file" ref={bundleFileRef} style={{ display: "none" }} accept=".json,.md,.csv" multiple onChange={handleBundleFile} />
+          {/* Bundle file input — single picker, called from any slot/button */}
+          <input type="file" ref={bundleFileRef} style={{ display: "none" }} accept=".json,.md,.csv" onChange={handleBundleFile} />
 
-          {/* Upload button */}
-          <button onClick={() => bundleFileRef.current?.click()}
-            style={{ width: "100%", padding: "14px 20px", borderRadius: "10px", border: `2px solid ${bundleData ? "#6d28d9" : "var(--border-light)"}`, background: bundleData ? "#12102a" : "var(--bg-surface)", color: bundleData ? "#a78bfa" : "var(--text-primary)", fontSize: "14px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", gap: "12px", textAlign: "left" }}>
-            <span style={{ fontSize: "22px" }}>📦</span>
-            <span>{bundleData ? `✓ File loaded` : "Upload your student file (.json, .md, or .md + .csv)"}</span>
-          </button>
+          {/* Two-slot picker: IEP Markdown + Roster CSV. Drop one in, prompt for the other. */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <BundleSlot
+              icon="📝"
+              title="IEP Summaries"
+              subtitle=".md  ·  goals, accommodations, alerts"
+              slot={bundleSlots.md}
+              onPick={() => bundleFileRef.current?.click()}
+              onClear={() => clearBundleSlot('md')}
+            />
+            <BundleSlot
+              icon="📊"
+              title="Roster"
+              subtitle=".csv  ·  names + para # + period"
+              slot={bundleSlots.csv}
+              onPick={() => bundleFileRef.current?.click()}
+              onClear={() => clearBundleSlot('csv')}
+            />
+          </div>
+
+          {/* Status strip — guides the user to the next file or lets them proceed solo */}
+          {(bundleSlots.md || bundleSlots.csv) && !bundleImported && (
+            <div style={{
+              padding: "10px 14px",
+              background: "#0c1a3d",
+              border: "1px solid #1d4ed8",
+              borderRadius: 10,
+              fontSize: 12.5,
+              color: "#bfdbfe",
+              lineHeight: 1.55,
+              display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap",
+            }}>
+              <span style={{ fontSize: 18 }}>
+                {bundleSlots.md && bundleSlots.csv ? "🎯" : "👋"}
+              </span>
+              <span style={{ flex: 1, minWidth: 200 }}>
+                {bundleSlots.md && !bundleSlots.csv && (
+                  <>Got your <strong>IEP file</strong>. Now drop in the <strong>roster CSV</strong> for real para numbers + class periods — or use what you have.</>
+                )}
+                {bundleSlots.csv && !bundleSlots.md && (
+                  <>Got your <strong>roster</strong>. Now drop in the <strong>IEP markdown</strong> to fill in goals + accommodations — or use what you have.</>
+                )}
+                {bundleSlots.md && bundleSlots.csv && (
+                  <>Both files loaded — assembling now…</>
+                )}
+              </span>
+              {!(bundleSlots.md && bundleSlots.csv) && (
+                <button
+                  onClick={importFromSlots}
+                  style={{
+                    padding: "8px 14px",
+                    borderRadius: 8,
+                    border: "1px solid #6d28d9",
+                    background: "#1e1b4b",
+                    color: "#c4b5fd",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Use what I have
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Tiny tertiary line — paras can also drop a JSON bundle here */}
+          {!bundleSlots.md && !bundleSlots.csv && !bundleData && (
+            <div style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "center" }}>
+              Have a single <code style={{ background: "var(--bg-surface)", padding: "1px 5px", borderRadius: 4 }}>.json</code> bundle instead? Drop it on either tile.
+            </div>
+          )}
 
           {/* Validation error */}
           {bundleError && (
@@ -1291,6 +1374,71 @@ function Row({ label, value, color }) {
     <div style={{ display: "flex", gap: "8px" }}>
       <span style={{ color: "var(--text-muted)", flexShrink: 0, minWidth: "90px" }}>{label}:</span>
       <span style={{ color: color || "var(--text-primary)" }}>{value}</span>
+    </div>
+  );
+}
+
+// Visual slot in the App Bundle picker — shows whether a file is loaded for
+// MD or CSV. Clicking the empty state opens the file dialog (parent picks
+// the actual extension); clicking ✕ on a filled slot clears it.
+function BundleSlot({ icon, title, subtitle, slot, onPick, onClear }) {
+  const filled = !!slot;
+  return (
+    <div
+      onClick={filled ? undefined : onPick}
+      style={{
+        padding: "14px 16px",
+        borderRadius: 10,
+        border: `2px ${filled ? "solid #6d28d9" : "dashed var(--border-light)"}`,
+        background: filled ? "#12102a" : "var(--bg-surface)",
+        color: filled ? "#a78bfa" : "var(--text-primary)",
+        cursor: filled ? "default" : "pointer",
+        display: "flex", flexDirection: "column", gap: 6,
+        minHeight: 90,
+        position: "relative",
+        transition: "border-color 150ms ease",
+      }}
+    >
+      {filled && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onClear(); }}
+          title="Remove this file"
+          style={{
+            position: "absolute", top: 8, right: 8,
+            border: "1px solid var(--border)", background: "var(--bg-deep)",
+            color: "var(--text-muted)", fontSize: 11,
+            borderRadius: 6, padding: "2px 7px", cursor: "pointer",
+          }}
+        >
+          ✕
+        </button>
+      )}
+      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+        <span style={{ fontSize: 22 }}>{icon}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>
+            {filled && "✓ "}{title}
+          </div>
+          <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 1 }}>
+            {subtitle}
+          </div>
+        </div>
+      </div>
+      {filled ? (
+        <div style={{
+          fontSize: 11, color: "var(--text-secondary)",
+          background: "var(--bg-dark)",
+          padding: "5px 8px", borderRadius: 6,
+          fontFamily: "JetBrains Mono, monospace",
+          wordBreak: "break-all",
+        }}>
+          {slot.name}
+        </div>
+      ) : (
+        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+          Click to choose a file
+        </div>
+      )}
     </div>
   );
 }
