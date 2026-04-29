@@ -42,6 +42,25 @@ export function onAuthStateChange(cb) {
 
 // ---------- Teams ----------
 
+// Mirrors the SQL `lower(regexp_replace(name, '[^a-z0-9]', '', 'g'))` — must
+// stay in sync with the generated column in the team_normalized_name
+// migration so client checks line up with what the DB stores.
+export function normalizeTeamName(name) {
+  if (name == null) return '';
+  return String(name).toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+// Find existing teams whose normalized name matches the candidate. Used by
+// the create-team flow to warn when a para is about to make a duplicate.
+export async function findSimilarTeam(name) {
+  const candidate = normalizeTeamName(name);
+  if (!candidate) return [];
+  requireClient();
+  const { data, error } = await supabase.rpc('find_similar_team', { candidate });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
 export async function createTeam(name, displayName) {
   requireClient();
   const { data, error } = await supabase.rpc('create_team', {

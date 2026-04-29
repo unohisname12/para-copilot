@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTeam } from '../context/TeamProvider';
 import { useEscape } from '../hooks/useEscape';
+import { findSimilarTeam } from '../services/teamSync';
 
 export default function TeamOnboardingModal({ onClose, mustChoose = false }) {
   const { user, teams, activeTeamId, setActiveTeamId, createTeam, joinTeamByCode, signOut } = useTeam();
@@ -18,13 +19,28 @@ export default function TeamOnboardingModal({ onClose, mustChoose = false }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const [created, setCreated] = useState(null);
+  // When create-team detects an existing team with the same normalized name,
+  // we hold the form submission and pop a confirmation step. Cleared on
+  // cancel/dismiss so the user can edit the name and try again.
+  const [duplicateMatches, setDuplicateMatches] = useState(null);
   useEscape(() => { if (!mustChoose && onClose) onClose(); });
 
   async function handleCreate(e) {
     e.preventDefault();
     setBusy(true); setErr(null);
     try {
+      // Pre-flight: warn if a team with the same normalized name already exists.
+      // Skipped only if user already saw + dismissed the warning (duplicateMatches set).
+      if (duplicateMatches === null) {
+        const hits = await findSimilarTeam(teamName.trim());
+        if (hits && hits.length > 0) {
+          setDuplicateMatches(hits);
+          setBusy(false);
+          return;
+        }
+      }
       const t = await createTeam(teamName.trim(), displayName.trim());
+      setDuplicateMatches(null);
       setCreated(t);
     } catch (e2) { setErr(e2.message || String(e2)); }
     finally { setBusy(false); }
@@ -115,13 +131,13 @@ export default function TeamOnboardingModal({ onClose, mustChoose = false }) {
             </form>
           )}
 
-          {tab === 'create' && !created && (
+          {tab === 'create' && !created && !duplicateMatches && (
             <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
               <Field label="Team name">
                 <input
                   className="chat-input"
                   value={teamName}
-                  onChange={(e) => setTeamName(e.target.value)}
+                  onChange={(e) => { setTeamName(e.target.value); setDuplicateMatches(null); }}
                   required autoFocus
                   placeholder="e.g. Lincoln Middle School"
                 />
@@ -135,9 +151,69 @@ export default function TeamOnboardingModal({ onClose, mustChoose = false }) {
                 />
               </Field>
               <button type="submit" disabled={busy} className="btn btn-primary" style={{ width: '100%', marginTop: 'var(--space-2)' }}>
-                {busy ? 'Creating…' : 'Create team'}
+                {busy ? 'Checking…' : 'Create team'}
               </button>
             </form>
+          )}
+
+          {tab === 'create' && !created && duplicateMatches && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+              <div style={{
+                padding: 'var(--space-4)',
+                background: '#1a1505',
+                border: '1px solid #854d0e',
+                borderRadius: 'var(--radius-md)',
+                color: '#fbbf24',
+                fontSize: 13, lineHeight: 1.55,
+              }}>
+                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>
+                  ⚠ A team with this name already exists
+                </div>
+                {duplicateMatches.map(m => (
+                  <div key={m.id} style={{ marginTop: 6, fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: 'var(--text-secondary)' }}>
+                    • {m.name}
+                  </div>
+                ))}
+                <div style={{ marginTop: 10, color: 'var(--text-secondary)', fontSize: 12 }}>
+                  Are you trying to <strong>join</strong> this team, or is yours a different one?
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setTab('join'); setDuplicateMatches(null); }}
+                className="btn btn-primary"
+                style={{ width: '100%' }}
+              >
+                I'm joining this team — take me to the invite-code form
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  // User confirmed the new team genuinely is different.
+                  // Re-call handleCreate; duplicateMatches is set so it'll skip the pre-flight.
+                  setBusy(true); setErr(null);
+                  try {
+                    const t = await createTeam(teamName.trim(), displayName.trim());
+                    setDuplicateMatches(null);
+                    setCreated(t);
+                  } catch (e2) { setErr(e2.message || String(e2)); }
+                  finally { setBusy(false); }
+                }}
+                disabled={busy}
+                className="btn btn-secondary"
+                style={{ width: '100%' }}
+              >
+                {busy ? 'Creating…' : 'No, mine is different — create anyway'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setDuplicateMatches(null)}
+                className="btn btn-ghost"
+                style={{ width: '100%', fontSize: 12, color: 'var(--text-muted)' }}
+              >
+                ← Back, change the team name
+              </button>
+            </div>
           )}
 
           {tab === 'create' && created && (

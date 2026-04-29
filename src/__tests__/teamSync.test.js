@@ -19,6 +19,8 @@ import {
   joinTeamByCode,
   pushStudents,
   getMyAssignedStudents,
+  findSimilarTeam,
+  normalizeTeamName,
 } from '../services/teamSync';
 import { supabase } from '../services/supabaseClient';
 
@@ -245,6 +247,50 @@ describe('pushStudents', () => {
     // Only one supabase.from call (the insert), no second from() for cleanup
     expect(supabase.from).toHaveBeenCalledTimes(1);
     expect(insertMock).toHaveBeenCalled();
+  });
+});
+
+describe('normalizeTeamName', () => {
+  test('lowercases + strips punctuation/whitespace', () => {
+    expect(normalizeTeamName('Fair-View Middle School')).toBe('fairviewmiddleschool');
+    expect(normalizeTeamName('FAIR VIEW MIDDLE SCHOOL')).toBe('fairviewmiddleschool');
+    expect(normalizeTeamName(' Fair  View   Middle.School! ')).toBe('fairviewmiddleschool');
+  });
+  test('handles empty / null safely', () => {
+    expect(normalizeTeamName('')).toBe('');
+    expect(normalizeTeamName(null)).toBe('');
+    expect(normalizeTeamName(undefined)).toBe('');
+  });
+  test('keeps numbers and unicode letters', () => {
+    expect(normalizeTeamName('Lincoln 9 ★')).toBe('lincoln9');
+  });
+});
+
+describe('findSimilarTeam', () => {
+  test('queries teams via the find_similar_team RPC with normalized input', async () => {
+    supabase.rpc.mockResolvedValueOnce({
+      data: [{ id: 't1', name: 'Fair-View Middle School' }],
+      error: null,
+    });
+    const hits = await findSimilarTeam('FAIR VIEW MIDDLE SCHOOL!');
+    expect(supabase.rpc).toHaveBeenCalledWith('find_similar_team', {
+      candidate: 'fairviewmiddleschool',
+    });
+    expect(hits).toHaveLength(1);
+    expect(hits[0].name).toBe('Fair-View Middle School');
+  });
+  test('returns empty array when no match', async () => {
+    supabase.rpc.mockResolvedValueOnce({ data: [], error: null });
+    expect(await findSimilarTeam('Brand New Team')).toEqual([]);
+  });
+  test('blank input is a safe no-op (returns [] without hitting the RPC)', async () => {
+    expect(await findSimilarTeam('')).toEqual([]);
+    expect(await findSimilarTeam('   ')).toEqual([]);
+    expect(supabase.rpc).not.toHaveBeenCalledWith('find_similar_team', expect.anything());
+  });
+  test('throws on RPC error', async () => {
+    supabase.rpc.mockResolvedValueOnce({ data: null, error: { message: 'boom' } });
+    await expect(findSimilarTeam('Foo')).rejects.toThrow(/boom/);
   });
 });
 
