@@ -1,14 +1,30 @@
 import { useLocalStorage } from './useLocalStorage';
 import { createLog } from '../models';
+import { polishText } from '../utils/spellPolish';
 
 export function useLogs({ currentDate, periodLabel, activePeriod, onLogCreated }) {
   const [logs, setLogs] = useLocalStorage('paraLogsV1', []);
+  // Auto-polish toggle. Default ON — paras want quick messy notes cleaned
+  // up automatically. They can flip it off in Settings → Editor if they
+  // want raw input preserved.
+  const [autoPolish] = useLocalStorage('paraAutoPolishV1', true);
 
   const addLog = (studentId, note, type, extras = {}) => {
+    let finalNote = note;
+    let polishMeta = null;
+    if (autoPolish && note && typeof note === 'string') {
+      const { polished, original, changes } = polishText(note);
+      if (changes.length > 0 && polished !== note) {
+        finalNote = polished;
+        polishMeta = { original, changes: changes.length };
+      }
+    }
     const log = createLog({
-      studentId, type, note, date: currentDate,
+      studentId, type, note: finalNote, date: currentDate,
       period: periodLabel, periodId: activePeriod,
       ...extras,
+      // Tag the log so the UI can offer Undo to the original text.
+      polish: polishMeta || undefined,
     });
     setLogs(prev => [log, ...prev]);
     if (onLogCreated) {

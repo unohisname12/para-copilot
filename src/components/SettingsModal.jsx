@@ -79,6 +79,7 @@ export default function SettingsModal({ open, onClose, onReplayOnboarding }) {
 
           {/* EDITOR */}
           <Section label="Editor">
+            <AutoPolishToggle />
             <GrammarFixToggle />
           </Section>
 
@@ -207,6 +208,32 @@ function GrammarFixToggle() {
       body="Lightly fixes capitalization and double spaces 1.5s after you stop typing. Cursor stays put. Applies to every place you log notes (dashboard, Simple Mode, handoffs, parent notes)."
       on={!!enabled}
       onChange={() => setEnabled(!enabled)}
+    />
+  );
+}
+
+// Auto-polish-on-save: catches typos when you save a note. ~150 common
+// para-context misspellings + capitalization + spacing. Default ON because
+// paras explicitly asked for "type fast, system cleans up".
+function AutoPolishToggle() {
+  const [enabled, setEnabled] = React.useState(() => {
+    try {
+      const v = localStorage.getItem('paraAutoPolishV1');
+      return v == null ? true : JSON.parse(v); // default ON
+    } catch { return true; }
+  });
+  function flip() {
+    const next = !enabled;
+    setEnabled(next);
+    try { localStorage.setItem('paraAutoPolishV1', JSON.stringify(next)); } catch {}
+  }
+  return (
+    <Toggle
+      icon="🪄"
+      title="Auto-polish notes on save"
+      body="Catches common typos (behavoir → behavior, recieve → receive, etc.) and fixes capitalization the moment you save a log. Doesn't touch slang, names, or your line breaks. ~150 misspellings covered."
+      on={enabled}
+      onChange={flip}
     />
   );
 }
