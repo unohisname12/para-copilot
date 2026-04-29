@@ -60,11 +60,12 @@ export default function SettingsModal({ open, onClose, onReplayOnboarding }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay">
+      {/* Backdrop click intentionally does NOT close — paras kept losing
+          their place when they tapped slightly outside the panel. Use X or Esc. */}
       <div
         className="modal-content"
         style={{ maxWidth: 560, width: '100%' }}
-        onClick={e => e.stopPropagation()}
       >
         <div className="modal-header">
           <div>

@@ -57,8 +57,8 @@ function OrphanStudentModal({ studentId, logs, onClose }) {
   const orphanLogs = (logs || []).filter(l => l.studentId === studentId);
   useEscape(onClose);
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" style={{ maxWidth: 460, position: 'relative' }} onClick={e => e.stopPropagation()}>
+    <div className="modal-overlay">
+      <div className="modal-content" style={{ maxWidth: 460, position: 'relative' }}>
         <button
           type="button"
           onClick={onClose}
@@ -212,8 +212,10 @@ function StudentProfileModalInner({ studentId, logs, currentDate, activePeriod, 
   const cFaint = c + "12";
   const cBorder = c + "40";
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" style={{ width: "680px", maxWidth: "96vw", maxHeight: "88vh", display: "flex", flexDirection: "column", borderTop: `3px solid ${c}` }} onClick={e => e.stopPropagation()}>
+    <div className="modal-overlay">
+      {/* Backdrop click intentionally does NOT close — log-note + supports
+          state lives inside this modal. Use X or Esc. */}
+      <div className="modal-content" style={{ width: "680px", maxWidth: "96vw", maxHeight: "88vh", display: "flex", flexDirection: "column", borderTop: `3px solid ${c}` }}>
         {/* Alert banner — only for v2 students with alertText or alert flag */}
         {(s.alertText || s.flags?.alert) && (
           <div style={{ padding: "8px 16px", background: "#1a0505", borderBottom: "1px solid #7f1d1d", fontSize: "12px", color: "#f87171", fontWeight: "700", display: "flex", alignItems: "center", gap: "8px" }}>

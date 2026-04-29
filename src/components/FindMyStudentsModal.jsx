@@ -93,11 +93,12 @@ export default function FindMyStudentsModal({ open, onClose, onIdentityLoad }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={close}>
+    <div className="modal-overlay">
+      {/* Backdrop click intentionally does NOT close — paras kept losing
+          mid-import context when they tapped outside. Use X or Esc. */}
       <div
         className="modal-content"
         style={{ maxWidth: 600, width: '100%' }}
-        onClick={e => e.stopPropagation()}
       >
         <div className="modal-header">
           <div>

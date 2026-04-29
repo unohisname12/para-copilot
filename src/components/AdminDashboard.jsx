@@ -762,8 +762,8 @@ function ShareTipModal({ topic, paraName, studentLabel, onClose }) {
   const [text, setText] = useState(draft);
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" style={{ width: 560 }} onClick={e => e.stopPropagation()}>
+    <div className="modal-overlay">
+      <div className="modal-content" style={{ width: 560 }}>
         <div className="modal-header">
           <div>
             <div style={{ fontWeight: 700, fontSize: 16 }}>Share a tip with {paraName || 'para'}</div>

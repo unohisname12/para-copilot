@@ -38,10 +38,37 @@ export function useTeamOptional() {
   return useContext(TeamContext);
 }
 
+// Cache key for the team list. Reads on mount so the dashboard can render
+// from cached data immediately instead of showing "Loading your teams..."
+// every reload. Cloud refetch happens in the background; if it returns
+// different data, state updates and the UI flips.
+const TEAMS_CACHE_KEY = 'paraTeamsCacheV1';
+
+function readCachedTeams() {
+  try {
+    const raw = globalThis.localStorage?.getItem(TEAMS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch { return null; }
+}
+
+function writeCachedTeams(teams) {
+  try {
+    if (Array.isArray(teams) && teams.length > 0) {
+      globalThis.localStorage?.setItem(TEAMS_CACHE_KEY, JSON.stringify(teams));
+    } else {
+      globalThis.localStorage?.removeItem(TEAMS_CACHE_KEY);
+    }
+  } catch { /* ignore */ }
+}
+
 export function TeamProvider({ children }) {
   const [session, setSession] = useState(null);
   const [authReady, setAuthReady] = useState(false);
-  const [teams, setTeams] = useState([]);
+  // Hydrate from cache so the first render skips the spinner. Cloud fetch
+  // below replaces this with fresh data once it lands.
+  const [teams, setTeams] = useState(() => readCachedTeams() || []);
   const [activeTeamId, setActiveTeamId] = useState(null);
   const [teamsLoading, setTeamsLoading] = useState(false);
 
@@ -58,14 +85,23 @@ export function TeamProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    if (!session) { setTeams([]); setActiveTeamId(null); return; }
+    if (!session) {
+      setTeams([]);
+      setActiveTeamId(null);
+      writeCachedTeams(null);
+      return;
+    }
     let cancelled = false;
-    setTeamsLoading(true);
+    // Only show the spinner if we DON'T already have cached teams. Otherwise
+    // the dashboard renders from cache while the cloud fetch happens silently.
+    const hadCache = (teams || []).length > 0;
+    if (!hadCache) setTeamsLoading(true);
     (async () => {
       try {
         const t = await getMyTeams();
         if (cancelled) return;
         setTeams(t);
+        writeCachedTeams(t);
         setActiveTeamId((prev) => prev || (t[0] ? t[0].id : null));
       } finally {
         if (!cancelled) setTeamsLoading(false);

@@ -62,11 +62,12 @@ export default function BugReportButton({ collapsed = false }) {
       </button>
 
       {open && (
-        <div className="modal-overlay" onClick={close}>
+        <div className="modal-overlay">
+          {/* Backdrop click intentionally does NOT close — bug-report draft
+              would be lost. Use X or Esc. */}
           <div
             className="modal-content"
             style={{ maxWidth: 520, width: '100%' }}
-            onClick={e => e.stopPropagation()}
           >
             <div className="modal-header">
               <div>
