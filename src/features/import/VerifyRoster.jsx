@@ -205,14 +205,18 @@ export default function VerifyRoster({
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead style={{ position: 'sticky', top: 0, background: 'var(--bg-surface)' }}>
                 <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                  {['Status', 'Real Name', 'Para #', 'Period', 'Pseudonym', 'Detail'].map(h => (
-                    <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>{h}</th>
+                  {['Status', 'Real Name', 'Para #', 'Period', 'Pseudonym', 'Detail', ''].map((h, i) => (
+                    <th key={i} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {report.rows.map((r, i) => {
                   const meta = STATUS_META[r.status] || STATUS_META.linked;
+                  // Per-period removal only makes sense for linked rows — orphan/noPeriod
+                  // already have whole-row actions, missing/collision/cloudOrphan aren't
+                  // local periodMap entries.
+                  const canRemoveFromPeriod = r.status === 'linked' && r.studentId && r.periodId && onRemoveOrphan;
                   return (
                     <tr key={`${r.paraAppNumber}_${i}`} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{ padding: '7px 12px' }}>
@@ -230,6 +234,26 @@ export default function VerifyRoster({
                       <td style={{ padding: '7px 12px', color: 'var(--text-secondary)' }}>{r.periodId || '—'}</td>
                       <td style={{ padding: '7px 12px', color: 'var(--text-muted)' }}>{r.pseudonym || '—'}</td>
                       <td style={{ padding: '7px 12px', color: 'var(--text-muted)', fontSize: 11 }}>{r.detail}</td>
+                      <td style={{ padding: '7px 12px' }}>
+                        {canRemoveFromPeriod && (
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`Remove ${r.realName || r.pseudonym} from ${r.periodId} only? Cross-period kids stay in their other classes.`)) {
+                                onRemoveOrphan(r.studentId, { periodId: r.periodId });
+                              }
+                            }}
+                            style={{
+                              fontSize: 10, padding: '3px 8px',
+                              borderRadius: 6, border: '1px solid var(--border)',
+                              background: 'transparent', color: 'var(--text-muted)',
+                              cursor: 'pointer', whiteSpace: 'nowrap',
+                            }}
+                            title="Remove from this class only"
+                          >
+                            Remove from {r.periodId}
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}

@@ -5,6 +5,45 @@ import { migrateIdentity, patchIdentity } from '../identity';
 import { normalizeIdentityEntries } from '../models';
 import { migrateSupports } from '../models/supports';
 
+// Pure reducer for student removal. Lives outside the hook so it can be
+// tested directly (no renderer required) and reused if we ever need a
+// non-hook caller. Behavior:
+//   - no options.periodId  → full delete (drop from every period + the
+//                            importedStudents map)
+//   - options.periodId set → drop from that period only. If the student
+//                            no longer appears in any period, fully delete.
+//                            Keeps cross-period kids alive in their other
+//                            periods, which is the whole point of this fix.
+export function applyStudentRemoval(state, studentId, options = {}) {
+  if (!studentId || !state) return state;
+  const periodId = options.periodId;
+  const importedStudents = { ...(state.importedStudents || {}) };
+  const importedPeriodMap = {};
+  Object.entries(state.importedPeriodMap || {}).forEach(([pid, ids]) => {
+    importedPeriodMap[pid] = Array.isArray(ids) ? [...ids] : [];
+  });
+
+  if (!periodId) {
+    delete importedStudents[studentId];
+    Object.keys(importedPeriodMap).forEach(pid => {
+      importedPeriodMap[pid] = importedPeriodMap[pid].filter(id => id !== studentId);
+    });
+    return { importedStudents, importedPeriodMap };
+  }
+
+  if (!importedPeriodMap[periodId]) return state; // nothing to do
+  const before = importedPeriodMap[periodId];
+  const after = before.filter(id => id !== studentId);
+  if (after.length === before.length) return state; // student wasn't in that period
+  importedPeriodMap[periodId] = after;
+
+  // Was that the student's last appearance? If so, drop from importedStudents too.
+  const stillUsed = Object.values(importedPeriodMap).some(ids => ids.includes(studentId));
+  if (!stillUsed) delete importedStudents[studentId];
+
+  return { importedStudents, importedPeriodMap };
+}
+
 function fromCloudRow(row) {
   return migrateIdentity({
     id: row.id,
@@ -193,22 +232,21 @@ export function useStudents({ activePeriod, cloudStudents = null }) {
 
   const getStudentById = (id) => allStudents[id] || null;
 
-  // Surgical removal of a single imported student. Used by the Roster Health
-  // Check "Remove orphans" action — keeps everything else in place.
-  const removeImportedStudent = (studentId) => {
+  // Surgical removal. Pass `{ periodId }` to drop the student from that
+  // class only — cross-period kids stay visible in their other classes.
+  // Without options, removes globally (used by Verify Roster orphan cleanup).
+  const removeImportedStudent = (studentId, options = {}) => {
     if (!studentId) return;
-    setImportedStudents(prev => {
-      const next = { ...prev };
-      delete next[studentId];
-      return next;
-    });
-    setImportedPeriodMap(prev => {
-      const next = {};
-      Object.entries(prev).forEach(([pid, ids]) => {
-        next[pid] = (ids || []).filter(id => id !== studentId);
-      });
-      return next;
-    });
+    // Both pieces of state need to flip atomically — but useLocalStorage
+    // setters can only see one slice each. Snapshot current values, run the
+    // pure reducer, then push both halves.
+    const next = applyStudentRemoval(
+      { importedStudents, importedPeriodMap },
+      studentId,
+      options
+    );
+    setImportedStudents(next.importedStudents);
+    setImportedPeriodMap(next.importedPeriodMap);
   };
 
   // Wipe all imports + identity back to a fresh state. Used by the
