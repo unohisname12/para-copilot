@@ -476,7 +476,13 @@ export function assembleBundleFromFiles({ md, csv } = {}) {
   let rosterPairs = [];
   const csvPeriodsByName = new Map();
   if (csv) {
-    const { entries: rawEntries } = parseRosterCsv(csv);
+    const { entries: rawEntries, errors: csvErrors } = parseRosterCsv(csv);
+    // If the parser couldn't make sense of the CSV (most commonly because the
+    // user dropped a log export by mistake), surface that error so the UI can
+    // show the actual reason instead of a generic "no students found".
+    if ((!rawEntries || rawEntries.length === 0) && csvErrors && csvErrors.length) {
+      throw new Error(csvErrors[0]);
+    }
     const { entries } = dedupeAndValidate(rawEntries);
     // Collect periodId per name across rows
     entries.forEach(e => {

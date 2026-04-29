@@ -808,7 +808,7 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
             <BundleSlot
               icon="📊"
               title="Roster"
-              subtitle=".csv  ·  names + para # + period"
+              subtitle=".csv  ·  names + para # (NOT today-export / ParaData)"
               slot={bundleSlots.csv}
               onPick={() => bundleFileRef.current?.click()}
               onClear={() => clearBundleSlot('csv')}

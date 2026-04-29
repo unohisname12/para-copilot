@@ -261,6 +261,16 @@ Funny, social.
     expect(() => assembleBundleFromFiles({})).toThrow();
   });
 
+  test('throws the friendly parser error when CSV is actually a log export', () => {
+    const logExport = [
+      'Date,Period,Student,Type,Category,Flagged,Tags,Observation',
+      '"2026-04-28","Period 3","🍊 Tangerine 1","Accommodation Used","break","No","break","note"',
+    ].join('\n');
+    const md = '## Maria Garcia\n\n**Eligibility:** SLD';
+    expect(() => assembleBundleFromFiles({ md, csv: logExport }))
+      .toThrow(/log export/i);
+  });
+
   test('extracts periods from MD and stamps onto normalizedStudent + privateRosterMap', () => {
     const md = `## Maria Garcia\n\n**Eligibility:** SLD\n\n- Period 1 — Language Arts 7 — Ms. Lambard\n\n### Strengths\nHardworking.\n`;
     const bundle = assembleBundleFromFiles({ md });
