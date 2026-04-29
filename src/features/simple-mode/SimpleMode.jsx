@@ -8,6 +8,7 @@
 // - Responsive grid: 1 column on narrow, 2 on wide (auto-fit ≥ 520px)
 // ══════════════════════════════════════════════════════════════
 import React, { useState, useMemo, useRef, useEffect } from "react";
+import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { DB, SUPPORT_CARDS } from '../../data';
 import { runLocalEngine } from '../../engine';
 import { getHealth, hdot } from '../../models';
@@ -124,6 +125,12 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
 
   // v3: filter for "show only students who haven't gotten [category] today"
   const [summaryFilter, setSummaryFilter] = useState(null);
+
+  // Surface today's lesson topic in Simple Mode too — paras shouldn't have
+  // to flip back to the full Dashboard just to see what they're teaching.
+  // Same storage key the Dashboard writes to, read-only here. Edit happens
+  // in Dashboard's "Today's Plan" card.
+  const [todayTopic] = useLocalStorage(`classTopic_${activePeriod}_${currentDate}`, "");
 
   // Focus row — tap a student's name or 📝 Note to expand that row in place.
   // The textarea grows, quick-actions stay visible, accommodations + the first
@@ -345,6 +352,27 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
             <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
               {period.teacher} · {rows.length} / {periodStudentIds.length} students
             </div>
+            {todayTopic && todayTopic.trim() && (
+              <div
+                style={{
+                  marginTop: 8,
+                  padding: "8px 12px",
+                  background: "var(--accent-soft, #1e1b4b)",
+                  border: "1px solid var(--accent-border, #4c1d95)",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  color: "var(--accent-hover, #c4b5fd)",
+                  display: "flex",
+                  gap: 8,
+                  alignItems: "flex-start",
+                  maxWidth: 520,
+                }}
+                title="Today's lesson focus — edit in the full Dashboard"
+              >
+                <span style={{ fontSize: 14, flexShrink: 0 }}>📚</span>
+                <span style={{ whiteSpace: "pre-wrap", lineHeight: 1.4 }}>{todayTopic}</span>
+              </div>
+            )}
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <button onClick={() => setActiveTool("timer")} title="Visual Timer" className="btn btn-secondary" style={{ fontSize: 16, padding: "8px 14px" }}>⏱️</button>
