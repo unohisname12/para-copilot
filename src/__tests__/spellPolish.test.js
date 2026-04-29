@@ -33,6 +33,16 @@ describe('applyTypoFixes', () => {
     expect(applyTypoFixes('').text).toBe('');
     expect(applyTypoFixes(null).text).toBe('');
   });
+
+  test('catches more "because" scrambles', () => {
+    expect(applyTypoFixes('it was beucase he was tired').text).toBe('it was because he was tired');
+    expect(applyTypoFixes('bcause of recess').text).toBe('because of recess');
+    expect(applyTypoFixes('becase he asked').text).toBe('because he asked');
+  });
+
+  test('leaves codes/names with digits untouched (e.g. R2rodman)', () => {
+    expect(applyTypoFixes('R2rodman is fine').text).toBe('R2rodman is fine');
+  });
 });
 
 describe('polishText', () => {
