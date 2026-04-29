@@ -3,6 +3,7 @@
 // Imports everything, manages state, wires it together.
 // ══════════════════════════════════════════════════════════════
 import React, { useState } from "react";
+import { useLocalStorage } from './hooks/useLocalStorage';
 import "./styles/styles.css";
 
 // Data layer
@@ -148,8 +149,13 @@ function CloudGate({ children }) {
 
 function AppCore() {
   const today = new Date(), localISO = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split("T")[0];
+  // currentDate stays in plain useState — it should default to today on each
+  // reload (paras work in "today" 99% of the time), even if they navigated
+  // to a different date in the previous session.
   const [currentDate, setCurrentDate] = useState(localISO);
-  const [activePeriod, setActivePeriod] = useState("p3");
+  // activePeriod persists so you come back to the period you were last in
+  // — paras switch periods all day; resetting to a default is annoying.
+  const [activePeriod, setActivePeriod] = useLocalStorage("paraActivePeriodV1", "p3");
   const period = DB.periods[activePeriod];
 
   return (
@@ -184,8 +190,10 @@ function VaultBridge({ children }) {
 }
 
 function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, period }) {
-  const [view, setView] = useState("dashboard");
-  const [simpleMode, setSimpleMode] = useState(false);
+  // view + simpleMode persist across reload so you don't lose your spot when
+  // a school computer reloads the tab unexpectedly.
+  const [view, setView] = useLocalStorage("paraLastViewV1", "dashboard");
+  const [simpleMode, setSimpleMode] = useLocalStorage("paraSimpleModeV1", false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [findStudentsOpen, setFindStudentsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
