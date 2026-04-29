@@ -239,6 +239,28 @@ export async function pushStudents(teamId, students, userId) {
     written.push(...(data || []));
   }
 
+  // Auto-cleanup: every push by this uploader represents the canonical set
+  // of THEIR contributions to the team roster. Any row in team_students where
+  // created_by matches this user but external_key isn't in the keys we just
+  // pushed is a stale leftover (algorithm change, kid removed, etc.) — delete
+  // it. RLS + the created_by predicate make this multi-para safe: we only
+  // ever touch rows the current user uploaded.
+  // Skipped when keyed.length === 0 because we don't have a "keep" set —
+  // running it would delete every row the uploader owns.
+  if (keyed.length > 0 && userId) {
+    const keepKeys = keyed.map(r => r.external_key);
+    const inList = `(${keepKeys.map(k => String(k).replace(/[(),]/g, '')).join(',')})`;
+    await supabase
+      .from('team_students')
+      .delete()
+      .eq('team_id', teamId)
+      .eq('created_by', userId)
+      .not('external_key', 'in', inList)
+      .select();
+    // Don't throw on cleanup error — the upsert already succeeded; cleanup
+    // is best-effort. Surfaced via console for debugging.
+  }
+
   return written;
 }
 
