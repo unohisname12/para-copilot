@@ -200,12 +200,38 @@ export function IEPImport({ onImport, onBulkImport, onIdentityLoad, importedCoun
     // eslint-disable-next-line
   }, [bundleSlots.md, bundleSlots.csv]);
 
+  // Pre-clean step: when re-importing the same kids, the previous round's
+  // students stay in localStorage with stale paraAppNumbers (e.g. one round
+  // came from MD-alone with auto-generated numbers, the next from CSV with
+  // real numbers). The names are the same — Parker Cartwright shouldn't
+  // appear twice in p2 — so wipe any existing imports whose vault-resolved
+  // real name OR raw paraAppNumber overlaps the incoming bundle.
+  const purgeMatchingImports = (incomingBundle) => {
+    if (!onRemoveOrphan || !importedStudents) return;
+    const incomingNames = new Set();
+    const incomingNumbers = new Set();
+    (incomingBundle?.privateRosterMap?.privateRosterMap || []).forEach(r => {
+      if (r.realName) incomingNames.add(r.realName.trim().toLowerCase());
+      if (r.paraAppNumber) incomingNumbers.add(String(r.paraAppNumber).trim());
+    });
+    Object.values(importedStudents).forEach(s => {
+      const num = (s?.paraAppNumber || '').toString().trim();
+      const vaultName = (vault && num) ? vault[num] : null;
+      const matchByNumber = num && incomingNumbers.has(num);
+      const matchByName = vaultName && incomingNames.has(vaultName.trim().toLowerCase());
+      if (matchByNumber || matchByName) onRemoveOrphan(s.id);
+    });
+  };
+
   // Accepts an optional bundle arg so it can be invoked inline right after
   // assembly (when React state hasn't flushed yet). Falls back to bundleData
   // when called from the click handler.
   const doBundleImport = (bundleArg) => {
     const data = bundleArg || bundleData;
     if (!data || !onBulkImport) return;
+
+    // Wipe stale duplicates BEFORE the new bundle's students get added.
+    purgeMatchingImports(data);
 
     if (data.privateRosterMap?.privateRosterMap?.length > 0) {
       // Combined JSON with real names — build identity registry
