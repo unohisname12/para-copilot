@@ -118,6 +118,7 @@ export default function FindMyStudentsModal({ open, onClose, onIdentityLoad }) {
             <div style={sectionHat}>Easiest way</div>
             <div style={sectionTitle}>Type or paste names + Para App Numbers</div>
             <textarea
+              spellCheck="false"
               value={paste}
               onChange={e => setPaste(e.target.value)}
               placeholder={'Maria Lopez, 847293\nJames Chen, 102938\nAiden Brown, 449112'}

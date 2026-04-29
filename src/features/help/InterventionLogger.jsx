@@ -80,6 +80,7 @@ export function InterventionLogger({ student, incident, onSave, onCancel, prefil
       <div style={{ marginBottom: '12px' }}>
         <label style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Staff Note (optional)</label>
         <textarea
+          spellCheck="true" lang="en"
           value={staffNote} onChange={e => setStaffNote(e.target.value)}
           placeholder="What exactly did you do?"
           rows={2}

@@ -649,7 +649,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
             <div><label style={{ fontSize: "11px", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>Title</label><input value={kb.kbTitle} onChange={e => kb.setKbTitle(e.target.value)} placeholder="e.g. Decimal Strategies" style={{ width: "100%", padding: "8px 10px", background: "var(--bg-dark)", border: "1px solid var(--border)", borderRadius: "6px", color: "white", fontSize: "13px" }} /></div>
             <div><label style={{ fontSize: "11px", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>Type</label><select value={kb.kbDocType} onChange={e => kb.setKbDocType(e.target.value)} className="period-select" style={{ width: "100%" }}><option>Teaching Strategy</option><option>Lesson Plan</option><option>IEP Document</option><option>My Own Notes</option><option>Para Team Notes</option><option>Other</option></select></div>
           </div>
-          <textarea value={kb.kbInput} onChange={e => kb.setKbInput(e.target.value)} className="data-textarea" style={{ height: "100px" }} placeholder="Paste content or upload below..." />
+          <textarea spellCheck="true" lang="en" value={kb.kbInput} onChange={e => kb.setKbInput(e.target.value)} className="data-textarea" style={{ height: "100px" }} placeholder="Paste content or upload below..." />
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
             <button className="btn btn-primary" onClick={() => kb.addToKB(activePeriod)}>+ Add for {period.label}</button>
             <button className="btn btn-secondary" onClick={() => kb.addToKB("all")}>+ Add for All</button>

@@ -220,6 +220,7 @@ export function GoalTrackerFullscreen({
                 Add a note
               </div>
               <textarea
+                spellCheck="true" lang="en"
                 value={note}
                 onChange={e => setNote(e.target.value)}
                 placeholder="What's going on with this kid right now? Saves to the activity log."

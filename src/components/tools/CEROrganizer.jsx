@@ -12,7 +12,7 @@ export function CEROrganizer() {
         <div key={label}>
           <div style={{ fontSize: "12px", fontWeight: "600", color, marginBottom: "3px" }}>{label}</div>
           <div style={{ fontSize: "11px", color: "#64748b", marginBottom: "4px" }}>{hint}</div>
-          <textarea value={val} onChange={e => set(e.target.value)} className="data-textarea" style={{ height: "70px", marginBottom: 0, border: `1px solid ${color}40` }} />
+          <textarea spellCheck="true" lang="en" value={val} onChange={e => set(e.target.value)} className="data-textarea" style={{ height: "70px", marginBottom: 0, border: `1px solid ${color}40` }} />
         </div>
       ))}
     </div>

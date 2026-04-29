@@ -775,6 +775,7 @@ function ShareTipModal({ topic, paraName, studentLabel, onClose }) {
         </div>
         <div className="modal-body">
           <textarea
+            spellCheck="true" lang="en"
             value={text}
             onChange={e => setText(e.target.value)}
             className="data-textarea"

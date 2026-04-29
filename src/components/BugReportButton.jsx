@@ -128,6 +128,7 @@ export default function BugReportButton({ collapsed = false }) {
               <div>
                 <label style={fieldLabel}>What happened (one or two lines)</label>
                 <textarea
+                  spellCheck="true" lang="en"
                   value={whatHappened}
                   onChange={e => setWhatHappened(e.target.value)}
                   placeholder={kind === 'bug' ? 'I clicked X and Y happened. Expected Z.' : kind === 'idea' ? 'It would help if...' : 'I need help with...'}
@@ -139,6 +140,7 @@ export default function BugReportButton({ collapsed = false }) {
               <div>
                 <label style={fieldLabel}>More detail (optional)</label>
                 <textarea
+                  spellCheck="true" lang="en"
                   value={details}
                   onChange={e => setDetails(e.target.value)}
                   placeholder="Anything else you want Dre to know"
