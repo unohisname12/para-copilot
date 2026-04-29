@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef } from "react";
 import { useAutoGrammarFix, useGrammarFixSetting } from '../../hooks/useAutoGrammarFix';
+import { useDraft } from '../../hooks/useDraft';
 import { GOAL_PROGRESS_OPTIONS } from '../../data';
 import { getHealth, hdot } from '../../models';
 import { migrateIdentity, getDefaultIdentity, isIdentityCustomized } from '../../identity';
@@ -119,6 +120,10 @@ function StudentProfileModalInner({ studentId, logs, currentDate, activePeriod, 
   const [autoFix] = useGrammarFixSetting();
   useAutoGrammarFix({ value: logNote,   setValue: setLogNote,   ref: logNoteRef,   enabled: autoFix });
   useAutoGrammarFix({ value: staffNote, setValue: setStaffNote, ref: staffNoteRef, enabled: autoFix });
+  // Draft persistence keyed per-student so each kid's notes survive
+  // closing the profile modal mid-thought.
+  const logNoteStore   = useDraft(studentId ? `profileLog:${studentId}`   : '', logNote,   setLogNote);
+  const staffNoteStore = useDraft(studentId ? `profileStaff:${studentId}` : '', staffNote, setStaffNote);
   const helpWorthy = useMemo(() => isHelpWorthy(logNote), [logNote]);
 
   const resetGuidedFlow = () => { setHelpPhase("note"); setAntecedent(null); setIntervention(null); setResult(null); setAftermath(null); setStaffNote(""); };
@@ -126,6 +131,7 @@ function StudentProfileModalInner({ studentId, logs, currentDate, activePeriod, 
   const handleSaveNote = () => {
     if (!logNote.trim()) return;
     onLog(studentId, logNote, logType);
+    logNoteStore.clear();
     setLogNote("");
     resetGuidedFlow();
   };
@@ -147,6 +153,8 @@ function StudentProfileModalInner({ studentId, logs, currentDate, activePeriod, 
         }
       }
     }
+    logNoteStore.clear();
+    staffNoteStore.clear();
     setLogNote("");
     resetGuidedFlow();
   };

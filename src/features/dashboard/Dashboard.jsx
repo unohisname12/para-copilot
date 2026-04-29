@@ -7,6 +7,7 @@ import { getHealth, hdot } from '../../models';
 import { resolveLabel } from '../../privacy/nameResolver';
 import { parseDocForPeriod, matchCaseKeywords } from '../../engine';
 import { useAutoGrammarFix, useGrammarFixSetting } from '../../hooks/useAutoGrammarFix';
+import { useDraft } from '../../hooks/useDraft';
 import { OllamaStatusBadge } from '../../components/OllamaStatusBadge';
 import { HelpButton } from '../help';
 import { ShowcaseBanner } from '../showcase';
@@ -114,6 +115,14 @@ export function Dashboard({
   useAutoGrammarFix({ value: topicDraft, setValue: setTopicDraft, ref: topicTextareaRef, enabled: autoFix && topicEdit });
   useAutoGrammarFix({ value: noteDraft,  setValue: setNoteDraft,  ref: noteTextareaRef,  enabled: autoFix && !!noteTarget });
 
+  // Draft persistence: in-flight notes survive modal close, view switch,
+  // tab reload. Cleared explicitly when the para finishes the action.
+  // Topic doesn't need it — `topic` itself is already persisted.
+  const noteDraftKey = noteTarget
+    ? `quickNote:${noteTarget.studentId}:${noteTarget.action?.type || 'note'}`
+    : '';
+  const noteDraftStore = useDraft(noteDraftKey, noteDraft, setNoteDraft);
+
   const showToast = useCallback((msg) => {
     setToast(msg);
     clearTimeout(toastRef.current);
@@ -126,10 +135,12 @@ export function Dashboard({
     const note = extraNote.trim() || (topic ? `${action.type} — ${topic}` : action.type);
     addLog(studentId, note, action.type);
     showToast(`✅ ${action.label} → ${resolveLabel(s, "compact")}`);
+    // Clear persisted draft — successful save means the in-flight text is done.
+    noteDraftStore.clear();
     setActiveAction(null);
     setNoteTarget(null);
     setNoteDraft("");
-  }, [allStudents, topic, addLog, showToast]);
+  }, [allStudents, topic, addLog, showToast, noteDraftStore]);
 
   // Per-card action taps always open the detail sheet. Paras using the
   // dashboard (vs. Simple Mode) want room to write — the sheet has a
@@ -999,7 +1010,13 @@ export function Dashboard({
         const studentLabel = resolveLabel(student, "compact") || noteTarget.studentId;
         const patterns = getStudentPatterns(noteTarget.studentId, logs);
         const hasDetail = noteDraft.trim().length > 0;
-        const onCancel = () => { setNoteTarget(null); setNoteDraft(""); };
+        const onCancel = () => {
+          // Don't auto-clear the draft on cancel — the para may want to come
+          // back to it. Just close the sheet. Draft stays in localStorage and
+          // will hydrate next time the same (student × action) sheet opens.
+          setNoteTarget(null);
+          setNoteDraft("");
+        };
         const onSave = () => quickLog(noteTarget.studentId, noteTarget.action, noteDraft);
 
         return (

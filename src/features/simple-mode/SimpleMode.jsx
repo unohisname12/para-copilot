@@ -10,6 +10,7 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { useAutoGrammarFix, useGrammarFixSetting } from '../../hooks/useAutoGrammarFix';
+import { useDraft } from '../../hooks/useDraft';
 import { DB, SUPPORT_CARDS } from '../../data';
 import { runLocalEngine } from '../../engine';
 import { getHealth, hdot } from '../../models';
@@ -145,6 +146,13 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
   useAutoGrammarFix({ value: focusedDraft, setValue: setFocusedDraft, ref: focusedRef, enabled: autoFix && !!focusedStudentId });
   useAutoGrammarFix({ value: noteText,     setValue: setNoteText,     ref: noteTextRef, enabled: autoFix });
 
+  // Draft persistence — keyed per-student so each kid's in-flight note is
+  // remembered separately. Survives focus swap, navigation away, reload.
+  const focusedKey = focusedStudentId ? `simpleFocus:${focusedStudentId}` : '';
+  const focusedDraftStore = useDraft(focusedKey, focusedDraft, setFocusedDraft);
+  const noteKey = `simpleNote`; // shared — popover holds one note at a time
+  const noteDraftStore = useDraft(noteKey, noteText, setNoteText);
+
   const swapFocus = (newStudentId) => {
     if (focusedStudentId && focusedDraft.trim()) {
       commitFocusedDraft({
@@ -153,6 +161,7 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
         allStudents: studentsMap,
         addLog,
       });
+      focusedDraftStore.clear(); // saved → drop the persisted draft
     }
     setFocusedStudentId(newStudentId);
     setFocusedDraft('');
@@ -166,6 +175,7 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
         allStudents: studentsMap,
         addLog,
       });
+      focusedDraftStore.clear();
     }
     setFocusedStudentId(null);
     setFocusedDraft('');
@@ -283,6 +293,7 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
     });
 
     if (newLog?.id) showUndo(newLog.id, selectedStudent, cat?.label || 'note');
+    noteDraftStore.clear();  // saved → drop persisted draft
     setSaved(true);
     setTimeout(reset, 1400);
   };

@@ -4,6 +4,7 @@ import { resolveLabel } from '../../privacy/nameResolver';
 import { useTeamOptional } from '../../context/TeamProvider';
 import { pushHandoff } from '../../services/teamSync';
 import { useAutoGrammarFix, useGrammarFixSetting } from '../../hooks/useAutoGrammarFix';
+import { useDraft } from '../../hooks/useDraft';
 
 const lbl = { fontSize: "11px", color: "#94a3b8", display: "block", marginBottom: "3px" };
 
@@ -18,6 +19,12 @@ export function HandoffBuilder({ students, onSave, studentsMap, ollamaOnline, ol
   const [autoFix] = useGrammarFixSetting();
   useAutoGrammarFix({ value: summary,  setValue: setSummary,  ref: summaryRef,  enabled: autoFix });
   useAutoGrammarFix({ value: nextStep, setValue: setNextStep, ref: nextStepRef, enabled: autoFix });
+  // Draft persistence — keyed per (audience × student) so a half-typed
+  // handoff for next_para about stu_001 doesn't clobber another in-flight
+  // one for parent about all kids.
+  const draftKey = `handoff:${audience}:${stuId}`;
+  const summaryStore  = useDraft(`${draftKey}:summary`,  summary,  setSummary);
+  const nextStepStore = useDraft(`${draftKey}:nextStep`, nextStep, setNextStep);
   const save = () => {
     if (!summary.trim()) return;
     const aud = { next_para: "Next Para", teacher: "Teacher", end_of_day: "End of Day", urgent: "URGENT Follow-up" }[audience];
@@ -46,6 +53,8 @@ export function HandoffBuilder({ students, onSave, studentsMap, ollamaOnline, ol
         console.error('[cloud] pushHandoff failed', err);
       });
     }
+    summaryStore.clear();
+    nextStepStore.clear();
     setSummary(""); setNextStep("");
   };
   const handleAIDraft = async () => {

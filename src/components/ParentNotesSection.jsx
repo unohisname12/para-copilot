@@ -5,6 +5,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useTeamOptional } from '../context/TeamProvider';
 import { listParentNotes, addParentNote, deleteParentNote } from '../services/teamSync';
 import { useAutoGrammarFix, useGrammarFixSetting } from '../hooks/useAutoGrammarFix';
+import { useDraft } from '../hooks/useDraft';
 
 export default function ParentNotesSection({ studentDbId, studentLabel }) {
   const team = useTeamOptional();
@@ -13,6 +14,8 @@ export default function ParentNotesSection({ studentDbId, studentLabel }) {
   const draftRef = useRef(null);
   const [autoFix] = useGrammarFixSetting();
   useAutoGrammarFix({ value: draft, setValue: setDraft, ref: draftRef, enabled: autoFix });
+  // Draft persistence keyed per-student.
+  const draftStore = useDraft(studentDbId ? `parentNote:${studentDbId}` : '', draft, setDraft);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -40,6 +43,7 @@ export default function ParentNotesSection({ studentDbId, studentLabel }) {
     setSaving(true); setErr(null);
     try {
       await addParentNote(teamId, studentDbId, draft.trim());
+      draftStore.clear();
       setDraft('');
       await refresh();
     } catch (e2) {
