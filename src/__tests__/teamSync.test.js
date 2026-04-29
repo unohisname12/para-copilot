@@ -21,6 +21,9 @@ import {
   getMyAssignedStudents,
   findSimilarTeam,
   normalizeTeamName,
+  joinTeamAsOwner,
+  regenerateOwnerCode,
+  isOwnerCode,
 } from '../services/teamSync';
 import { supabase } from '../services/supabaseClient';
 
@@ -291,6 +294,58 @@ describe('findSimilarTeam', () => {
   test('throws on RPC error', async () => {
     supabase.rpc.mockResolvedValueOnce({ data: null, error: { message: 'boom' } });
     await expect(findSimilarTeam('Foo')).rejects.toThrow(/boom/);
+  });
+});
+
+describe('owner code', () => {
+  test('isOwnerCode detects the OWN- prefix (case-insensitive)', () => {
+    expect(isOwnerCode('OWN-ABCDEFGH')).toBe(true);
+    expect(isOwnerCode('own-abcdefgh')).toBe(true);
+    expect(isOwnerCode('  OWN-XYZ12345  ')).toBe(true);
+    expect(isOwnerCode('ABC123')).toBe(false);
+    expect(isOwnerCode('OWNERLIKETHIS')).toBe(false);
+    expect(isOwnerCode('OWN-')).toBe(false); // prefix only
+    expect(isOwnerCode('')).toBe(false);
+    expect(isOwnerCode(null)).toBe(false);
+  });
+
+  test('joinTeamAsOwner calls join_team_as_owner RPC and returns team', async () => {
+    supabase.rpc.mockResolvedValueOnce({
+      data: { id: 't1', name: 'Fair-View', invite_code: 'ABC123', owner_code: 'OWN-ABCDEFGH' },
+      error: null,
+    });
+    const t = await joinTeamAsOwner('OWN-ABCDEFGH', 'Mr Dre');
+    expect(supabase.rpc).toHaveBeenCalledWith('join_team_as_owner', {
+      code: 'OWN-ABCDEFGH',
+      display: 'Mr Dre',
+    });
+    expect(t.id).toBe('t1');
+  });
+
+  test('joinTeamAsOwner uppercases + trims the code', async () => {
+    supabase.rpc.mockResolvedValueOnce({ data: { id: 't1' }, error: null });
+    await joinTeamAsOwner('  own-abcdefgh  ', 'Mr Dre');
+    expect(supabase.rpc).toHaveBeenCalledWith('join_team_as_owner', {
+      code: 'OWN-ABCDEFGH',
+      display: 'Mr Dre',
+    });
+  });
+
+  test('joinTeamAsOwner throws on RPC error', async () => {
+    supabase.rpc.mockResolvedValueOnce({ data: null, error: { message: 'Invalid owner code' } });
+    await expect(joinTeamAsOwner('OWN-BAD12345', 'X')).rejects.toThrow(/Invalid owner code/);
+  });
+
+  test('regenerateOwnerCode calls the RPC with team_id and returns new code', async () => {
+    supabase.rpc.mockResolvedValueOnce({ data: 'OWN-NEW12345', error: null });
+    const code = await regenerateOwnerCode('t1');
+    expect(supabase.rpc).toHaveBeenCalledWith('regenerate_owner_code', { tid: 't1' });
+    expect(code).toBe('OWN-NEW12345');
+  });
+
+  test('regenerateOwnerCode rejects without a team_id', async () => {
+    await expect(regenerateOwnerCode()).rejects.toThrow(/team/i);
+    await expect(regenerateOwnerCode('')).rejects.toThrow(/team/i);
   });
 });
 

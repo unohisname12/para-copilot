@@ -298,6 +298,13 @@ export function TeamProvider({ children }) {
       setTeams((ts) => ts.map((t) => (t.id === activeTeamId ? { ...t, inviteCode: code } : t)));
       return code;
     },
+    regenerateOwnerCode: async () => {
+      if (!activeTeamId) return null;
+      const { regenerateOwnerCode } = await import('../services/teamSync');
+      const code = await regenerateOwnerCode(activeTeamId);
+      setTeams((ts) => ts.map((t) => (t.id === activeTeamId ? { ...t, ownerCode: code } : t)));
+      return code;
+    },
   }), [
     session, authReady, teams, activeTeam, activeTeamId, teamsLoading,
     currentRole, isAdmin, isSub, subLockedOut,

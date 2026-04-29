@@ -413,6 +413,48 @@ export default function AdminDashboard({ allStudents = {}, vaultNames = {} } = {
                 Regenerating invalidates the old code. Anyone who hasn't joined yet will need the new one.
               </div>
             </div>
+            <div>
+              <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-muted)', marginBottom: 4 }}>
+                Owner code <span style={{ marginLeft: 6, color: '#a78bfa' }}>(joins as Sped Teacher)</span>
+              </div>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', flexWrap: 'wrap' }}>
+                <code style={{
+                  fontFamily: 'JetBrains Mono, monospace',
+                  fontSize: 18, letterSpacing: 1, fontWeight: 700,
+                  padding: '8px 14px',
+                  background: '#12102a',
+                  border: '1px solid #6d28d9',
+                  color: '#c4b5fd',
+                  borderRadius: 'var(--radius-md)',
+                }}>{activeTeam?.ownerCode || '— not set —'}</code>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => {
+                    if (activeTeam?.ownerCode) {
+                      navigator.clipboard.writeText(activeTeam.ownerCode);
+                    }
+                  }}
+                  disabled={!activeTeam?.ownerCode}
+                >
+                  📋 Copy
+                </button>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={async () => {
+                    if (!window.confirm('Regenerate the owner code? The old one will stop working immediately.')) return;
+                    try {
+                      const code = await team.regenerateOwnerCode();
+                      if (code) alert(`New owner code: ${code}`);
+                    } catch (e) { setErr(e.message); }
+                  }}
+                >
+                  🔄 Regenerate
+                </button>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.55 }}>
+                Hand this to a teacher / case manager so they can join with full admin access. Don't share with paras — they should use the regular invite code.
+              </div>
+            </div>
           </div>
 
           <DangerZone

@@ -50,6 +50,43 @@ export function normalizeTeamName(name) {
   return String(name).toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
+// ── Owner codes ──────────────────────────────────────────────
+// Owner codes are how a sped teacher / owner joins an existing team.
+// Format is `OWN-XXXXXXXX` (4-char prefix + 8 random alphanumerics) so the
+// client can auto-detect them in the join form vs the para invite code.
+const OWNER_CODE_RE = /^own-[a-z0-9]{6,12}$/i;
+
+export function isOwnerCode(code) {
+  if (!code) return false;
+  return OWNER_CODE_RE.test(String(code).trim());
+}
+
+// Join an existing team as a sped teacher / owner. Server-side RPC validates
+// the code, inserts a team_members row with role='sped_teacher'.
+export async function joinTeamAsOwner(code, displayName) {
+  requireClient();
+  const cleaned = String(code || '').trim().toUpperCase();
+  const display = String(displayName || '').trim();
+  if (!cleaned) throw new Error('Owner code required');
+  if (!display) throw new Error('Display name required');
+  const { data, error } = await supabase.rpc('join_team_as_owner', {
+    code: cleaned,
+    display,
+  });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+// Owner-only — generate a new owner code for a team and return it. Old code
+// is invalidated. Server checks the caller is an owner of the team.
+export async function regenerateOwnerCode(teamId) {
+  if (!teamId) throw new Error('team id required');
+  requireClient();
+  const { data, error } = await supabase.rpc('regenerate_owner_code', { tid: teamId });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 // Find existing teams whose normalized name matches the candidate. Used by
 // the create-team flow to warn when a para is about to make a duplicate.
 export async function findSimilarTeam(name) {
@@ -88,7 +125,7 @@ export async function getMyTeams() {
   requireClient();
   const { data, error } = await supabase
     .from('team_members')
-    .select('team_id, role, display_name, active, teams(id, name, invite_code, allow_subs)')
+    .select('team_id, role, display_name, active, teams(id, name, invite_code, owner_code, allow_subs)')
     .eq('active', true)
     .order('joined_at', { ascending: true });
   if (error) throw new Error(error.message);
@@ -96,6 +133,7 @@ export async function getMyTeams() {
     id: row.teams.id,
     name: row.teams.name,
     inviteCode: row.teams.invite_code,
+    ownerCode: row.teams.owner_code,
     allowSubs: row.teams.allow_subs,
     role: row.role,
     displayName: row.display_name,

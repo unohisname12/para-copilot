@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useTeam } from '../context/TeamProvider';
 import { useEscape } from '../hooks/useEscape';
-import { findSimilarTeam } from '../services/teamSync';
+import { findSimilarTeam, isOwnerCode, joinTeamAsOwner } from '../services/teamSync';
 
 export default function TeamOnboardingModal({ onClose, mustChoose = false }) {
   const { user, teams, activeTeamId, setActiveTeamId, createTeam, joinTeamByCode, signOut } = useTeam();
@@ -53,7 +53,13 @@ export default function TeamOnboardingModal({ onClose, mustChoose = false }) {
     e.preventDefault();
     setBusy(true); setErr(null);
     try {
-      await joinTeamByCode(inviteCode.trim().toUpperCase(), displayName.trim(), joinRole);
+      // Owner-code path takes precedence — joins as sped_teacher regardless
+      // of the para/sub toggle (the toggle is for invite-code joins only).
+      if (isOwnerCode(inviteCode)) {
+        await joinTeamAsOwner(inviteCode, displayName.trim());
+      } else {
+        await joinTeamByCode(inviteCode.trim().toUpperCase(), displayName.trim(), joinRole);
+      }
       if (!mustChoose && onClose) onClose();
     } catch (e2) { setErr(e2.message || String(e2)); }
     finally { setBusy(false); }
@@ -291,17 +297,21 @@ export default function TeamOnboardingModal({ onClose, mustChoose = false }) {
             </div>
           )}
 
-          {tab === 'join' && (
+          {tab === 'join' && (() => {
+            const ownerMode = isOwnerCode(inviteCode);
+            return (
             <form onSubmit={handleJoin} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-              <Field label="Invite code">
+              <Field label="Invite or owner code">
                 <input
                   className="chat-input"
                   value={inviteCode}
                   onChange={(e) => setInviteCode(e.target.value)}
-                  required autoFocus maxLength={6}
-                  placeholder="ABC123"
+                  required autoFocus
+                  // Owner codes are 12 chars; bump max so they don't get truncated
+                  maxLength={20}
+                  placeholder={ownerMode ? 'OWN-XXXXXXXX' : 'ABC123 or OWN-XXXXXXXX'}
                   style={{
-                    letterSpacing: 6,
+                    letterSpacing: ownerMode ? 1 : 6,
                     textTransform: 'uppercase',
                     fontFamily: 'JetBrains Mono, monospace',
                     fontSize: 16,
@@ -309,6 +319,21 @@ export default function TeamOnboardingModal({ onClose, mustChoose = false }) {
                   }}
                 />
               </Field>
+              {ownerMode && (
+                <div style={{
+                  padding: 'var(--space-3) var(--space-4)',
+                  background: '#12102a',
+                  border: '1px solid #6d28d9',
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: 12.5,
+                  color: '#c4b5fd',
+                  lineHeight: 1.55,
+                }}>
+                  <span style={{ fontSize: 14 }}>🔑</span>{' '}
+                  <strong>Owner code detected.</strong> You'll join as a <strong>Sped Teacher</strong>{' '}
+                  with full admin access (manage roster, members, settings). Confirm before you click Join.
+                </div>
+              )}
               <Field label="Your display name">
                 <input
                   className="chat-input"
@@ -317,30 +342,32 @@ export default function TeamOnboardingModal({ onClose, mustChoose = false }) {
                   required
                 />
               </Field>
-              <Field label="I'm joining as">
-                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                  {[
-                    { id: 'para', label: '👩‍🏫 Para', desc: 'Regular access' },
-                    { id: 'sub',  label: '🕒 Sub',  desc: 'Substitute / temp' },
-                  ].map((r) => (
-                    <button
-                      key={r.id}
-                      type="button"
-                      onClick={() => setJoinRole(r.id)}
-                      className={joinRole === r.id ? 'btn btn-primary' : 'btn btn-secondary'}
-                      style={{
-                        flex: 1, flexDirection: 'column', height: 'auto',
-                        padding: 'var(--space-3)',
-                        alignItems: 'center', justifyContent: 'center',
-                        gap: 2,
-                      }}
-                    >
-                      <span style={{ fontSize: 14, fontWeight: 700 }}>{r.label}</span>
-                      <span style={{ fontSize: 11, opacity: 0.8 }}>{r.desc}</span>
-                    </button>
-                  ))}
-                </div>
-              </Field>
+              {!ownerMode && (
+                <Field label="I'm joining as">
+                  <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                    {[
+                      { id: 'para', label: '👩‍🏫 Para', desc: 'Regular access' },
+                      { id: 'sub',  label: '🕒 Sub',  desc: 'Substitute / temp' },
+                    ].map((r) => (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => setJoinRole(r.id)}
+                        className={joinRole === r.id ? 'btn btn-primary' : 'btn btn-secondary'}
+                        style={{
+                          flex: 1, flexDirection: 'column', height: 'auto',
+                          padding: 'var(--space-3)',
+                          alignItems: 'center', justifyContent: 'center',
+                          gap: 2,
+                        }}
+                      >
+                        <span style={{ fontSize: 14, fontWeight: 700 }}>{r.label}</span>
+                        <span style={{ fontSize: 11, opacity: 0.8 }}>{r.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                </Field>
+              )}
               <div style={{
                 padding: 'var(--space-3)',
                 background: 'var(--bg-dark)',
@@ -349,15 +376,15 @@ export default function TeamOnboardingModal({ onClose, mustChoose = false }) {
                 fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.55,
               }}>
                 <b style={{ color: 'var(--text-secondary)' }}>About access:</b>{' '}
-                Paras and Subs see student data, logs, and handoffs. Admin access
-                (Sped Teacher / Owner) can't be self-selected — a team admin has to
-                promote you after you join.
+                Para invite codes (6 chars) join as Para or Sub. Owner codes
+                (<code>OWN-XXXXXXXX</code>) join as Sped Teacher with admin rights.
+                Owner codes are issued + rotated by current team owners.
               </div>
               <button type="submit" disabled={busy} className="btn btn-primary" style={{ width: '100%', marginTop: 'var(--space-2)' }}>
-                {busy ? 'Joining…' : `Join as ${joinRole === 'sub' ? 'Sub' : 'Para'}`}
+                {busy ? 'Joining…' : ownerMode ? 'Join as Sped Teacher' : `Join as ${joinRole === 'sub' ? 'Sub' : 'Para'}`}
               </button>
             </form>
-          )}
+          ); })()}
 
           {err && (
             <div style={{
