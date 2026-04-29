@@ -273,6 +273,21 @@ Funny, social.
     expect(pr.classLabel).toBe('Language Arts 7');
   });
 
+  test('CSV-only with Period column routes cross-period kid into both periods', () => {
+    const csv = [
+      'Name,ParaAppNumber,Period',
+      'Cross Kid,111111,p1',
+      'Cross Kid,111111,p3',
+      'Solo Kid,222222,p2',
+    ].join('\n');
+    const bundle = assembleBundleFromFiles({ csv });
+    expect(bundle.normalizedStudents.students).toHaveLength(2); // unique kids
+    const crossRows = bundle.privateRosterMap.privateRosterMap.filter(r => r.realName === 'Cross Kid');
+    expect(crossRows.map(r => r.periodId).sort()).toEqual(['p1', 'p3']);
+    const solo = bundle.privateRosterMap.privateRosterMap.find(r => r.realName === 'Solo Kid');
+    expect(solo.periodId).toBe('p2');
+  });
+
   test('cross-period kid gets one privateRosterMap row per period', () => {
     const md = `## Multi Kid\n\n**Eligibility:** SLD\n\n- Period 1 — ELA 7 — Mr. A\n- Period 4 — Science 8 — Ms. B\n`;
     const bundle = assembleBundleFromFiles({ md });

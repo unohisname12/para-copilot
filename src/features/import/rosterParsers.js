@@ -92,6 +92,19 @@ function splitCsvLine(line) {
   return out.map(s => s.trim());
 }
 
+// Coerce a "Period" cell into the canonical "p<N>" form. Accepts:
+//   "p1", "P3", "1", "  4 ", "" → returns "p1" / "p3" / "p1" / "p4" / null.
+// Anything that doesn't end in a digit (e.g. "ELA 7", "Math") returns null
+// so we don't accidentally label class subjects as period IDs.
+function normalizePeriodCell(raw) {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  const m = s.match(/^[Pp]?(\d+)$/);
+  if (!m) return null;
+  return `p${parseInt(m[1], 10)}`;
+}
+
 export function parseRosterCsv(text) {
   const errors = [];
   const lines = text.split(/\r?\n/).filter(l => l.trim());
@@ -101,6 +114,15 @@ export function parseRosterCsv(text) {
   const firstCols = splitCsvLine(lines[0]);
   const looksLikeHeader = !firstCols.some(c => isSixDigit(c));
   const dataLines = looksLikeHeader ? lines.slice(1) : lines;
+
+  // If the header has a third "Period" column (case-insensitive), capture which
+  // column that is — usually 2 (0-indexed) for "Name,ParaAppNumber,Period".
+  let periodColIdx = -1;
+  if (looksLikeHeader) {
+    firstCols.forEach((h, i) => {
+      if (/period/i.test(h.trim())) periodColIdx = i;
+    });
+  }
 
   const entries = [];
   dataLines.forEach((line, i) => {
@@ -118,7 +140,13 @@ export function parseRosterCsv(text) {
 
     const realName = cleanName(name);
     if (!realName) { errors.push(`Row ${i + 1}: missing name`); return; }
-    entries.push({ realName, paraAppNumber: number });
+
+    const entry = { realName, paraAppNumber: number };
+    if (periodColIdx >= 0 && cols[periodColIdx] != null) {
+      const periodId = normalizePeriodCell(cols[periodColIdx]);
+      if (periodId) entry.periodId = periodId;
+    }
+    entries.push(entry);
   });
 
   return { entries, errors };
@@ -239,8 +267,9 @@ export async function parseRosterFile(file) {
 // ── Dedup + normalize (same name twice → same para number; conflicts flagged) ──
 
 export function dedupeAndValidate(entries) {
-  const byName = new Map();
-  const byNumber = new Map();
+  const byName = new Map();        // name → first paraAppNumber seen
+  const byNumber = new Map();      // paraAppNumber → first name seen
+  const seenAppearance = new Set(); // (name|number|periodId) — collapses exact dupes
   const errors = [];
   const out = [];
 
@@ -256,11 +285,15 @@ export function dedupeAndValidate(entries) {
       errors.push(`Para number ${e.paraAppNumber} is used by two students: "${nameForNum}" and "${e.realName}"`);
       return;
     }
-    if (!byName.has(key)) {
-      byName.set(key, e.paraAppNumber);
-      byNumber.set(e.paraAppNumber, e.realName);
-      out.push(e);
-    }
+    byName.set(key, e.paraAppNumber);
+    byNumber.set(e.paraAppNumber, e.realName);
+    // Cross-period rows share name+number but have different periodIds, so the
+    // dedupe key has to include period — otherwise we'd collapse them and
+    // lose the multi-class assignment the user explicitly provided.
+    const appearanceKey = `${key}|${e.paraAppNumber}|${e.periodId || ''}`;
+    if (seenAppearance.has(appearanceKey)) return;
+    seenAppearance.add(appearanceKey);
+    out.push(e);
   });
 
   return { entries: out, errors };

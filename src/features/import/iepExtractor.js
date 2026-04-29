@@ -470,14 +470,29 @@ export function assembleBundleFromFiles({ md, csv } = {}) {
   }
 
   // 2. Build the rosterPairs list — preferring CSV when present
+  // csvPeriodsByName tracks period assignments parsed from the CSV "Period"
+  // column. Used as a fallback when the MD lacks period info — and as the
+  // primary source when there's no MD at all.
   let rosterPairs = [];
+  const csvPeriodsByName = new Map();
   if (csv) {
     const { entries: rawEntries } = parseRosterCsv(csv);
     const { entries } = dedupeAndValidate(rawEntries);
-    rosterPairs = entries.map(e => ({
-      realName: e.realName,
-      paraAppNumber: e.paraAppNumber,
-    }));
+    // Collect periodId per name across rows
+    entries.forEach(e => {
+      if (!e.periodId) return;
+      if (!csvPeriodsByName.has(e.realName)) csvPeriodsByName.set(e.realName, []);
+      csvPeriodsByName.get(e.realName).push(e.periodId);
+    });
+    // rosterPairs: one entry per UNIQUE student (multi-period kids show up
+    // once here, with the period info reattached below from csvPeriodsByName).
+    const seenName = new Set();
+    rosterPairs = entries.filter(e => {
+      const k = e.realName.toLowerCase();
+      if (seenName.has(k)) return false;
+      seenName.add(k);
+      return true;
+    }).map(e => ({ realName: e.realName, paraAppNumber: e.paraAppNumber }));
   } else {
     // Generate paraAppNumbers deterministically from each MD H2 name
     rosterPairs = [...parsedByName.keys()].map(name => ({
@@ -497,19 +512,24 @@ export function assembleBundleFromFiles({ md, csv } = {}) {
   const bundle = buildBundleFromExtraction(rosterPairs, cleanParsed);
 
   // Stamp period info onto each normalizedStudent + privateRosterMap entry.
-  // buildBundleFromExtraction left periodId blank; the MD has it.
+  // Source priority:
+  //   1. MD `### Periods` block (richest — has classLabel + teacher)
+  //   2. CSV "Period" column (period only, no class/teacher detail)
+  //   3. Empty (kid imports with no period assigned)
   // For cross-period kids, expand the privateRosterMap into one entry per
   // period so buildIdentityRegistry adds them to every period they belong to.
   const expandedRoster = [];
   bundle.normalizedStudents.students.forEach((stu, i) => {
     const parsed = cleanParsed.get(rosterPairs[i].realName);
-    const periods = (parsed && parsed.periods) || [];
+    const mdPeriods = (parsed && parsed.periods) || [];
+    const csvPeriods = (csvPeriodsByName.get(rosterPairs[i].realName) || [])
+      .map(pid => ({ periodId: pid, classLabel: '', teacherName: '' }));
+    const periods = mdPeriods.length > 0 ? mdPeriods : csvPeriods;
+
     if (periods.length > 0) {
-      // Stamp primary period onto the normalizedStudent
       stu.periodId = periods[0].periodId;
       stu.classLabel = periods[0].classLabel;
       stu.teacherName = periods[0].teacherName;
-      // Emit one privateRosterMap row per period appearance
       periods.forEach(p => {
         expandedRoster.push({
           studentId: stu.id,
@@ -521,7 +541,6 @@ export function assembleBundleFromFiles({ md, csv } = {}) {
         });
       });
     } else {
-      // No period info — keep the single empty roster row buildBundleFromExtraction produced
       expandedRoster.push(bundle.privateRosterMap.privateRosterMap[i]);
     }
   });

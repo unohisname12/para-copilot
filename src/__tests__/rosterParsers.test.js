@@ -63,6 +63,62 @@ describe('parseRosterCsv', () => {
     expect(entries).toHaveLength(0);
     expect(errors[0]).toMatch(/6-digit/);
   });
+
+  test('3-column with Period column produces a row per appearance', () => {
+    const csv = [
+      'Name,ParaAppNumber,Period',
+      'Cross Kid,111111,p1',
+      'Cross Kid,111111,p3',
+      'Solo Kid,222222,p2',
+    ].join('\n');
+    const { entries, errors } = parseRosterCsv(csv);
+    expect(errors).toEqual([]);
+    expect(entries).toHaveLength(3);
+    expect(entries[0]).toEqual({ realName: 'Cross Kid', paraAppNumber: '111111', periodId: 'p1' });
+    expect(entries[1]).toEqual({ realName: 'Cross Kid', paraAppNumber: '111111', periodId: 'p3' });
+    expect(entries[2]).toEqual({ realName: 'Solo Kid',  paraAppNumber: '222222', periodId: 'p2' });
+  });
+
+  test('Period column accepts bare integers (1, 2, …) and stamps them as p1, p2', () => {
+    const csv = 'Name,ParaAppNumber,Period\nKid A,111111,1\nKid B,222222,4';
+    const { entries } = parseRosterCsv(csv);
+    expect(entries[0].periodId).toBe('p1');
+    expect(entries[1].periodId).toBe('p4');
+  });
+
+  test('Period column tolerates blank values (no period assignment for that row)', () => {
+    const csv = 'Name,ParaAppNumber,Period\nKid A,111111,\nKid B,222222,p2';
+    const { entries } = parseRosterCsv(csv);
+    expect(entries[0]).toEqual({ realName: 'Kid A', paraAppNumber: '111111' });
+    expect(entries[1]).toEqual({ realName: 'Kid B', paraAppNumber: '222222', periodId: 'p2' });
+  });
+});
+
+describe('dedupeAndValidate with multi-period rows', () => {
+  test('keeps cross-period rows for the same kid (different periodIds)', () => {
+    const { entries, errors } = dedupeAndValidate([
+      { realName: 'Cross Kid', paraAppNumber: '111111', periodId: 'p1' },
+      { realName: 'Cross Kid', paraAppNumber: '111111', periodId: 'p3' },
+    ]);
+    expect(errors).toEqual([]);
+    expect(entries).toHaveLength(2);
+  });
+
+  test('still collapses exact dupes (same name, same number, same period)', () => {
+    const { entries } = dedupeAndValidate([
+      { realName: 'Solo Kid', paraAppNumber: '222222', periodId: 'p2' },
+      { realName: 'Solo Kid', paraAppNumber: '222222', periodId: 'p2' },
+    ]);
+    expect(entries).toHaveLength(1);
+  });
+
+  test('still flags name-with-two-numbers as a conflict', () => {
+    const { errors } = dedupeAndValidate([
+      { realName: 'Conflict', paraAppNumber: '111111' },
+      { realName: 'Conflict', paraAppNumber: '999999' },
+    ]);
+    expect(errors[0]).toMatch(/two different para numbers/);
+  });
 });
 
 describe('parseRosterMarkdown', () => {
