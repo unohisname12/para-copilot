@@ -23,6 +23,9 @@ export default function TeamOnboardingModal({ onClose, mustChoose = false }) {
   // we hold the form submission and pop a confirmation step. Cleared on
   // cancel/dismiss so the user can edit the name and try again.
   const [duplicateMatches, setDuplicateMatches] = useState(null);
+  // Type-to-confirm gate: paras must type the EXISTING team name back to
+  // override the duplicate-warning. Prevents one-click duplicate creation.
+  const [overrideTyped, setOverrideTyped] = useState('');
   useEscape(() => { if (!mustChoose && onClose) onClose(); });
 
   async function handleCreate(e) {
@@ -156,7 +159,11 @@ export default function TeamOnboardingModal({ onClose, mustChoose = false }) {
             </form>
           )}
 
-          {tab === 'create' && !created && duplicateMatches && (
+          {tab === 'create' && !created && duplicateMatches && (() => {
+            // Use the FIRST existing match as the canonical name to type back.
+            const existingName = duplicateMatches[0]?.name || '';
+            const overrideOk = overrideTyped.trim().toLowerCase() === existingName.trim().toLowerCase();
+            return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
               <div style={{
                 padding: 'var(--space-4)',
@@ -175,46 +182,73 @@ export default function TeamOnboardingModal({ onClose, mustChoose = false }) {
                   </div>
                 ))}
                 <div style={{ marginTop: 10, color: 'var(--text-secondary)', fontSize: 12 }}>
-                  Are you trying to <strong>join</strong> this team, or is yours a different one?
+                  Almost everyone hitting this should be <strong>joining</strong> the existing team — not creating another. Pick the option that matches what you're doing.
                 </div>
               </div>
+
+              {/* Primary action — join. */}
               <button
                 type="button"
-                onClick={() => { setTab('join'); setDuplicateMatches(null); }}
+                onClick={() => { setTab('join'); setDuplicateMatches(null); setOverrideTyped(''); }}
                 className="btn btn-primary"
                 style={{ width: '100%' }}
               >
-                I'm joining this team — take me to the invite-code form
+                ✅ I'm joining this team — take me to the invite-code form
               </button>
+
+              {/* Type-to-confirm override. The existing team's name has to be
+                  typed back exactly before "Create anyway" enables. Stops
+                  one-click duplicate creation. */}
+              <div style={{
+                padding: 'var(--space-3) var(--space-4)',
+                background: 'var(--bg-dark)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-md)',
+                display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
+              }}>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                  Mine is genuinely different and I want a separate team.
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                  To confirm, type the existing name <strong style={{ color: 'var(--text-primary)' }}>{existingName}</strong> below.
+                </div>
+                <input
+                  className="chat-input"
+                  value={overrideTyped}
+                  onChange={(e) => setOverrideTyped(e.target.value)}
+                  placeholder={`Type "${existingName}" to confirm`}
+                  style={{ fontSize: 13 }}
+                />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setBusy(true); setErr(null);
+                    try {
+                      const t = await createTeam(teamName.trim(), displayName.trim());
+                      setDuplicateMatches(null);
+                      setOverrideTyped('');
+                      setCreated(t);
+                    } catch (e2) { setErr(e2.message || String(e2)); }
+                    finally { setBusy(false); }
+                  }}
+                  disabled={busy || !overrideOk}
+                  className="btn btn-secondary"
+                  style={{ width: '100%', fontSize: 12 }}
+                >
+                  {busy ? 'Creating…' : overrideOk ? 'Confirmed — create separate team' : 'Type the existing name to enable'}
+                </button>
+              </div>
+
               <button
                 type="button"
-                onClick={async () => {
-                  // User confirmed the new team genuinely is different.
-                  // Re-call handleCreate; duplicateMatches is set so it'll skip the pre-flight.
-                  setBusy(true); setErr(null);
-                  try {
-                    const t = await createTeam(teamName.trim(), displayName.trim());
-                    setDuplicateMatches(null);
-                    setCreated(t);
-                  } catch (e2) { setErr(e2.message || String(e2)); }
-                  finally { setBusy(false); }
-                }}
-                disabled={busy}
-                className="btn btn-secondary"
-                style={{ width: '100%' }}
-              >
-                {busy ? 'Creating…' : 'No, mine is different — create anyway'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setDuplicateMatches(null)}
+                onClick={() => { setDuplicateMatches(null); setOverrideTyped(''); }}
                 className="btn btn-ghost"
                 style={{ width: '100%', fontSize: 12, color: 'var(--text-muted)' }}
               >
                 ← Back, change the team name
               </button>
             </div>
-          )}
+          ); })()}
 
           {tab === 'create' && created && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
