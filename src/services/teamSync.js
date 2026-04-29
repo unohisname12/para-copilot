@@ -87,6 +87,57 @@ export async function regenerateOwnerCode(teamId) {
   return data;
 }
 
+// ── Join requests (Phase C) ──────────────────────────────────
+// Para flow: request to join a specific team without an invite code.
+// Owner flow: see pending requests + approve/deny.
+
+export async function requestToJoinTeam({ teamId, displayName, message, requestedRole } = {}) {
+  if (!teamId) throw new Error('team id required');
+  const display = String(displayName || '').trim();
+  if (!display) throw new Error('display name required');
+  requireClient();
+  const { data, error } = await supabase.rpc('request_to_join_team', {
+    tid: teamId,
+    display,
+    msg: String(message || '').trim() || null,
+    requested: String(requestedRole || 'para'),
+  });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function listPendingRequests(teamId) {
+  if (!teamId) throw new Error('team id required');
+  requireClient();
+  const { data, error } = await supabase
+    .from('team_join_requests')
+    .select('*')
+    .eq('team_id', teamId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function approveJoinRequest(requestId) {
+  if (!requestId) throw new Error('request id required');
+  requireClient();
+  const { data, error } = await supabase.rpc('approve_join_request', { rid: requestId });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function denyJoinRequest(requestId, reason) {
+  if (!requestId) throw new Error('request id required');
+  requireClient();
+  const { data, error } = await supabase.rpc('deny_join_request', {
+    rid: requestId,
+    reason: reason ? String(reason).trim() : null,
+  });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 // Find existing teams whose normalized name matches the candidate. Used by
 // the create-team flow to warn when a para is about to make a duplicate.
 export async function findSimilarTeam(name) {

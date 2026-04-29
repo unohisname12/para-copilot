@@ -24,6 +24,10 @@ import {
   joinTeamAsOwner,
   regenerateOwnerCode,
   isOwnerCode,
+  requestToJoinTeam,
+  listPendingRequests,
+  approveJoinRequest,
+  denyJoinRequest,
 } from '../services/teamSync';
 import { supabase } from '../services/supabaseClient';
 
@@ -346,6 +350,74 @@ describe('owner code', () => {
   test('regenerateOwnerCode rejects without a team_id', async () => {
     await expect(regenerateOwnerCode()).rejects.toThrow(/team/i);
     await expect(regenerateOwnerCode('')).rejects.toThrow(/team/i);
+  });
+});
+
+describe('join requests', () => {
+  test('requestToJoinTeam calls request_to_join_team RPC with the team UUID', async () => {
+    supabase.rpc.mockResolvedValueOnce({ data: { id: 'req1', status: 'pending' }, error: null });
+    const r = await requestToJoinTeam({
+      teamId: 't1', displayName: 'Mr Dre', message: 'I work in their classroom', requestedRole: 'para',
+    });
+    expect(supabase.rpc).toHaveBeenCalledWith('request_to_join_team', {
+      tid: 't1',
+      display: 'Mr Dre',
+      msg: 'I work in their classroom',
+      requested: 'para',
+    });
+    expect(r.id).toBe('req1');
+  });
+
+  test('requestToJoinTeam rejects without team / display', async () => {
+    await expect(requestToJoinTeam({ displayName: 'A' })).rejects.toThrow(/team/i);
+    await expect(requestToJoinTeam({ teamId: 't1' })).rejects.toThrow(/display/i);
+  });
+
+  test('requestToJoinTeam defaults role to "para" when omitted', async () => {
+    supabase.rpc.mockResolvedValueOnce({ data: { id: 'r1' }, error: null });
+    await requestToJoinTeam({ teamId: 't1', displayName: 'X', message: '' });
+    expect(supabase.rpc).toHaveBeenCalledWith('request_to_join_team', expect.objectContaining({
+      requested: 'para',
+    }));
+  });
+
+  test('listPendingRequests queries team_join_requests with status=pending', async () => {
+    const orderMock = jest.fn().mockResolvedValue({
+      data: [{ id: 'r1', display_name: 'A', message: 'hi', requested_role: 'para' }],
+      error: null,
+    });
+    const eqStatus = jest.fn(() => ({ order: orderMock }));
+    const eqTeam = jest.fn(() => ({ eq: eqStatus }));
+    const select = jest.fn(() => ({ eq: eqTeam }));
+    supabase.from.mockReturnValueOnce({ select });
+
+    const rows = await listPendingRequests('t1');
+    expect(supabase.from).toHaveBeenCalledWith('team_join_requests');
+    expect(eqTeam).toHaveBeenCalledWith('team_id', 't1');
+    expect(eqStatus).toHaveBeenCalledWith('status', 'pending');
+    expect(rows).toEqual([{ id: 'r1', display_name: 'A', message: 'hi', requested_role: 'para' }]);
+  });
+
+  test('approveJoinRequest calls approve_join_request RPC', async () => {
+    supabase.rpc.mockResolvedValueOnce({ data: { id: 'r1', status: 'approved' }, error: null });
+    await approveJoinRequest('r1');
+    expect(supabase.rpc).toHaveBeenCalledWith('approve_join_request', { rid: 'r1' });
+  });
+
+  test('denyJoinRequest calls deny_join_request RPC with reason', async () => {
+    supabase.rpc.mockResolvedValueOnce({ data: { id: 'r1', status: 'denied' }, error: null });
+    await denyJoinRequest('r1', 'not on staff');
+    expect(supabase.rpc).toHaveBeenCalledWith('deny_join_request', {
+      rid: 'r1', reason: 'not on staff',
+    });
+  });
+
+  test('denyJoinRequest tolerates a missing reason', async () => {
+    supabase.rpc.mockResolvedValueOnce({ data: {}, error: null });
+    await denyJoinRequest('r1');
+    expect(supabase.rpc).toHaveBeenCalledWith('deny_join_request', {
+      rid: 'r1', reason: null,
+    });
   });
 });
 

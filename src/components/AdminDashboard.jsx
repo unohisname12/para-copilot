@@ -17,6 +17,9 @@ import {
   removeMember,
   setTeamAllowSubs,
   deleteAllTeamStudents,
+  listPendingRequests,
+  approveJoinRequest,
+  denyJoinRequest,
 } from '../services/teamSync';
 import ParaAssignmentPanel from './ParaAssignmentPanel';
 import { runTrainingGapRules } from '../engine';
@@ -57,6 +60,7 @@ export default function AdminDashboard({ allStudents = {}, vaultNames = {} } = {
   const { activeTeam, activeTeamId, isAdmin, user, reloadTeams } = team;
   const [tab, setTab] = useState('start');
   const [members, setMembers] = useState([]);
+  const [pendingRequests, setPendingRequests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
   const [working, setWorking] = useState(null); // userId currently being acted on
@@ -66,8 +70,12 @@ export default function AdminDashboard({ allStudents = {}, vaultNames = {} } = {
     if (!activeTeamId) return;
     setLoading(true); setErr(null);
     try {
-      const rows = await listTeamMembers(activeTeamId);
+      const [rows, pending] = await Promise.all([
+        listTeamMembers(activeTeamId),
+        listPendingRequests(activeTeamId),
+      ]);
       setMembers(rows);
+      setPendingRequests(pending);
     } catch (e) {
       setErr(e.message || String(e));
     }
@@ -121,7 +129,7 @@ export default function AdminDashboard({ allStudents = {}, vaultNames = {} } = {
         {[
           ['start',       '🤝 Get paras started'],
           ['coaching',    '🔖 Coaching'],
-          ['members',     '👥 Members'],
+          ['members',     pendingRequests.length > 0 ? `👥 Members  (${pendingRequests.length} pending)` : '👥 Members'],
           ['assignments', '🎯 Assign Students'],
           ['access',      '🔐 Access'],
           ['settings',    '⚙️  Settings'],
@@ -154,6 +162,47 @@ export default function AdminDashboard({ allStudents = {}, vaultNames = {} } = {
       {tab === 'members' && (
         <div>
           {loading && <div style={{ color: 'var(--text-muted)' }}>Loading…</div>}
+
+          {pendingRequests.length > 0 && (
+            <div style={{
+              marginBottom: 'var(--space-5)',
+              padding: 'var(--space-4)',
+              background: '#0c1a3d',
+              border: '1px solid #1d4ed8',
+              borderRadius: 'var(--radius-md)',
+            }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>
+                {pendingRequests.length} pending request{pendingRequests.length === 1 ? '' : 's'}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                {pendingRequests.map(req => (
+                  <PendingRequestRow
+                    key={req.id}
+                    request={req}
+                    busy={working === req.id}
+                    onApprove={async () => {
+                      setWorking(req.id);
+                      try {
+                        await approveJoinRequest(req.id);
+                        await refresh();
+                      } catch (e) { setErr(e.message); }
+                      setWorking(null);
+                    }}
+                    onDeny={async () => {
+                      const reason = window.prompt(`Deny ${req.display_name}'s request? Optional reason:`);
+                      if (reason === null) return; // canceled
+                      setWorking(req.id);
+                      try {
+                        await denyJoinRequest(req.id, reason || null);
+                        await refresh();
+                      } catch (e) { setErr(e.message); }
+                      setWorking(null);
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
             {members.map(m => {
@@ -907,6 +956,57 @@ function ShareCard({ icon, title, body }) {
       <div style={{ fontSize: 22, marginBottom: 4 }}>{icon}</div>
       <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{title}</div>
       <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.55, marginTop: 4 }}>{body}</div>
+    </div>
+  );
+}
+
+function PendingRequestRow({ request, busy, onApprove, onDeny }) {
+  const meta = ROLE_META[request.requested_role] || ROLE_META.para;
+  return (
+    <div style={{
+      padding: 'var(--space-3) var(--space-4)',
+      background: 'var(--bg-dark)',
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--radius-md)',
+      display: 'flex', flexDirection: 'column', gap: 8,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{request.display_name}</div>
+        <span style={{
+          fontSize: 10, fontWeight: 700,
+          padding: '2px 8px', borderRadius: 20,
+          background: `${meta.tone}22`, color: meta.tone, border: `1px solid ${meta.tone}44`,
+          textTransform: 'uppercase', letterSpacing: '0.08em',
+        }}>requesting {meta.label}</span>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>
+          {new Date(request.created_at).toLocaleString()}
+        </span>
+      </div>
+      {request.message && (
+        <div style={{
+          fontSize: 12.5, color: 'var(--text-secondary)',
+          padding: 'var(--space-2) var(--space-3)',
+          background: 'var(--panel-bg)', borderRadius: 'var(--radius-sm)',
+          fontStyle: 'italic',
+        }}>"{request.message}"</div>
+      )}
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+        <button
+          onClick={onDeny}
+          disabled={busy}
+          className="btn btn-secondary btn-sm"
+          style={{ color: 'var(--red)', borderColor: 'rgba(248,113,113,0.3)' }}
+        >
+          Deny
+        </button>
+        <button
+          onClick={onApprove}
+          disabled={busy}
+          className="btn btn-primary btn-sm"
+        >
+          {busy ? '...' : `Approve as ${meta.label}`}
+        </button>
+      </div>
     </div>
   );
 }

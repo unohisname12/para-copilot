@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useTeam } from '../context/TeamProvider';
 import { useEscape } from '../hooks/useEscape';
-import { findSimilarTeam, isOwnerCode, joinTeamAsOwner } from '../services/teamSync';
+import { findSimilarTeam, isOwnerCode, joinTeamAsOwner, requestToJoinTeam } from '../services/teamSync';
 
 export default function TeamOnboardingModal({ onClose, mustChoose = false }) {
   const { user, teams, activeTeamId, setActiveTeamId, createTeam, joinTeamByCode, signOut } = useTeam();
@@ -26,6 +26,10 @@ export default function TeamOnboardingModal({ onClose, mustChoose = false }) {
   // Type-to-confirm gate: paras must type the EXISTING team name back to
   // override the duplicate-warning. Prevents one-click duplicate creation.
   const [overrideTyped, setOverrideTyped] = useState('');
+  // "Request to join" sub-flow when user picks Join from the duplicate
+  // warning. Holds the message; team UUID + display come from existing state.
+  const [requestMode, setRequestMode] = useState(null); // null | { team, message, role }
+  const [requestSent, setRequestSent] = useState(null); // null | { teamName }
   useEscape(() => { if (!mustChoose && onClose) onClose(); });
 
   async function handleCreate(e) {
@@ -140,7 +144,112 @@ export default function TeamOnboardingModal({ onClose, mustChoose = false }) {
             </form>
           )}
 
-          {tab === 'create' && !created && !duplicateMatches && (
+          {/* Request-to-join sub-flow — shown after the duplicate warning's
+              primary CTA. The owner gets an inbox entry with the message + role. */}
+          {requestMode && !requestSent && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+              <div style={{
+                padding: 'var(--space-3) var(--space-4)',
+                background: '#0c1a3d',
+                border: '1px solid #1d4ed8',
+                borderRadius: 'var(--radius-md)',
+                fontSize: 13, color: '#bfdbfe', lineHeight: 1.55,
+              }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#60a5fa', marginBottom: 4 }}>
+                  Request access to {requestMode.team.name}
+                </div>
+                The team owner will get a notification and approve or deny. You'll see the team in your list once they approve.
+              </div>
+              <Field label="Your display name">
+                <input
+                  className="chat-input"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  required autoFocus
+                />
+              </Field>
+              <Field label="A short message (optional)">
+                <textarea
+                  className="data-textarea"
+                  value={requestMode.message}
+                  onChange={(e) => setRequestMode({ ...requestMode, message: e.target.value })}
+                  placeholder="e.g. I'm the new para in Mr. Koehler's class"
+                  spellCheck="true" lang="en"
+                  style={{ height: 70 }}
+                />
+              </Field>
+              <Field label="I'm requesting as">
+                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                  {[
+                    { id: 'para', label: '👩‍🏫 Para' },
+                    { id: 'sub',  label: '🕒 Sub' },
+                  ].map(r => (
+                    <button
+                      key={r.id} type="button"
+                      onClick={() => setRequestMode({ ...requestMode, role: r.id })}
+                      className={requestMode.role === r.id ? 'btn btn-primary' : 'btn btn-secondary'}
+                      style={{ flex: 1, fontSize: 13 }}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true); setErr(null);
+                  try {
+                    await requestToJoinTeam({
+                      teamId: requestMode.team.id,
+                      displayName: displayName.trim(),
+                      message: requestMode.message,
+                      requestedRole: requestMode.role,
+                    });
+                    setRequestSent({ teamName: requestMode.team.name });
+                    setRequestMode(null);
+                  } catch (e2) { setErr(e2.message || String(e2)); }
+                  finally { setBusy(false); }
+                }}
+                className="btn btn-primary"
+                style={{ width: '100%' }}
+              >
+                {busy ? 'Sending…' : 'Send request'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setRequestMode(null)}
+                className="btn btn-ghost"
+                style={{ width: '100%', fontSize: 12, color: 'var(--text-muted)' }}
+              >
+                ← Back
+              </button>
+            </div>
+          )}
+
+          {requestSent && (
+            <div style={{
+              padding: 'var(--space-4)',
+              background: '#0d2010',
+              border: '1px solid #166534',
+              borderRadius: 'var(--radius-md)',
+              fontSize: 14, color: '#4ade80', lineHeight: 1.6, textAlign: 'center',
+            }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>✓</div>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>Request sent</div>
+              <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>
+                The owner of <strong>{requestSent.teamName}</strong> will see your request and approve or deny it. You'll see the team in your list once they approve.
+              </div>
+              {!mustChoose && onClose && (
+                <button onClick={onClose} className="btn btn-secondary" style={{ marginTop: 12 }}>
+                  Close
+                </button>
+              )}
+            </div>
+          )}
+
+          {tab === 'create' && !created && !duplicateMatches && !requestMode && !requestSent && (
             <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
               <Field label="Team name">
                 <input
@@ -192,14 +301,31 @@ export default function TeamOnboardingModal({ onClose, mustChoose = false }) {
                 </div>
               </div>
 
-              {/* Primary action — join. */}
+              {/* Primary action — request to join (no code needed). */}
               <button
                 type="button"
-                onClick={() => { setTab('join'); setDuplicateMatches(null); setOverrideTyped(''); }}
+                onClick={() => {
+                  setRequestMode({
+                    team: duplicateMatches[0],
+                    message: '',
+                    role: 'para',
+                  });
+                  setDuplicateMatches(null);
+                  setOverrideTyped('');
+                  setErr(null);
+                }}
                 className="btn btn-primary"
                 style={{ width: '100%' }}
               >
-                ✅ I'm joining this team — take me to the invite-code form
+                ✅ I'm joining this team — request access from the owner
+              </button>
+              <button
+                type="button"
+                onClick={() => { setTab('join'); setDuplicateMatches(null); setOverrideTyped(''); }}
+                className="btn btn-secondary"
+                style={{ width: '100%', fontSize: 12 }}
+              >
+                I have an invite code — go to the join form instead
               </button>
 
               {/* Type-to-confirm override. The existing team's name has to be
