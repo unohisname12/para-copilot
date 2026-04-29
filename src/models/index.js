@@ -109,6 +109,10 @@ export function buildIdentityRegistry(bundleData) {
       accs:       mergedAccs.length  ? mergedAccs  : (primaryRaw.accs  || []),
       periodId:   primaryEntry?.periodId   || "",
       classLabel: primaryEntry?.classLabel || "",
+      // periodIds[]: full multi-period list. Cross-period kids carry the
+      // whole set so the cloud sync writes period_ids; the local periodMap
+      // already gets every period via the forEach below.
+      periodIds,
       // Para App Number: admin-assigned 6-digit stable ID. Cloud-safe.
       // Pseudonymous — does not identify the student without the local roster vault.
       paraAppNumber,
@@ -355,6 +359,9 @@ export function normalizeImportedStudent(raw) {
     color:        String(raw.color        || "#94a3b8"),
     paraAppNumber,
     periodId:     String(raw.periodId     || ""),
+    // Multi-period assignment list. Cross-period kids carry both periods
+    // through to the cloud sync so period_ids text[] gets populated.
+    periodIds:    Array.isArray(raw.periodIds) ? raw.periodIds.filter(Boolean) : [],
     periodNumber: Number(raw.periodNumber)  || 0,
     classLabel:   String(raw.classLabel   || ""),
     subject:      String(raw.subject      || ""),

@@ -118,6 +118,58 @@ describe('pushStudents', () => {
     expect(result).toEqual([]);
   });
 
+  test('writes period_ids array when student carries multi-period info', async () => {
+    const upsertSelect = jest.fn().mockResolvedValue({ data: [], error: null });
+    const upsertMock = jest.fn(() => ({ select: upsertSelect }));
+    const cleanupSelect = jest.fn().mockResolvedValue({ data: [], error: null });
+    const cleanupNot = jest.fn(() => ({ select: cleanupSelect }));
+    const cleanupEqUser = jest.fn(() => ({ not: cleanupNot }));
+    const cleanupEqTeam = jest.fn(() => ({ eq: cleanupEqUser }));
+    const cleanupDelete = jest.fn(() => ({ eq: cleanupEqTeam }));
+    supabase.from
+      .mockReturnValueOnce({ upsert: upsertMock })
+      .mockReturnValueOnce({ delete: cleanupDelete });
+
+    await pushStudents('t1', [{
+      pseudonym: 'Cross 1',
+      color: '#3b82f6',
+      paraAppNumber: '111111',
+      periodId: 'p1',
+      periodIds: ['p1', 'p3'],
+    }], 'u1');
+
+    const sentRows = upsertMock.mock.calls[0][0];
+    expect(sentRows[0]).toMatchObject({
+      external_key: '111111',
+      period_id: 'p1',          // primary period (legacy column)
+      period_ids: ['p1', 'p3'], // full list (new column)
+    });
+  });
+
+  test('falls back to single-period array when only periodId is provided', async () => {
+    const upsertSelect = jest.fn().mockResolvedValue({ data: [], error: null });
+    const upsertMock = jest.fn(() => ({ select: upsertSelect }));
+    const cleanupSelect = jest.fn().mockResolvedValue({ data: [], error: null });
+    const cleanupNot = jest.fn(() => ({ select: cleanupSelect }));
+    const cleanupEqUser = jest.fn(() => ({ not: cleanupNot }));
+    const cleanupEqTeam = jest.fn(() => ({ eq: cleanupEqUser }));
+    const cleanupDelete = jest.fn(() => ({ eq: cleanupEqTeam }));
+    supabase.from
+      .mockReturnValueOnce({ upsert: upsertMock })
+      .mockReturnValueOnce({ delete: cleanupDelete });
+
+    await pushStudents('t1', [{
+      pseudonym: 'Solo',
+      color: '#3b82f6',
+      paraAppNumber: '222222',
+      periodId: 'p2',
+      // no periodIds — should derive [p2]
+    }], 'u1');
+
+    const sentRows = upsertMock.mock.calls[0][0];
+    expect(sentRows[0].period_ids).toEqual(['p2']);
+  });
+
   test('upserts students with stable external keys', async () => {
     const selectMock = jest.fn().mockResolvedValue({ data: [{ id: 'db1' }], error: null });
     const upsertMock = jest.fn(() => ({ select: selectMock }));

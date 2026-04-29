@@ -188,6 +188,16 @@ function toTeamStudentRow(teamId, s, userId) {
   };
   const periodId = s.periodId || s.period_id;
   if (periodId) row.period_id = periodId;
+
+  // period_ids[]: full list of periods this kid belongs to. Cross-period
+  // kids (e.g., a math student who shows up in both p3 and p6) need this
+  // because the unique index on (team_id, external_key) collapses them
+  // to ONE row, so we can't represent multi-period via duplicate rows.
+  // Fall back to [periodId] when only the legacy single field is set so
+  // the new read path always sees an array.
+  const periodIds = Array.isArray(s.periodIds) ? s.periodIds.filter(Boolean) : null;
+  if (periodIds && periodIds.length > 0) row.period_ids = periodIds;
+  else if (periodId) row.period_ids = [periodId];
   const classLabel = s.classLabel || s.class_label;
   if (classLabel) row.class_label = classLabel;
   if (s.eligibility) row.eligibility = s.eligibility;

@@ -3,7 +3,7 @@
 // useStudents.js as `applyStudentRemoval(state, id, options)` so it can be
 // exercised directly here.
 
-import { applyStudentRemoval } from '../hooks/useStudents';
+import { applyStudentRemoval, fromCloudRowForTests } from '../hooks/useStudents';
 
 const stu = (id, periodId = 'p1') => ({ id, periodId, paraAppNumber: id, pseudonym: id });
 
@@ -64,5 +64,37 @@ describe('applyStudentRemoval', () => {
     const before = baseState();
     expect(applyStudentRemoval(before, null)).toEqual(before);
     expect(applyStudentRemoval(before, undefined, { periodId: 'p1' })).toEqual(before);
+  });
+});
+
+describe('fromCloudRow / period_ids unpacking', () => {
+  test('cloud row with period_ids[] populates the array on the student', () => {
+    const stu = fromCloudRowForTests({
+      id: 'db1', pseudonym: 'X', color: '#000',
+      external_key: '111111',
+      period_id: 'p1',
+      period_ids: ['p1', 'p3'],
+    });
+    expect(stu.periodIds).toEqual(['p1', 'p3']);
+    expect(stu.periodId).toBe('p1');
+  });
+
+  test('legacy row with only period_id falls back to a single-element array', () => {
+    const stu = fromCloudRowForTests({
+      id: 'db1', pseudonym: 'X', color: '#000',
+      external_key: '111111',
+      period_id: 'p2',
+      // no period_ids
+    });
+    expect(stu.periodIds).toEqual(['p2']);
+    expect(stu.periodId).toBe('p2');
+  });
+
+  test('row with neither period column gives an empty array', () => {
+    const stu = fromCloudRowForTests({
+      id: 'db1', pseudonym: 'X', color: '#000',
+      external_key: '111111',
+    });
+    expect(stu.periodIds).toEqual([]);
   });
 });

@@ -44,13 +44,25 @@ export function applyStudentRemoval(state, studentId, options = {}) {
   return { importedStudents, importedPeriodMap };
 }
 
+// Exported under a separate name solely so jest tests can exercise the
+// row→student mapping without spinning up a renderer. Production callers
+// inside this module use `fromCloudRow` directly.
+export function fromCloudRowForTests(row) { return fromCloudRow(row); }
+
 function fromCloudRow(row) {
+  // Prefer the new period_ids[] column. Fall back to scalar period_id for
+  // legacy rows written before the multi-period migration. Both are kept in
+  // sync going forward (period_ids includes period_id as its first element).
+  const periodIds = Array.isArray(row.period_ids) && row.period_ids.length > 0
+    ? row.period_ids.filter(Boolean)
+    : (row.period_id ? [row.period_id] : []);
   return migrateIdentity({
     id: row.id,
     dbId: row.id,
     pseudonym: row.pseudonym,
     color: row.color,
-    periodId: row.period_id || '',
+    periodId: row.period_id || periodIds[0] || '',
+    periodIds,
     classLabel: row.class_label || '',
     eligibility: row.eligibility || '',
     accs: row.accs || [],
@@ -173,8 +185,17 @@ export function useStudents({ activePeriod, cloudStudents = null }) {
   const effectivePeriodStudents = useMemo(() => {
     const importedIds = importedPeriodMap[activePeriod] || [];
     if (cloudStudentList) {
+      // Multi-period match: cross-period kids carry every period in their
+      // periodIds array; legacy single-period rows fall back to periodId.
+      const inPeriod = (s) => {
+        if (!activePeriod) return true;
+        const ids = Array.isArray(s.periodIds) && s.periodIds.length > 0
+          ? s.periodIds
+          : (s.periodId ? [s.periodId] : []);
+        return ids.includes(activePeriod);
+      };
       const cloudIds = cloudStudentList
-        .filter((s) => !activePeriod || s.periodId === activePeriod)
+        .filter(inPeriod)
         .map((s) => s.id);
       // Always include locally-imported students. Excluding them in cloud
       // mode is what made every dashboard go blank after a Smart Import or
