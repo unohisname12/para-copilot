@@ -2,6 +2,7 @@ import React from 'react';
 import { useEscape } from '../hooks/useEscape';
 import { useVault } from '../context/VaultProvider';
 import { useTeamOptional } from '../context/TeamProvider';
+import { useGrammarFixSetting } from '../hooks/useAutoGrammarFix';
 import { ONBOARDING_KEY } from './OnboardingModal';
 import { hasPin, clearPin } from '../features/stealth/pinStorage';
 import { PinEntryModal } from '../features/stealth/PinEntryModal';
@@ -74,6 +75,11 @@ export default function SettingsModal({ open, onClose, onReplayOnboarding }) {
         </div>
 
         <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+
+          {/* EDITOR */}
+          <Section label="Editor">
+            <GrammarFixToggle />
+          </Section>
 
           {/* DISPLAY */}
           <Section label="Display">
@@ -185,6 +191,22 @@ export default function SettingsModal({ open, onClose, onReplayOnboarding }) {
         )}
       </div>
     </div>
+  );
+}
+
+// Wraps the global "Auto-cleanup typing" toggle. Reading + writing goes
+// through useGrammarFixSetting so the same value drives every textarea
+// across the app (Dashboard topic, Simple Mode, Handoff Builder, etc.).
+function GrammarFixToggle() {
+  const [enabled, setEnabled] = useGrammarFixSetting();
+  return (
+    <Toggle
+      icon="✨"
+      title="Auto-cleanup typing"
+      body="Lightly fixes capitalization and double spaces 1.5s after you stop typing. Cursor stays put. Applies to every place you log notes (dashboard, Simple Mode, handoffs, parent notes)."
+      on={!!enabled}
+      onChange={() => setEnabled(!enabled)}
+    />
   );
 }
 

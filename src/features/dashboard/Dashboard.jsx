@@ -6,7 +6,7 @@ import { DB } from '../../data';
 import { getHealth, hdot } from '../../models';
 import { resolveLabel } from '../../privacy/nameResolver';
 import { parseDocForPeriod, matchCaseKeywords } from '../../engine';
-import { applyFixWithCursor } from '../../utils/grammarFix';
+import { useAutoGrammarFix, useGrammarFixSetting } from '../../hooks/useAutoGrammarFix';
 import { OllamaStatusBadge } from '../../components/OllamaStatusBadge';
 import { HelpButton } from '../help';
 import { ShowcaseBanner } from '../showcase';
@@ -77,9 +77,9 @@ export function Dashboard({
   // 'write' = type the topic in the app; 'fetch' = pull from Google Doc URL;
   // 'none' = skip (no plan today). Persisted per-period-per-day.
   const [planMode, setPlanMode] = useLS(`planMode_${activePeriod}_${currentDate}`, 'write');
-  // Auto-Grammar-Fix toggle — off by default. When on, light cleanup runs on
-  // typing pauses (1.5s idle). Cursor position is preserved.
-  const [autoFix, setAutoFix] = useLS('paraAutoGrammarFixV1', false);
+  // Auto-Grammar-Fix toggle — toggle now lives in Settings; this hook just
+  // reads the persisted setting so multiple components stay in sync.
+  const [autoFix] = useGrammarFixSetting();
 
   // ── Ephemeral UI state ───────────────────────────────────
   const [topicEdit,   setTopicEdit]   = useState(false);
@@ -110,44 +110,9 @@ export function Dashboard({
   // Sync topic draft when switching periods / dates
   useEffect(() => { setTopicDraft(topic); }, [activePeriod, currentDate]);
 
-  // Auto-grammar-fix: debounced (1.5s idle) on the actively-edited textarea.
-  // Captures current cursor, runs the fix, then restores selection on the
-  // next animation frame so the user doesn't see a jump while typing.
-  useEffect(() => {
-    if (!autoFix || !topicEdit || !topicDraft) return;
-    const t = setTimeout(() => {
-      const ta = topicTextareaRef.current;
-      const cursor = ta ? ta.selectionStart : topicDraft.length;
-      const { text: fixed, cursor: newCursor } = applyFixWithCursor(topicDraft, cursor);
-      if (fixed !== topicDraft) {
-        setTopicDraft(fixed);
-        requestAnimationFrame(() => {
-          if (topicTextareaRef.current) {
-            topicTextareaRef.current.setSelectionRange(newCursor, newCursor);
-          }
-        });
-      }
-    }, 1500);
-    return () => clearTimeout(t);
-  }, [topicDraft, autoFix, topicEdit]);
-
-  useEffect(() => {
-    if (!autoFix || !noteTarget || !noteDraft) return;
-    const t = setTimeout(() => {
-      const ta = noteTextareaRef.current;
-      const cursor = ta ? ta.selectionStart : noteDraft.length;
-      const { text: fixed, cursor: newCursor } = applyFixWithCursor(noteDraft, cursor);
-      if (fixed !== noteDraft) {
-        setNoteDraft(fixed);
-        requestAnimationFrame(() => {
-          if (noteTextareaRef.current) {
-            noteTextareaRef.current.setSelectionRange(newCursor, newCursor);
-          }
-        });
-      }
-    }, 1500);
-    return () => clearTimeout(t);
-  }, [noteDraft, autoFix, noteTarget]);
+  // Auto-grammar-fix: shared hook handles debounce + cursor restoration.
+  useAutoGrammarFix({ value: topicDraft, setValue: setTopicDraft, ref: topicTextareaRef, enabled: autoFix && topicEdit });
+  useAutoGrammarFix({ value: noteDraft,  setValue: setNoteDraft,  ref: noteTextareaRef,  enabled: autoFix && !!noteTarget });
 
   const showToast = useCallback((msg) => {
     setToast(msg);
@@ -529,6 +494,8 @@ export function Dashboard({
                   <textarea
                     ref={topicTextareaRef}
                     autoFocus
+                    spellCheck="true"
+                    lang="en"
                     value={topicDraft}
                     onChange={e => setTopicDraft(e.target.value)}
                     onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveTopic(); } }}
@@ -536,22 +503,6 @@ export function Dashboard({
                     className="data-textarea"
                     style={{ height: 90 }}
                   />
-                  <label
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 8,
-                      marginTop: 6, fontSize: 11, color: 'var(--text-muted)',
-                      cursor: 'pointer', userSelect: 'none',
-                    }}
-                    title="Lightly fixes capitalization and double spaces while you pause typing. Cursor stays put."
-                  >
-                    <input
-                      type="checkbox"
-                      checked={autoFix}
-                      onChange={e => setAutoFix(e.target.checked)}
-                      style={{ accentColor: '#a78bfa' }}
-                    />
-                    ✨ Auto-cleanup typing
-                  </label>
                   <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
                     <button onClick={saveTopic} className="btn btn-primary" style={{ flex: 1 }}>
                       ✓ Save
@@ -1161,6 +1112,8 @@ export function Dashboard({
                   <textarea
                     autoFocus
                     ref={noteTextareaRef}
+                    spellCheck="true"
+                    lang="en"
                     value={noteDraft}
                     onChange={e => setNoteDraft(e.target.value)}
                     onKeyDown={e => {

@@ -1,0 +1,44 @@
+import { useEffect } from 'react';
+import { useLocalStorage } from './useLocalStorage';
+import { applyFixWithCursor } from '../utils/grammarFix';
+
+// Single source of truth for the auto-grammar-fix toggle. Read it anywhere
+// to know whether to apply the cleanup; write through setEnabled to flip.
+// Persisted under paraAutoGrammarFixV1 (default: off).
+export function useGrammarFixSetting() {
+  const [enabled, setEnabled] = useLocalStorage('paraAutoGrammarFixV1', false);
+  return [enabled, setEnabled];
+}
+
+// Reusable cursor-preserving auto-grammar-fix for any controlled textarea.
+//
+// Usage:
+//   const ref = useRef(null);
+//   const [autoFix] = useGrammarFixSetting();
+//   useAutoGrammarFix({ value: text, setValue: setText, ref, enabled: autoFix });
+//   // <textarea ref={ref} value={text} onChange={e => setText(e.target.value)} ... />
+//
+// Behavior:
+//   - 1.5s after the user stops typing, runs applyFixWithCursor on the text
+//   - If the fix changes anything, updates value AND restores selection on the
+//     next animation frame so the cursor doesn't visibly jump
+//   - Ignores empty input, disabled state, and missing ref (safe no-op)
+export function useAutoGrammarFix({ value, setValue, ref, enabled, delayMs = 1500 }) {
+  useEffect(() => {
+    if (!enabled || !value || typeof setValue !== 'function') return;
+    const t = setTimeout(() => {
+      const ta = ref?.current;
+      const cursor = ta && typeof ta.selectionStart === 'number' ? ta.selectionStart : value.length;
+      const { text: fixed, cursor: newCursor } = applyFixWithCursor(value, cursor);
+      if (fixed !== value) {
+        setValue(fixed);
+        requestAnimationFrame(() => {
+          if (ref?.current && typeof ref.current.setSelectionRange === 'function') {
+            ref.current.setSelectionRange(newCursor, newCursor);
+          }
+        });
+      }
+    }, delayMs);
+    return () => clearTimeout(t);
+  }, [value, enabled, delayMs]);
+}

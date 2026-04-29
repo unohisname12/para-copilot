@@ -9,6 +9,7 @@
 // ══════════════════════════════════════════════════════════════
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useLocalStorage } from '../../hooks/useLocalStorage';
+import { useAutoGrammarFix, useGrammarFixSetting } from '../../hooks/useAutoGrammarFix';
 import { DB, SUPPORT_CARDS } from '../../data';
 import { runLocalEngine } from '../../engine';
 import { getHealth, hdot } from '../../models';
@@ -138,6 +139,11 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
   // current draft (so notes are never lost).
   const [focusedStudentId, setFocusedStudentId] = useState(null);
   const [focusedDraft, setFocusedDraft] = useState('');
+  const focusedRef = useRef(null);
+  const noteTextRef = useRef(null);
+  const [autoFix] = useGrammarFixSetting();
+  useAutoGrammarFix({ value: focusedDraft, setValue: setFocusedDraft, ref: focusedRef, enabled: autoFix && !!focusedStudentId });
+  useAutoGrammarFix({ value: noteText,     setValue: setNoteText,     ref: noteTextRef, enabled: autoFix });
 
   const swapFocus = (newStudentId) => {
     if (focusedStudentId && focusedDraft.trim()) {
@@ -726,7 +732,10 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                       ) : null}
 
                       <textarea
+                        ref={focusedRef}
                         autoFocus
+                        spellCheck="true"
+                        lang="en"
                         value={focusedDraft}
                         onChange={e => setFocusedDraft(e.target.value)}
                         placeholder={`What happened with ${label}? Type freely — saves automatically when you switch students.`}
@@ -937,7 +946,7 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
               <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 10, fontWeight: 600 }}>
                 Write a short note: <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(or just hit Save)</span>
               </div>
-              <textarea value={noteText} onChange={e => setNoteText(e.target.value)}
+              <textarea ref={noteTextRef} spellCheck="true" lang="en" value={noteText} onChange={e => setNoteText(e.target.value)}
                 placeholder={`What happened with ${resolveLabel(s, "compact")}?\n\nJust describe what you saw — keep it simple.`}
                 className="data-textarea"
                 style={{ minHeight: 130, fontSize: 16, lineHeight: 1.6 }} />

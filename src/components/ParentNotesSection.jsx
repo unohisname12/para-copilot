@@ -1,14 +1,18 @@
 // Parent Notes panel — visible only to team admins (owner / sped_teacher).
 // RLS on parent_notes enforces the same rule server-side; this is the UI gate.
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useTeamOptional } from '../context/TeamProvider';
 import { listParentNotes, addParentNote, deleteParentNote } from '../services/teamSync';
+import { useAutoGrammarFix, useGrammarFixSetting } from '../hooks/useAutoGrammarFix';
 
 export default function ParentNotesSection({ studentDbId, studentLabel }) {
   const team = useTeamOptional();
   const [notes, setNotes] = useState([]);
   const [draft, setDraft] = useState('');
+  const draftRef = useRef(null);
+  const [autoFix] = useGrammarFixSetting();
+  useAutoGrammarFix({ value: draft, setValue: setDraft, ref: draftRef, enabled: autoFix });
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -98,6 +102,9 @@ export default function ParentNotesSection({ studentDbId, studentLabel }) {
 
       <form onSubmit={handleAdd} style={{ marginBottom: 'var(--space-4)' }}>
         <textarea
+          ref={draftRef}
+          spellCheck="true"
+          lang="en"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder={`Notes from parent communication about ${studentLabel || 'this student'}…`}

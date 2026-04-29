@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
+import { useAutoGrammarFix, useGrammarFixSetting } from '../../hooks/useAutoGrammarFix';
 import { GOAL_PROGRESS_OPTIONS } from '../../data';
 import { getHealth, hdot } from '../../models';
 import { migrateIdentity, getDefaultIdentity, isIdentityCustomized } from '../../identity';
@@ -113,6 +114,11 @@ function StudentProfileModalInner({ studentId, logs, currentDate, activePeriod, 
   const [result, setResult] = useState(null);
   const [aftermath, setAftermath] = useState(null);
   const [staffNote, setStaffNote] = useState("");
+  const logNoteRef = useRef(null);
+  const staffNoteRef = useRef(null);
+  const [autoFix] = useGrammarFixSetting();
+  useAutoGrammarFix({ value: logNote,   setValue: setLogNote,   ref: logNoteRef,   enabled: autoFix });
+  useAutoGrammarFix({ value: staffNote, setValue: setStaffNote, ref: staffNoteRef, enabled: autoFix });
   const helpWorthy = useMemo(() => isHelpWorthy(logNote), [logNote]);
 
   const resetGuidedFlow = () => { setHelpPhase("note"); setAntecedent(null); setIntervention(null); setResult(null); setAftermath(null); setStaffNote(""); };
@@ -259,7 +265,7 @@ function StudentProfileModalInner({ studentId, logs, currentDate, activePeriod, 
             <div className="panel" style={{ padding: "12px" }}>
               <div style={{ fontSize: "11px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: ".07em", marginBottom: "8px" }}>Quick Log</div>
               <select value={logType} onChange={e => setLogType(e.target.value)} className="period-select" style={{ width: "100%", marginBottom: "8px" }}><option>Academic Support</option><option>Accommodation Used</option><option>Behavior Note</option><option>Positive Note</option><option>General Observation</option><option>Parent Contact</option><option>Goal Progress</option><option>Handoff Note</option></select>
-              <textarea value={logNote} onChange={e => setLogNote(e.target.value)} className="data-textarea" style={{ height: "70px", marginBottom: "8px" }} placeholder="Type observation..." />
+              <textarea ref={logNoteRef} spellCheck="true" lang="en" value={logNote} onChange={e => setLogNote(e.target.value)} className="data-textarea" style={{ height: "70px", marginBottom: "8px" }} placeholder="Type observation..." />
               {caseSuggestions.length > 0 && (
                 <div style={{ marginBottom: '8px', padding: '10px 12px', background: '#0a1628', border: '1px solid #1e3a5f', borderRadius: '8px', maxHeight: '180px', overflow: 'auto' }}>
                   <div style={{ fontSize: '11px', fontWeight: '700', color: '#60a5fa', marginBottom: '8px' }}>
@@ -323,7 +329,7 @@ function StudentProfileModalInner({ studentId, logs, currentDate, activePeriod, 
                   {/* Staff note */}
                   <div style={{ marginBottom: '10px' }}>
                     <div style={{ fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '5px' }}>Staff note (optional)</div>
-                    <textarea value={staffNote} onChange={e => setStaffNote(e.target.value)} className="data-textarea" style={{ height: '40px', fontSize: '11px' }} placeholder="Any extra context..." />
+                    <textarea ref={staffNoteRef} spellCheck="true" lang="en" value={staffNote} onChange={e => setStaffNote(e.target.value)} className="data-textarea" style={{ height: '40px', fontSize: '11px' }} placeholder="Any extra context..." />
                   </div>
                   {/* Save guided */}
                   <div style={{ display: 'flex', gap: '6px' }}>
