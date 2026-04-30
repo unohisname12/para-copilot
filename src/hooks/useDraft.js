@@ -27,20 +27,25 @@ export function draftStorageKey(key) {
 }
 
 export function useDraft(key, value, setValue, { debounceMs = 300 } = {}) {
-  const hydratedRef = useRef(false);
+  const initialMountRef = useRef(true);
 
-  // Hydrate on mount (only if current value is empty, so user-loaded data wins).
+  // Hydrate on mount AND whenever the key changes — same hook instance is
+  // reused when a parent swaps the key per student/action, so the saved
+  // draft for the new key needs to load (and any leftover text from the
+  // previous key needs to clear). On the initial mount only, a non-empty
+  // value wins so caller-supplied initial data isn't clobbered.
   useEffect(() => {
-    if (hydratedRef.current) return;
-    hydratedRef.current = true;
     if (!key || typeof setValue !== 'function') return;
-    if (value && String(value).trim() !== '') return;
+    const isMount = initialMountRef.current;
+    initialMountRef.current = false;
+    if (isMount && value && String(value).trim() !== '') return;
     try {
       const saved = globalThis.localStorage?.getItem(draftStorageKey(key));
       if (saved && saved.trim()) setValue(saved);
+      else if (!isMount) setValue('');
     } catch { /* localStorage may be disabled — ignore */ }
-    // eslint-disable-next-line
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
 
   // Auto-save while typing (debounced).
   useEffect(() => {
