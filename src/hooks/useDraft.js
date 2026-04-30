@@ -44,7 +44,7 @@ export function useDraft(key, value, setValue, { debounceMs = 300 } = {}) {
       if (saved && saved.trim()) setValue(saved);
       else if (!isMount) setValue('');
     } catch { /* localStorage may be disabled — ignore */ }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line
   }, [key]);
 
   // Auto-save while typing (debounced).
