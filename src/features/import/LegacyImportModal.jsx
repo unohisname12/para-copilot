@@ -80,6 +80,30 @@ export function LegacyImportModal({ open, onClose, vaultLogs }) {
     setStep(reviewNeeded ? 'review' : 'confirm');
   }
 
+  async function runImport() {
+    let ingested = 0;
+    for (const r of rows) {
+      const d = decisions[r.rowIndex];
+      if (!d || d === 'skip') continue;
+      // Build the addLog payload. Type defaults to "General Observation"
+      // if the legacy CSV had a non-canonical type — addLog accepts any
+      // string, but match the app's well-known set when possible.
+      addLog(d.studentId, r.observation, r.type, {
+        date: r.date,
+        period: r.period,
+        periodId: r.periodId || r.period,
+        category: r.category,
+        flagged: r.flagged,
+        tags: r.tags,
+        paraAppNumber: d.paraAppNumber,
+        source: 'legacy_import',
+      });
+      ingested++;
+    }
+    setImportedCount(ingested);
+    setStep('done');
+  }
+
   return (
     <div className="modal-overlay">
       <div className="modal-content" style={{ maxWidth: 720, position: 'relative' }}>
@@ -113,9 +137,14 @@ export function LegacyImportModal({ open, onClose, vaultLogs }) {
             />
           )}
           {step === 'confirm' && (
-            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-              Confirm step renders here (Task 7).
-            </div>
+            <ConfirmStep
+              rows={rows}
+              decisions={decisions}
+              skipped={skipped}
+              counts={counts}
+              onBack={() => setStep('review')}
+              onImport={runImport}
+            />
           )}
           {step === 'done' && (
             <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
@@ -243,6 +272,40 @@ function ReviewStep({ rows, decisions, setDecisions, counts, onContinue, onBack 
         <button className="btn btn-secondary" onClick={onBack}>← Back</button>
         <button className="btn btn-primary" disabled={!allDecided} onClick={onContinue}>
           Continue → ({decidedCount}/{reviewRows.length} decided)
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmStep({ rows, decisions, skipped, counts, onBack, onImport }) {
+  const toImport = rows.filter(r => {
+    const d = decisions[r.rowIndex];
+    return d && d !== 'skip';
+  }).length;
+  const skippedByUser = rows.filter(r => decisions[r.rowIndex] === 'skip').length;
+  const undecided = rows.filter(r => !decisions[r.rowIndex]).length;
+
+  return (
+    <div>
+      <div style={{ fontSize: 13.5, color: 'var(--text-secondary)', marginBottom: 'var(--space-3)' }}>
+        Ready to import.
+      </div>
+      <ul style={{ fontSize: 13, lineHeight: 1.8, paddingLeft: 18 }}>
+        <li><strong>{toImport}</strong> rows will be imported as logs</li>
+        <li><strong>{counts.duplicates}</strong> rows already exist in the Vault and will be skipped</li>
+        <li><strong>{skippedByUser}</strong> rows you marked skip</li>
+        <li><strong>{skipped.length}</strong> rows were missing required fields (date / student / observation)</li>
+        {undecided > 0 && (
+          <li style={{ color: 'var(--red)' }}>
+            <strong>{undecided}</strong> rows are still undecided — go back to review them.
+          </li>
+        )}
+      </ul>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 'var(--space-4)' }}>
+        <button className="btn btn-secondary" onClick={onBack}>← Back to review</button>
+        <button className="btn btn-primary" disabled={toImport === 0 || undecided > 0} onClick={onImport}>
+          Import {toImport} observation{toImport !== 1 ? 's' : ''}
         </button>
       </div>
     </div>
