@@ -50,6 +50,7 @@ import AdminDashboard from './components/AdminDashboard';
 import BugReportButton from './components/BugReportButton';
 import FindMyStudentsModal from './components/FindMyStudentsModal';
 import SettingsModal, { isFindStudentsBannerHidden } from './components/SettingsModal';
+import { LegacyImportModal } from './features/import/LegacyImportModal';
 import { claimPendingAssignments } from './services/paraAssignments';
 import SubLockedScreen from './components/SubLockedScreen';
 import { VaultProvider, useVault, enrichStudentsWithNames } from './context/VaultProvider';
@@ -339,6 +340,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
 
   // ── UI state ───────────────────────────────────────────────
   const [profileStu, setProfileStu] = useState(null);
+  const [legacyImportOpen, setLegacyImportOpen] = useState(false);
   const [activeToolbox, setActiveToolbox] = useState(null);
   const [floatingTools, setFloatingTools] = useState([]);
   const [fullscreenTool, setFullscreenTool] = useState(null);
@@ -1208,7 +1210,15 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
           setSettingsOpen(false);
         }}
         onReplayOnboarding={() => setOnboardingOpen(true)}
+        onOpenLegacyImport={() => setLegacyImportOpen(true)}
       />
+      {legacyImportOpen && (
+        <LegacyImportModal
+          open={legacyImportOpen}
+          onClose={() => setLegacyImportOpen(false)}
+          vaultLogs={vaultLogs}
+        />
+      )}
 
       {sampleDataClearedToast && (
         <div style={{

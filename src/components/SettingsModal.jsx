@@ -29,7 +29,7 @@ export function setFindStudentsBannerHidden(hidden) {
   } catch {}
 }
 
-export default function SettingsModal({ open, onClose, onReplayOnboarding }) {
+export default function SettingsModal({ open, onClose, onReplayOnboarding, onOpenLegacyImport }) {
   const vault = useVault();
   const team  = useTeamOptional();
 
@@ -146,6 +146,22 @@ export default function SettingsModal({ open, onClose, onReplayOnboarding }) {
                 danger
               />
             )}
+          </Section>
+
+          {/* ADVANCED */}
+          <Section label="Advanced">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ width: '100%', justifyContent: 'flex-start' }}
+              disabled={!Object.keys(vault?.vault || {}).length}
+              title={!Object.keys(vault?.vault || {}).length
+                ? 'Import your roster first — this tool needs the name → Para App Number map.'
+                : 'Re-ingest old _private CSV exports as logs.'}
+              onClick={() => { onOpenLegacyImport?.(); onClose(); }}
+            >
+              📥 Import legacy observation CSV…
+            </button>
           </Section>
 
           {/* HELP */}
