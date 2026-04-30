@@ -1,12 +1,12 @@
 # SupaPara — NotebookLM Source Pack
 
-This folder contains **7 numbered source files (00–06)** designed to be uploaded to **NotebookLM** so it has full context about the SupaPara app — both how it's built and how it's used.
+This folder contains **8 numbered source files (00–07)** designed to be uploaded to **NotebookLM** so it has full context about the SupaPara app — both how it's built and how it's used.
 
 ## How to use
 
 1. Open NotebookLM (`notebooklm.google.com`).
 2. Create a new notebook called "SupaPara."
-3. Click **Add source** → **Upload** → select the 7 `.md` files numbered `00-` through `06-` in this folder. (You don't need to upload this README itself.)
+3. Click **Add source** → **Upload** → select the 8 `.md` files numbered `00-` through `07-` in this folder. (You don't need to upload this README itself.)
 4. NotebookLM will index them in a few seconds.
 5. Ask anything. Examples:
    - "How does a para log a quick note in Simple Mode?"
@@ -33,6 +33,7 @@ This folder contains **7 numbered source files (00–06)** designed to be upload
 | `04-features-deep-dive.md` | Every feature explained tech + usage | "How does Smart Import work?", "What does PatternsCard do?" |
 | `05-design-system.md` | Color tokens, components, plain-English style rule | UI/UX questions, button conventions, the design rules |
 | `06-business-and-sales.md` | Pricing, target customer, sales motion | Sales advice, pitch script, objection handling, roadmap |
+| `07-changelog.md` | Recent changes — fixes, features, schema, infra | "What changed lately?", "Is X bug fixed?", "When did Y land?" |
 
 ## Tips for NotebookLM
 
@@ -49,6 +50,10 @@ If you change the app and want NotebookLM to reflect it:
 3. NotebookLM will re-index in ~30 seconds.
 
 The docs are self-contained — none of them require context from outside this folder.
+
+### Auto-updates
+
+`07-changelog.md` is updated automatically every 3 days by a scheduled background agent. The agent reads commits since the last entry, summarizes them in plain language, and appends a new dated section. Manual entries are welcome too — just write the section with today's date and it'll sit comfortably alongside the auto-generated ones. After an auto-update lands, re-upload `07-changelog.md` to NotebookLM (or, in NotebookLM, click the source's refresh icon if your account has it).
 
 ## What lives outside the NotebookLM pack
 
