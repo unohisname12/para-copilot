@@ -103,9 +103,14 @@ export function LegacyImportModal({ open, onClose, vaultLogs }) {
           )}
           {/* Review + Confirm steps are added in Tasks 6 + 7. */}
           {step === 'review' && (
-            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-              Review step renders here (Task 6).
-            </div>
+            <ReviewStep
+              rows={rows}
+              decisions={decisions}
+              setDecisions={setDecisions}
+              counts={counts}
+              onContinue={() => setStep('confirm')}
+              onBack={() => setStep('upload')}
+            />
           )}
           {step === 'confirm' && (
             <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
@@ -148,6 +153,98 @@ function UploadStep({ vaultIsEmpty, error, onFile }) {
           {error}
         </div>
       )}
+    </div>
+  );
+}
+
+function ReviewStep({ rows, decisions, setDecisions, counts, onContinue, onBack }) {
+  // Show only non-exact rows in the review table; exact matches were auto-
+  // decided. The badge shows what was auto-confirmed silently.
+  const reviewRows = rows.filter(r => r.match.kind !== 'exact');
+
+  function pick(rowIndex, candidate) {
+    setDecisions(prev => ({
+      ...prev,
+      [rowIndex]: candidate
+        ? { studentId: candidate.studentId, paraAppNumber: candidate.paraAppNumber, realName: candidate.realName }
+        : 'skip',
+    }));
+  }
+
+  const decidedCount = reviewRows.filter(r => decisions[r.rowIndex]).length;
+  const allDecided = decidedCount === reviewRows.length;
+
+  return (
+    <div>
+      <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 'var(--space-3)' }}>
+        ✓ {counts.exact} rows auto-matched.
+        {counts.duplicates > 0 && ` ${counts.duplicates} duplicates skipped.`}
+        {' '}Review the {reviewRows.length} below.
+      </div>
+      <div style={{ maxHeight: 360, overflowY: 'auto', border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-md)' }}>
+        <table className="data-table" style={{ width: '100%' }}>
+          <thead>
+            <tr>
+              <th>Row</th><th>Spreadsheet</th><th>Match</th><th>Pick</th>
+            </tr>
+          </thead>
+          <tbody>
+            {reviewRows.map(r => {
+              const decided = decisions[r.rowIndex];
+              return (
+                <tr key={r.rowIndex}>
+                  <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>#{r.rowIndex}</td>
+                  <td>
+                    <div style={{ fontWeight: 600 }}>{r.student}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                      {r.date} · {r.observation.slice(0, 64)}{r.observation.length > 64 ? '…' : ''}
+                    </div>
+                  </td>
+                  <td>
+                    {r.match.kind === 'fuzzy' && (
+                      <span className="pill pill-yellow" style={{ fontSize: 11 }}>fuzzy</span>
+                    )}
+                    {r.match.kind === 'ambiguous' && (
+                      <span className="pill pill-yellow" style={{ fontSize: 11 }}>ambiguous</span>
+                    )}
+                    {r.match.kind === 'none' && (
+                      <span className="pill" style={{ fontSize: 11 }}>no match</span>
+                    )}
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {(r.match.candidates || []).slice(0, 3).map(c => (
+                        <button
+                          key={c.paraAppNumber}
+                          type="button"
+                          className={'btn ' + (decided && decided !== 'skip' && decided.paraAppNumber === c.paraAppNumber ? 'btn-primary' : 'btn-secondary')}
+                          style={{ fontSize: 12, padding: '4px 8px', textAlign: 'left' }}
+                          onClick={() => pick(r.rowIndex, c)}
+                        >
+                          {c.realName}{c.score < 1 ? ` (${Math.round(c.score * 100)}%)` : ''}
+                        </button>
+                      ))}
+                      <button type="button"
+                        className={'btn ' + (decided === 'skip' ? 'btn-primary' : 'btn-secondary')}
+                        style={{ fontSize: 12, padding: '4px 8px', color: 'var(--text-muted)' }}
+                        onClick={() => pick(r.rowIndex, null)}>
+                        Skip this row
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 'var(--space-4)' }}>
+        <button className="btn btn-secondary" onClick={onBack}>← Back</button>
+        <button className="btn btn-primary" disabled={!allDecided} onClick={onContinue}>
+          Continue → ({decidedCount}/{reviewRows.length} decided)
+        </button>
+      </div>
     </div>
   );
 }
