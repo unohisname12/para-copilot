@@ -45,7 +45,13 @@ export function LegacyImportModal({ open, onClose, vaultLogs }) {
   async function handleFile(file) {
     setError(null);
     if (!file) return;
-    const text = await file.text();
+    let text;
+    try {
+      text = await file.text();
+    } catch (e) {
+      setError(`Could not read that file: ${e?.message || 'unknown error'}. Try a smaller export or a different browser.`);
+      return;
+    }
     const parsed = parseLegacyCsv(text);
     if (parsed.error) { setError(parsed.error); return; }
     const matched = matchRowsToVault(parsed.rows, vaultEntries);
