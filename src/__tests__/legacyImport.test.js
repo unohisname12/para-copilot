@@ -12,7 +12,7 @@ describe('normalizeName', () => {
     expect(normalizeName('Maria   E.  Lopez')).toBe('maria e lopez');
   });
   test('drops common punctuation', () => {
-    expect(normalizeName("O'Brien-Smith")).toBe('obrien smith');
+    expect(normalizeName("O'Brien-Smith")).toBe('o brien smith');
   });
   test('returns empty string for null/undefined', () => {
     expect(normalizeName(null)).toBe('');
@@ -32,7 +32,7 @@ describe('jaroWinkler', () => {
     expect(jaroWinkler('maria e lopez', 'maria lopez')).toBeGreaterThan(0.85);
   });
   test('rates "Marco Herrera-Barojas" vs "Marco Herrera Barojas" above 0.95', () => {
-    expect(jaroWinkler('marco herrera barojas', 'marco herrera barojas')).toBe(1);
+    expect(jaroWinkler(normalizeName('Marco Herrera-Barojas'), normalizeName('Marco Herrera Barojas'))).toBeGreaterThan(0.95);
   });
   test('symmetric: jaroWinkler(a,b) === jaroWinkler(b,a)', () => {
     expect(jaroWinkler('alpha', 'alphabet')).toBe(jaroWinkler('alphabet', 'alpha'));

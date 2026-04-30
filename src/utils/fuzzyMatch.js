@@ -13,8 +13,7 @@ export function normalizeName(s) {
     .normalize('NFKD')
     .replace(/[̀-ͯ]/g, '')   // strip combining diacritics
     .toLowerCase()
-    .replace(/[\s\-]+/g, ' ')          // normalize hyphens and whitespace to spaces
-    .replace(/[^\w\s]/g, '')           // drop all other punctuation
+    .replace(/[^a-z0-9\s]/g, ' ')      // drop punctuation
     .replace(/\s+/g, ' ')              // collapse runs of whitespace
     .trim();
 }
