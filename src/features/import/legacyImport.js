@@ -11,7 +11,8 @@ const PRE_FIX_HEADER = 'Date,Period,Student,Type,Category,Flagged,Tags,Observati
 const POST_FIX_HEADER = 'Date,Period,Period ID,Student,Para App Number,Type,Category,Flagged,Tags,Observation';
 
 // RFC 4180 line splitter: respects quoted fields containing newlines, commas,
-// and "" escapes. Returns array of cell arrays, one per logical row.
+// and "" escapes. Returns { rows, truncated } where truncated indicates an
+// unterminated quoted field (data loss).
 function splitCsv(text) {
   const rows = [];
   let row = [];
@@ -39,14 +40,22 @@ function splitCsv(text) {
     cell += c;
   }
   if (cell.length || row.length) { row.push(cell); rows.push(row); }
-  return rows;
+  return { rows, truncated: inQuotes };
 }
 
 export function parseLegacyCsv(text) {
   if (!text || typeof text !== 'string') {
     return { rows: [], skipped: [], error: "This doesn't look like a SuperPara private export — empty file." };
   }
-  const allRows = splitCsv(text);
+  // Fix 1: Strip leading BOM (e.g., from Excel-saved CSV files)
+  const cleaned = String(text).replace(/^﻿/, '');
+  const { rows: allRows, truncated } = splitCsv(cleaned);
+
+  // Fix 2: Detect unterminated quoted field
+  if (truncated) {
+    return { rows: [], skipped: [], error: "This file looks corrupted — a quoted field never closed." };
+  }
+
   if (!allRows.length) {
     return { rows: [], skipped: [], error: "This doesn't look like a SuperPara private export — no data." };
   }
@@ -70,13 +79,18 @@ export function parseLegacyCsv(text) {
     tags: idx('Tags'),
     observation: idx('Observation'),
     periodId: idx('Period ID'),               // -1 in pre-fix
-    paraAppNumberFromCsv: idx('Para App Number'), // -1 in pre-fix
+    csvParaAppNumber: idx('Para App Number'), // -1 in pre-fix (renamed for symmetry)
   };
 
   const rows = [];
   const skipped = [];
   for (let r = 1; r < allRows.length; r++) {
     const cells = allRows[r];
+    // Fix 3: Detect column-count mismatch per data row
+    if (cells.length !== headerCells.length) {
+      skipped.push({ rowIndex: r, reason: 'column count mismatch' });
+      continue;
+    }
     const date = (cells[I.date] || '').trim();
     const student = (cells[I.student] || '').trim();
     const observation = (cells[I.observation] || '').trim();
@@ -98,7 +112,7 @@ export function parseLegacyCsv(text) {
       observation,
       // post-fix exports may already carry paraAppNumber; matcher honors it
       // before doing name lookup.
-      csvParaAppNumber: I.paraAppNumberFromCsv >= 0 ? ((cells[I.paraAppNumberFromCsv] || '').trim() || null) : null,
+      csvParaAppNumber: I.csvParaAppNumber >= 0 ? ((cells[I.csvParaAppNumber] || '').trim() || null) : null,
     });
   }
   return { rows, skipped, error: null, schema };

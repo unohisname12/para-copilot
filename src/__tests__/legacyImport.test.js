@@ -103,4 +103,49 @@ describe('parseLegacyCsv', () => {
     expect(skipped[1].reason).toMatch(/student/i);
     expect(skipped[2].reason).toMatch(/observation/i);
   });
+
+  test('strips a leading BOM (Excel-saved files)', () => {
+    const HEADER = 'Date,Period,Student,Type,Category,Flagged,Tags,Observation';
+    const csv = '﻿' + HEADER + '\n' +
+      '"2026-04-29","p3","Maria Lopez","Note","g","No","","obs"';
+    const { rows, error } = parseLegacyCsv(csv);
+    expect(error).toBeNull();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].student).toBe('Maria Lopez');
+  });
+
+  test('CRLF line endings parse identically to LF', () => {
+    const HEADER = 'Date,Period,Student,Type,Category,Flagged,Tags,Observation';
+    const lf   = HEADER + '\n'   + '"2026-04-29","p3","Maria","Note","g","No","","obs"';
+    const crlf = HEADER + '\r\n' + '"2026-04-29","p3","Maria","Note","g","No","","obs"';
+    expect(parseLegacyCsv(lf).rows).toEqual(parseLegacyCsv(crlf).rows);
+  });
+
+  test('returns an error for an unterminated quoted field', () => {
+    const HEADER = 'Date,Period,Student,Type,Category,Flagged,Tags,Observation';
+    const csv = HEADER + '\n' +
+      '"2026-04-29","p3","Maria","Note","g","No","","this never closes';
+    const { rows, error } = parseLegacyCsv(csv);
+    expect(rows).toEqual([]);
+    expect(error).toMatch(/never closed|corrupted/i);
+  });
+
+  test('skips rows whose column count does not match the header', () => {
+    const HEADER = 'Date,Period,Student,Type,Category,Flagged,Tags,Observation';
+    const csv = HEADER + '\n' +
+      '"2026-04-29","p3","Maria","Note","g","No","obs"\n' +                    // 7 cells, header has 8
+      '"2026-04-29","p3","Maria","Note","g","No","","kept"';
+    const { rows, skipped } = parseLegacyCsv(csv);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].observation).toBe('kept');
+    expect(skipped.some(s => /column count|mismatch/i.test(s.reason))).toBe(true);
+  });
+
+  test('post-fix schema correctly extracts csvParaAppNumber', () => {
+    const post = 'Date,Period,Period ID,Student,Para App Number,Type,Category,Flagged,Tags,Observation\n' +
+      '"2026-04-29","Period 3","p3","Maria Lopez","847293","Note","g","No","","obs"';
+    const { rows } = parseLegacyCsv(post);
+    expect(rows[0].csvParaAppNumber).toBe('847293');
+    expect(rows[0].periodId).toBe('p3');
+  });
 });
