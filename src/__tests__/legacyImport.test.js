@@ -149,3 +149,80 @@ describe('parseLegacyCsv', () => {
     expect(rows[0].periodId).toBe('p3');
   });
 });
+
+import { matchRowsToVault } from '../features/import/legacyImport';
+
+describe('matchRowsToVault', () => {
+  // vaultEntries = [{ paraAppNumber, realName, studentId? }]
+  // Mirror what the modal will pass: vault names paired with the local
+  // studentId so matched rows can be ingested directly without a second
+  // lookup.
+  const vault = [
+    { paraAppNumber: '111111', realName: 'Maria Lopez',           studentId: 'stu_a' },
+    { paraAppNumber: '222222', realName: 'Marco Herrera-Barojas', studentId: 'stu_b' },
+    { paraAppNumber: '333333', realName: 'Henry Carrillo',        studentId: 'stu_c' },
+    { paraAppNumber: '444444', realName: 'Sophie Blake',          studentId: 'stu_d' },
+  ];
+
+  function row(student, extras = {}) {
+    return { rowIndex: 1, date: '2026-04-29', student, observation: 'obs', tags: [], ...extras };
+  }
+
+  test('exact (case + whitespace insensitive) match', () => {
+    const out = matchRowsToVault([row('  maria lopez  ')], vault);
+    expect(out[0].match.kind).toBe('exact');
+    expect(out[0].match.paraAppNumber).toBe('111111');
+    expect(out[0].match.studentId).toBe('stu_a');
+  });
+
+  test('diacritic-insensitive exact match', () => {
+    const out = matchRowsToVault([row('Maria López')], vault);
+    expect(out[0].match.kind).toBe('exact');
+    expect(out[0].match.paraAppNumber).toBe('111111');
+  });
+
+  test('hyphen vs space normalizes to exact match', () => {
+    // "Marco Herrera Barojas" (no hyphen) vs "Marco Herrera-Barojas" — same
+    // after normalization → exact, not fuzzy.
+    const out = matchRowsToVault([row('Marco Herrera Barojas')], vault);
+    expect(out[0].match.kind).toBe('exact');
+  });
+
+  test('fuzzy match for true near-misses (typo)', () => {
+    const out = matchRowsToVault([row('Henry Carillo')], vault); // missing one r
+    expect(out[0].match.kind).toBe('fuzzy');
+    expect(out[0].match.candidates[0].paraAppNumber).toBe('333333');
+    expect(out[0].match.candidates[0].score).toBeGreaterThan(0.85);
+  });
+
+  test('returns kind=none when no candidate clears 0.85', () => {
+    const out = matchRowsToVault([row('Zelda Northgate')], vault);
+    expect(out[0].match.kind).toBe('none');
+    expect(out[0].match.candidates || []).toEqual([]);
+  });
+
+  test('flags ambiguous when two vault entries normalize equal', () => {
+    const dupVault = [
+      ...vault,
+      { paraAppNumber: '555555', realName: 'maria lopez', studentId: 'stu_e' },
+    ];
+    const out = matchRowsToVault([row('Maria Lopez')], dupVault);
+    expect(out[0].match.kind).toBe('ambiguous');
+    expect(out[0].match.candidates).toHaveLength(2);
+  });
+
+  test('honors csvParaAppNumber when present (post-fix exports)', () => {
+    // If the row already carries paraAppNumber from a post-fix export, skip
+    // the name lookup and accept it.
+    const r = row('Maria Lopez', { csvParaAppNumber: '111111' });
+    const out = matchRowsToVault([r], vault);
+    expect(out[0].match.kind).toBe('exact');
+    expect(out[0].match.paraAppNumber).toBe('111111');
+    expect(out[0].match.studentId).toBe('stu_a');
+  });
+
+  test('returns kind=vault_empty when vault is empty', () => {
+    const out = matchRowsToVault([row('Maria Lopez')], []);
+    expect(out[0].match.kind).toBe('vault_empty');
+  });
+});

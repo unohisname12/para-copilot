@@ -7,6 +7,8 @@
 //   matchRowsToVault(rows, ...)   → matchedRows[]   (Task 3)
 //   dedupeAgainstLogs(rows, ...)  → { fresh, duplicates }  (Task 4)
 
+import { normalizeName, jaroWinkler } from '../../utils/fuzzyMatch';
+
 const PRE_FIX_HEADER = 'Date,Period,Student,Type,Category,Flagged,Tags,Observation';
 const POST_FIX_HEADER = 'Date,Period,Period ID,Student,Para App Number,Type,Category,Flagged,Tags,Observation';
 
@@ -116,4 +118,91 @@ export function parseLegacyCsv(text) {
     });
   }
   return { rows, skipped, error: null, schema };
+}
+
+const FUZZY_THRESHOLD = 0.85;
+const TOP_CANDIDATES = 3;
+
+// Match each row's `student` field against vault entries.
+// vaultEntries: Array<{ paraAppNumber, realName, studentId? }>
+// Returns the same rows with a `.match` field added describing the resolution.
+//   match.kind:
+//     "exact"      — exactly one vault entry normalizes equal to row.student
+//     "ambiguous"  — two or more vault entries normalize equal (rare)
+//     "fuzzy"      — best Jaro-Winkler candidate >= threshold, normalize-not-equal
+//     "none"       — no candidate clears threshold
+//     "vault_empty"— vault has zero entries; matcher is effectively a no-op
+//   For exact: { paraAppNumber, studentId, realName }
+//   For ambiguous/fuzzy: { candidates: [{paraAppNumber,studentId,realName,score}] }
+//   For none / vault_empty: { candidates: [] }
+//
+// Special case: if row.csvParaAppNumber is set (from a post-fix export's
+// "Para App Number" column) AND that paraAppNumber resolves to a known vault
+// entry, treat as exact and skip the name lookup entirely.
+export function matchRowsToVault(rows, vaultEntries) {
+  if (!Array.isArray(vaultEntries) || vaultEntries.length === 0) {
+    return rows.map(r => ({ ...r, match: { kind: 'vault_empty', candidates: [] } }));
+  }
+  // Pre-compute normalized keys + an inverse lookup by paraAppNumber.
+  const byNormalized = new Map(); // normName -> Array<entry>
+  const byParaAppNumber = new Map();
+  for (const e of vaultEntries) {
+    if (!e || !e.realName) continue;
+    const norm = normalizeName(e.realName);
+    if (!byNormalized.has(norm)) byNormalized.set(norm, []);
+    byNormalized.get(norm).push(e);
+    if (e.paraAppNumber) byParaAppNumber.set(String(e.paraAppNumber), e);
+  }
+
+  return rows.map((r) => {
+    // Honor explicit paraAppNumber from post-fix exports first.
+    if (r.csvParaAppNumber) {
+      const hit = byParaAppNumber.get(String(r.csvParaAppNumber));
+      if (hit) {
+        return {
+          ...r,
+          match: {
+            kind: 'exact',
+            paraAppNumber: hit.paraAppNumber,
+            studentId: hit.studentId || null,
+            realName: hit.realName,
+          },
+        };
+      }
+      // Fall through to name match if csv paraAppNumber isn't in the vault.
+    }
+    const key = normalizeName(r.student);
+    const exact = byNormalized.get(key);
+    if (exact && exact.length === 1) {
+      const e = exact[0];
+      return {
+        ...r,
+        match: { kind: 'exact', paraAppNumber: e.paraAppNumber, studentId: e.studentId || null, realName: e.realName },
+      };
+    }
+    if (exact && exact.length > 1) {
+      return {
+        ...r,
+        match: {
+          kind: 'ambiguous',
+          candidates: exact.map(e => ({
+            paraAppNumber: e.paraAppNumber, studentId: e.studentId || null, realName: e.realName, score: 1,
+          })),
+        },
+      };
+    }
+    // Fuzzy: rank all entries by Jaro-Winkler against the row's normalized name.
+    const ranked = vaultEntries
+      .map((e) => ({
+        paraAppNumber: e.paraAppNumber,
+        studentId: e.studentId || null,
+        realName: e.realName,
+        score: jaroWinkler(key, normalizeName(e.realName)),
+      }))
+      .filter(c => c.score >= FUZZY_THRESHOLD)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, TOP_CANDIDATES);
+    if (ranked.length > 0) return { ...r, match: { kind: 'fuzzy', candidates: ranked } };
+    return { ...r, match: { kind: 'none', candidates: [] } };
+  });
 }
