@@ -127,3 +127,21 @@ export function buildRosterLookups(allStudents, identityRegistry) {
   });
   return { nameById, periodIdsById };
 }
+
+// ── resolveStudentByParaAppNumber ─────────────────────────────
+// FERPA-safe stable bridge for the LOG layer. When a log's studentId is
+// orphaned (e.g. after a roster re-import that regenerated stu_imp_/stu_gen_
+// IDs), the paraAppNumber is the cross-device stable key that still points at
+// the right kid. Returns the student object or null.
+//
+// Accepts numeric or string inputs — some import paths leave paraAppNumber as
+// a number; coerce here so callers don't have to.
+export function resolveStudentByParaAppNumber(allStudents, paraAppNumber) {
+  if (paraAppNumber == null) return null;
+  const key = String(paraAppNumber).trim();
+  if (!key) return null;
+  for (const s of Object.values(allStudents || {})) {
+    if (s?.paraAppNumber != null && String(s.paraAppNumber).trim() === key) return s;
+  }
+  return null;
+}

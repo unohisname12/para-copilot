@@ -14,10 +14,23 @@ export function useCaseMemory() {
     ? { teamId: team.activeTeamId, userId: team.user.id, teamStudents: team.teamStudents || [] }
     : null;
 
-  const resolveDbStudentId = (pseudonymOrStudentId) => {
+  // Resolve cloud team_students row by paraAppNumber first (FERPA-safe stable
+  // bridge), then by id, then by pseudonym. Pseudonym last because it can
+  // drift between devices when rosters regenerate independently.
+  const resolveDbStudentId = (data) => {
     if (!cloudCtx) return null;
+    const paraAppNumber = data?.paraAppNumber || null;
+    if (paraAppNumber) {
+      const key = String(paraAppNumber).trim();
+      const byKey = cloudCtx.teamStudents.find(
+        (s) => s.paraAppNumber != null && String(s.paraAppNumber).trim() === key
+      );
+      if (byKey) return byKey.id;
+    }
+    const candidate = data?.studentId || data?.pseudonym || null;
+    if (!candidate) return null;
     const match = cloudCtx.teamStudents.find(
-      (s) => s.id === pseudonymOrStudentId || s.pseudonym === pseudonymOrStudentId
+      (s) => s.id === candidate || s.pseudonym === candidate
     );
     return match ? match.id : null;
   };
@@ -28,7 +41,8 @@ export function useCaseMemory() {
     if (cloudCtx) {
       pushIncident(cloudCtx.teamId, cloudCtx.userId, {
         ...inc,
-        studentDbId: resolveDbStudentId(data.pseudonym || data.studentId),
+        studentDbId: resolveDbStudentId(data),
+        paraAppNumber: data.paraAppNumber || null,
       }).catch((err) => {
         team.reportCloudError?.(`Incident saved locally but did not sync: ${err.message || err}`);
         // eslint-disable-next-line no-console
@@ -50,7 +64,8 @@ export function useCaseMemory() {
     if (cloudCtx) {
       pushIntervention(cloudCtx.teamId, cloudCtx.userId, {
         ...intv,
-        studentDbId: resolveDbStudentId(data.pseudonym || data.studentId),
+        studentDbId: resolveDbStudentId(data),
+        paraAppNumber: data.paraAppNumber || null,
       }).catch((err) => {
         team.reportCloudError?.(`Intervention saved locally but did not sync: ${err.message || err}`);
         // eslint-disable-next-line no-console
@@ -74,7 +89,8 @@ export function useCaseMemory() {
     if (cloudCtx) {
       pushOutcome(cloudCtx.teamId, cloudCtx.userId, {
         ...out,
-        studentDbId: resolveDbStudentId(data.pseudonym || data.studentId),
+        studentDbId: resolveDbStudentId(data),
+        paraAppNumber: data.paraAppNumber || null,
       }).catch((err) => {
         team.reportCloudError?.(`Outcome saved locally but did not sync: ${err.message || err}`);
         // eslint-disable-next-line no-console

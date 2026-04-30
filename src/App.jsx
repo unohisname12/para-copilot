@@ -28,6 +28,7 @@ import { useCaseMemory } from './hooks/useCaseMemory';
 
 // Utilities
 import { exportCSV, exportCSVPrivate } from './utils/exportCSV';
+import { resolveStudentByParaAppNumber } from './features/roster/rosterUtils';
 import { logsInLastHours } from './features/analytics/getStudentPatterns';
 
 // Components
@@ -409,24 +410,43 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
     );
     const sharedAdapted = (teamCtx?.sharedLogs || [])
       .filter(l => l && !localFingerprints.has(`${l.student_id}__${l.timestamp}`))
-      .map(l => ({
-        id: l.id,
-        studentId: l.student_id,
-        type: l.type,
-        category: l.category,
-        note: l.note,
-        date: l.date,
-        period: l.period_id,
-        periodId: l.period_id,
-        timestamp: l.timestamp,
-        tags: l.tags || [],
-        flagged: Boolean(l.flagged),
-        source: l.source || 'cloud_sync',
-        situationId: l.situation_id,
-        strategyUsed: l.strategy_used,
-        goalId: l.goal_id,
-        sharedFromTeammate: l.user_id !== teamCtx?.user?.id,
-      }));
+      .map(l => {
+        // Resolve studentId via paraAppNumber when the cloud row's
+        // student_id FK doesn't match anything we currently know about
+        // locally. Happens after a roster reset/regen — external_key on
+        // the cloud row is the FERPA-safe stable bridge that points back
+        // at the right kid.
+        const cloudStudentId = l.student_id;
+        const paraAppNumber = l.external_key || null;
+        const stuByDirectId = cloudStudentId ? allStudents[cloudStudentId] : null;
+        const stuByParaAppNumber = !stuByDirectId
+          ? resolveStudentByParaAppNumber(allStudents, paraAppNumber)
+          : null;
+        const resolvedStudentId =
+          (stuByDirectId && cloudStudentId)
+          || (stuByParaAppNumber && stuByParaAppNumber.id)
+          || cloudStudentId
+          || null;
+        return {
+          id: l.id,
+          studentId: resolvedStudentId,
+          paraAppNumber,
+          type: l.type,
+          category: l.category,
+          note: l.note,
+          date: l.date,
+          period: l.period_id,
+          periodId: l.period_id,
+          timestamp: l.timestamp,
+          tags: l.tags || [],
+          flagged: Boolean(l.flagged),
+          source: l.source || 'cloud_sync',
+          situationId: l.situation_id,
+          strategyUsed: l.strategy_used,
+          goalId: l.goal_id,
+          sharedFromTeammate: l.user_id !== teamCtx?.user?.id,
+        };
+      });
     const vaultLogs = sharedAdapted.length ? [...logs, ...sharedAdapted] : logs;
 
     const allStu = Object.entries(allStudents);
@@ -466,11 +486,19 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
     if (vaultTypeFilter) filteredLogs = filteredLogs.filter(l => l.type === vaultTypeFilter);
     if (vaultTagFilter) filteredLogs = filteredLogs.filter(l => (l.tags || []).includes(vaultTagFilter));
 
+    // Resolve a student record for a log, falling back to paraAppNumber when
+    // the studentId is stale (e.g. the original local id was wiped and
+    // re-imported under a new id). Keeps Vault names + colors stable across
+    // roster regenerations.
+    const studentForLog = (l) =>
+      allStudents[l.studentId]
+      || resolveStudentByParaAppNumber(allStudents, l.paraAppNumber);
+
     // Text search across note / student name / tags / type
     if (vaultSearch.trim()) {
       const q = vaultSearch.trim().toLowerCase();
       filteredLogs = filteredLogs.filter(l => {
-        const stu = allStudents[l.studentId];
+        const stu = studentForLog(l);
         const name = (stu?.realName || stu?.pseudonym || l.studentId || '').toLowerCase();
         const note = (l.note || l.text || '').toLowerCase();
         const type = (l.type || '').toLowerCase();
@@ -488,8 +516,8 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
         return at > bt ? dir : at < bt ? -dir : 0;
       }
       if (vaultSort.col === "student") {
-        const as = allStudents[a.studentId];
-        const bs = allStudents[b.studentId];
+        const as = studentForLog(a);
+        const bs = studentForLog(b);
         const an = (as?.realName || as?.pseudonym || a.studentId || '').toLowerCase();
         const bn = (bs?.realName || bs?.pseudonym || b.studentId || '').toLowerCase();
         return an > bn ? dir : an < bn ? -dir : 0;
@@ -686,7 +714,10 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
           <th style={{ textAlign: "right" }}>Actions</th>
         </tr></thead>
         <tbody>{filteredLogs.map(l => {
-        const rawStudent = allStudents[l.studentId];
+        // Same fallback as the search/sort: missing studentId resolves via
+        // paraAppNumber so old logs keep showing the right name + color
+        // after a roster regen wipes their original local id.
+        const rawStudent = studentForLog(l);
         const isOrphan = !rawStudent;
         const s = rawStudent || { pseudonym: l.studentId, color: "var(--text-muted)" };
         const label = isOrphan

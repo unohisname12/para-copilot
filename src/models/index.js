@@ -210,6 +210,11 @@ export function createLog({
   strategyUsed = null,  // which strategy was applied
   goalId = null,        // linked IEP goal
   source = "manual",    // "manual", "quick_action", "engine", "ai"
+  // Para App Number — admin-assigned 6-digit stable student key. Stored on
+  // every log so a Vault entry can re-link to the student even after the
+  // local roster regenerates studentIds (the rosterReconnect bridge,
+  // applied at the log layer).
+  paraAppNumber = null,
 }) {
   _logCounter++;
 
@@ -219,9 +224,16 @@ export function createLog({
   // Auto-generate tags from type and note
   const autoTags = tags.length > 0 ? tags : generateTags(type, note);
 
+  // Coerce to trimmed non-empty string or null. Mirrors normalizeImportedStudent
+  // so numeric or whitespace-padded inputs land the same way.
+  const normalizedParaAppNumber = paraAppNumber != null
+    ? (String(paraAppNumber).trim() || null)
+    : null;
+
   return {
     id: `log_${Date.now()}_${_logCounter}`,
     studentId,
+    paraAppNumber: normalizedParaAppNumber,
     type,
     category: autoCategory,
     note,

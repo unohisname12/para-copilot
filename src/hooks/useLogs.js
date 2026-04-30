@@ -1,13 +1,34 @@
+import { useEffect } from 'react';
 import { useLocalStorage } from './useLocalStorage';
 import { createLog } from '../models';
 import { polishText } from '../utils/spellPolish';
 
-export function useLogs({ currentDate, periodLabel, activePeriod, onLogCreated }) {
+export function useLogs({ currentDate, periodLabel, activePeriod, onLogCreated, allStudents = {} }) {
   const [logs, setLogs] = useLocalStorage('paraLogsV1', []);
   // Auto-polish toggle. Default ON — paras want quick messy notes cleaned
   // up automatically. They can flip it off in Settings → Editor if they
   // want raw input preserved.
   const [autoPolish] = useLocalStorage('paraAutoPolishV1', true);
+
+  // One-shot backfill of paraAppNumber on legacy paraLogsV1 entries.
+  // Older logs were written before paraAppNumber was a field; resolve it
+  // from the current allStudents map when the studentId still matches.
+  // Idempotent: only writes when at least one log is missing the field
+  // AND its student record has a paraAppNumber to provide. Logs whose
+  // studentId no longer maps to any student stay untouched (the field
+  // stays absent and the Vault still renders them).
+  useEffect(() => {
+    if (!allStudents || !logs?.length) return;
+    const needsBackfill = logs.some(l => !l.paraAppNumber && allStudents[l.studentId]?.paraAppNumber);
+    if (!needsBackfill) return;
+    setLogs(prev => prev.map(l => {
+      if (l.paraAppNumber) return l;
+      const fromStu = allStudents[l.studentId]?.paraAppNumber;
+      return fromStu ? { ...l, paraAppNumber: String(fromStu).trim() || null } : l;
+    }));
+    // We deliberately don't depend on `logs` — that would re-fire on every
+    // setLogs and ping-pong. allStudents is the right trigger.
+  }, [allStudents]);
 
   const addLog = (studentId, note, type, extras = {}) => {
     let finalNote = note;
@@ -19,10 +40,18 @@ export function useLogs({ currentDate, periodLabel, activePeriod, onLogCreated }
         polishMeta = { original, changes: changes.length };
       }
     }
+    // Resolve paraAppNumber: caller's extras win, fall back to the student
+    // record. This way every log is born with the FERPA-safe stable bridge,
+    // even at call sites that don't know about paraAppNumber yet.
+    const resolvedParaAppNumber =
+      extras.paraAppNumber
+      ?? allStudents[studentId]?.paraAppNumber
+      ?? null;
     const log = createLog({
       studentId, type, note: finalNote, date: currentDate,
       period: periodLabel, periodId: activePeriod,
       ...extras,
+      paraAppNumber: resolvedParaAppNumber,
       // Tag the log so the UI can offer Undo to the original text.
       polish: polishMeta || undefined,
     });

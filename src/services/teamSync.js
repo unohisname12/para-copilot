@@ -449,11 +449,15 @@ export function subscribeTeamStudents(teamId, onChange) {
 
 // ---------- Logs ----------
 
-function toLogRow(teamId, userId, log) {
+// Exported for unit tests. Production callers go through pushLog().
+export function toLogRow(teamId, userId, log) {
   return {
     team_id: teamId,
     user_id: userId,
     student_id: log.studentDbId || null,
+    // FERPA-safe stable bridge — survives team_students regeneration so
+    // logs reconnect to the right kid even when the foreign key goes null.
+    external_key: log.paraAppNumber || null,
     type: log.type || null,
     category: log.category || null,
     note: log.note || null,
@@ -532,6 +536,7 @@ export async function pushHandoff(teamId, fromUserId, h) {
     team_id: teamId,
     from_user_id: fromUserId,
     student_id: h.studentDbId || null,
+    external_key: h.paraAppNumber || null,
     audience: h.audience || null,
     urgency: h.urgency || 'normal',
     body: h.body,
@@ -583,6 +588,7 @@ export async function pushIncident(teamId, userId, incident) {
     team_id: teamId,
     user_id: userId,
     student_id: incident.studentDbId || null,
+    external_key: incident.paraAppNumber || null,
     description: incident.description,
     period_id: incident.periodId || null,
     intensity: incident.intensity || null,
@@ -606,6 +612,7 @@ export async function pushIntervention(teamId, userId, intervention) {
     user_id: userId,
     incident_id: intervention.incidentId || null,
     student_id: intervention.studentDbId || null,
+    external_key: intervention.paraAppNumber || null,
     strategy: intervention.strategy,
     notes: intervention.notes || null,
     worked: intervention.worked || 'unknown',
@@ -622,6 +629,7 @@ export async function pushOutcome(teamId, userId, outcome) {
     user_id: userId,
     intervention_id: outcome.interventionId || null,
     student_id: outcome.studentDbId || null,
+    external_key: outcome.paraAppNumber || null,
     result: outcome.result,
     notes: outcome.notes || null,
   }, 'outcomes row');

@@ -30,20 +30,34 @@ export function HandoffBuilder({ students, onSave, studentsMap, ollamaOnline, ol
     const aud = { next_para: "Next Para", teacher: "Teacher", end_of_day: "End of Day", urgent: "URGENT Follow-up" }[audience];
     const note = `HANDOFF [${aud}] ${urgency === "urgent" ? "🔴 URGENT" : ""}${stuId !== "all" && lookup[stuId] ? " — " + resolveLabel(lookup[stuId], "compact") : ""}: ${summary}${nextStep ? " | Action: " + nextStep : ""}`;
     const targetStu = stuId !== "all" ? stuId : students[0];
-    const pseudonym = (stuId !== "all" && lookup[stuId]) ? lookup[stuId].pseudonym : null;
+    const targetStuRecord = (stuId !== "all" && lookup[stuId]) ? lookup[stuId] : null;
+    const pseudonym = targetStuRecord?.pseudonym || null;
+    const paraAppNumber = targetStuRecord?.paraAppNumber || null;
     onSave(targetStu, note, "Handoff Note", {
       tags: ["handoff", audience, urgency],
       source: "handoff_builder",
       pseudonym,
+      paraAppNumber,
       shared: canShare && shareWithTeam,
     });
     if (canShare && shareWithTeam) {
-      const dbStu = pseudonym
-        ? (team.teamStudents || []).find((s) => s.pseudonym === pseudonym)
-        : null;
+      // Resolve the cloud team_students row by paraAppNumber first — pseudonyms
+      // can drift across devices, paraAppNumber doesn't.
+      const teamStudents = team.teamStudents || [];
+      let dbStu = null;
+      if (paraAppNumber) {
+        const key = String(paraAppNumber).trim();
+        dbStu = teamStudents.find(
+          (s) => s.paraAppNumber != null && String(s.paraAppNumber).trim() === key
+        ) || null;
+      }
+      if (!dbStu && pseudonym) {
+        dbStu = teamStudents.find((s) => s.pseudonym === pseudonym) || null;
+      }
       const body = `${aud}${nextStep ? ` — Action: ${nextStep}` : ''}: ${summary}`;
       pushHandoff(team.activeTeamId, team.user.id, {
         studentDbId: dbStu?.id || null,
+        paraAppNumber,
         audience,
         urgency,
         body,
