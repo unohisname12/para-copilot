@@ -238,6 +238,56 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
     [allStudentsRaw, vaultCtx.vault, vaultCtx.showRealNames]
   );
 
+  // ── vaultLogs ──────────────────────────────────────────────
+  // Merged log set: local paraLogsV1 + cloud-shared logs adapted into the
+  // local log shape. Hoisted out of renderVault so the StudentProfileModal,
+  // health badges, and analytics see the same set the Vault does — without
+  // it, opening a kid's profile after a local clear shows "Logs (1)" while
+  // the Vault correctly shows N.
+  //
+  // For each cloud row, resolve studentId via paraAppNumber when the FK
+  // doesn't match anything local (rosterReconnect bridge at the log layer).
+  const vaultLogs = React.useMemo(() => {
+    const localFingerprints = new Set(
+      (logs || []).map(l => `${l.studentId}__${l.timestamp}`)
+    );
+    const sharedAdapted = (teamCtx?.sharedLogs || [])
+      .filter(l => l && !localFingerprints.has(`${l.student_id}__${l.timestamp}`))
+      .map(l => {
+        const cloudStudentId = l.student_id;
+        const paraAppNumber = l.external_key || null;
+        const stuByDirectId = cloudStudentId ? allStudents[cloudStudentId] : null;
+        const stuByParaAppNumber = !stuByDirectId
+          ? resolveStudentByParaAppNumber(allStudents, paraAppNumber)
+          : null;
+        const resolvedStudentId =
+          (stuByDirectId && cloudStudentId)
+          || (stuByParaAppNumber && stuByParaAppNumber.id)
+          || cloudStudentId
+          || null;
+        return {
+          id: l.id,
+          studentId: resolvedStudentId,
+          paraAppNumber,
+          type: l.type,
+          category: l.category,
+          note: l.note,
+          date: l.date,
+          period: l.period_id,
+          periodId: l.period_id,
+          timestamp: l.timestamp,
+          tags: l.tags || [],
+          flagged: Boolean(l.flagged),
+          source: l.source || 'cloud_sync',
+          situationId: l.situation_id,
+          strategyUsed: l.strategy_used,
+          goalId: l.goal_id,
+          sharedFromTeammate: l.user_id !== teamCtx?.user?.id,
+        };
+      });
+    return sharedAdapted.length ? [...(logs || []), ...sharedAdapted] : (logs || []);
+  }, [logs, teamCtx?.sharedLogs, teamCtx?.user?.id, allStudents]);
+
   // Auto-clear sample data when real students come in. demoMode flips to
   // false inside useStudents on any handleImport / handleBundleImport call.
   // This watches that flip and wipes the seeded demo logs + case memory so
@@ -399,56 +449,8 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
   // RENDER — Vault
   // ══════════════════════════════════════════════════════════
   const renderVault = () => {
-    // Merge cloud-shared logs into the Vault so historical context survives
-    // a local reset. Includes the user's OWN cloud-saved logs too — after a
-    // local reset, paraLogsV1 is empty but those logs still exist in the
-    // cloud `logs` table and should re-appear when the same kid is loaded
-    // back. Dedup by (studentId + timestamp) to avoid double-counting any
-    // local copy that happens to also be in sharedLogs.
-    const localFingerprints = new Set(
-      (logs || []).map(l => `${l.studentId}__${l.timestamp}`)
-    );
-    const sharedAdapted = (teamCtx?.sharedLogs || [])
-      .filter(l => l && !localFingerprints.has(`${l.student_id}__${l.timestamp}`))
-      .map(l => {
-        // Resolve studentId via paraAppNumber when the cloud row's
-        // student_id FK doesn't match anything we currently know about
-        // locally. Happens after a roster reset/regen — external_key on
-        // the cloud row is the FERPA-safe stable bridge that points back
-        // at the right kid.
-        const cloudStudentId = l.student_id;
-        const paraAppNumber = l.external_key || null;
-        const stuByDirectId = cloudStudentId ? allStudents[cloudStudentId] : null;
-        const stuByParaAppNumber = !stuByDirectId
-          ? resolveStudentByParaAppNumber(allStudents, paraAppNumber)
-          : null;
-        const resolvedStudentId =
-          (stuByDirectId && cloudStudentId)
-          || (stuByParaAppNumber && stuByParaAppNumber.id)
-          || cloudStudentId
-          || null;
-        return {
-          id: l.id,
-          studentId: resolvedStudentId,
-          paraAppNumber,
-          type: l.type,
-          category: l.category,
-          note: l.note,
-          date: l.date,
-          period: l.period_id,
-          periodId: l.period_id,
-          timestamp: l.timestamp,
-          tags: l.tags || [],
-          flagged: Boolean(l.flagged),
-          source: l.source || 'cloud_sync',
-          situationId: l.situation_id,
-          strategyUsed: l.strategy_used,
-          goalId: l.goal_id,
-          sharedFromTeammate: l.user_id !== teamCtx?.user?.id,
-        };
-      });
-    const vaultLogs = sharedAdapted.length ? [...logs, ...sharedAdapted] : logs;
-
+    // vaultLogs is hoisted to top-level useMemo (above) so the modal +
+    // analytics see the same merged set the Vault renders.
     const allStu = Object.entries(allStudents);
     const counts = { green: allStu.filter(([id]) => getHealth(id, vaultLogs, currentDate) === "green").length, yellow: allStu.filter(([id]) => getHealth(id, vaultLogs, currentDate) === "yellow").length, red: allStu.filter(([id]) => getHealth(id, vaultLogs, currentDate) === "red").length };
     // Students with >3 logs in the last 24h — surface as "needs attention"
@@ -1131,7 +1133,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
         <div style={{ flex: 1, overflowY: "auto" }}>{toolboxTools.find(t => t.id === activeToolbox)?.component}</div>
       </aside>)}
 
-      {profileStu && (<StudentProfileModal studentId={profileStu} studentData={allStudents[profileStu]} logs={logs} currentDate={currentDate} activePeriod={activePeriod} onClose={() => setProfileStu(null)} onLog={addLog} onDraftEmail={(id) => { setProfileStu(null); insights.draftEmail(id); }} onUpdateIdentity={students.handleUpdateIdentity} onUpdateSupports={students.handleUpdateSupports} caseMemory={caseMemory} />)}
+      {profileStu && (<StudentProfileModal studentId={profileStu} studentData={allStudents[profileStu]} logs={vaultLogs} currentDate={currentDate} activePeriod={activePeriod} onClose={() => setProfileStu(null)} onLog={addLog} onDraftEmail={(id) => { setProfileStu(null); insights.draftEmail(id); }} onUpdateIdentity={students.handleUpdateIdentity} onUpdateSupports={students.handleUpdateSupports} caseMemory={caseMemory} />)}
       {insights.emailModal && (<EmailModal studentId={insights.emailModal.studentId} studentData={allStudents[insights.emailModal.studentId]} emailLoading={insights.emailLoading} emailDraft={insights.emailDraft} setEmailDraft={insights.setEmailDraft} onClose={() => { insights.setEmailModal(null); insights.setEmailDraft(""); }} />)}
       {situationModal && (<SituationResponseModal situation={situationModal} students={effectivePeriodStudents} studentsMap={allStudents} onClose={() => setSituationModal(null)} onLog={(id, note, type) => addLog(id, note, type)} onOpenCard={() => { setSituationModal(null); setActiveToolbox("cards"); }} />)}
       {insights.ollamaModal && (<OllamaInsightModal feature={insights.ollamaModal.feature} text={insights.ollamaModal.text} studentId={insights.ollamaModal.studentId} onClose={() => insights.setOllamaModal(null)} onLog={addLog} />)}

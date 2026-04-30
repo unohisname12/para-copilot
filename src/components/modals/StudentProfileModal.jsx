@@ -98,7 +98,14 @@ function OrphanStudentModal({ studentId, logs, onClose }) {
 function StudentProfileModalInner({ studentId, logs, currentDate, activePeriod, onClose, onLog, onDraftEmail, studentData, onUpdateIdentity, onUpdateSupports, caseMemory }) {
   useEscape(onClose);
   const s = studentData;
-  const stuLogs = logs.filter(l => l.studentId === studentId);
+  // Defensive paraAppNumber-aware filter: a log row's studentId may be
+  // stale (different import path produced a different local id), but its
+  // paraAppNumber is the FERPA-safe stable bridge that survives. Match
+  // either way so cross-session logs surface in the right kid's profile.
+  const stuLogs = logs.filter(l =>
+    l.studentId === studentId
+    || (s.paraAppNumber && l.paraAppNumber === s.paraAppNumber)
+  );
   const health = getHealth(studentId, logs, currentDate);
   const [tab, setTab] = useState("overview"), [logNote, setLogNote] = useState(""), [logType, setLogType] = useState("General Observation");
 

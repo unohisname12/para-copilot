@@ -90,6 +90,37 @@ describe('toLogRow — external_key surfaces paraAppNumber on cloud rows', () =>
   });
 });
 
+describe('profile-modal-style filter — paraAppNumber bridges stale studentIds', () => {
+  // Mirrors StudentProfileModalInner's stuLogs filter — matches by studentId
+  // OR by paraAppNumber so a log written under a previous local id still
+  // shows up in the current student's profile.
+  const studentId = 'stu_current';
+  const student = { id: 'stu_current', pseudonym: 'Red Student 1', paraAppNumber: '847293' };
+  const logs = [
+    { id: 'l_local_today', studentId: 'stu_current',     paraAppNumber: '847293', note: 'Extra time' },
+    { id: 'l_cloud_old1',  studentId: 'stu_previous_id', paraAppNumber: '847293', note: 'Did not wear glasses' },
+    { id: 'l_cloud_old2',  studentId: 'stu_other',       paraAppNumber: '847293', note: 'Not sure if she learned today' },
+    { id: 'l_someone_else', studentId: 'stu_other_kid',  paraAppNumber: '999999', note: 'unrelated' },
+  ];
+
+  test('matches all three of the kid\'s logs across studentId mismatches', () => {
+    const stuLogs = logs.filter(l =>
+      l.studentId === studentId
+      || (student.paraAppNumber && l.paraAppNumber === student.paraAppNumber)
+    );
+    expect(stuLogs).toHaveLength(3);
+    expect(stuLogs.map(l => l.id).sort()).toEqual(['l_cloud_old1', 'l_cloud_old2', 'l_local_today']);
+  });
+
+  test('does not pull in another kid\'s logs', () => {
+    const stuLogs = logs.filter(l =>
+      l.studentId === studentId
+      || (student.paraAppNumber && l.paraAppNumber === student.paraAppNumber)
+    );
+    expect(stuLogs.find(l => l.id === 'l_someone_else')).toBeUndefined();
+  });
+});
+
 describe('end-to-end reconnect — log resolves by paraAppNumber after re-import', () => {
   test('a log whose original studentId is gone still finds the kid via paraAppNumber', () => {
     // Pre-clear: log written against a local student.
