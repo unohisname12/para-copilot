@@ -38,3 +38,69 @@ describe('jaroWinkler', () => {
     expect(jaroWinkler('alpha', 'alphabet')).toBe(jaroWinkler('alphabet', 'alpha'));
   });
 });
+
+import { parseLegacyCsv } from '../features/import/legacyImport';
+
+describe('parseLegacyCsv', () => {
+  const HEADER_PREFIX = 'Date,Period,Student,Type,Category,Flagged,Tags,Observation';
+
+  test('parses a standard well-formed row', () => {
+    const csv = HEADER_PREFIX + '\n' +
+      '"2026-04-29","Period 3 — Math 2","Maria Lopez","Behavior Note","behavior","No","break;regulation","Used break pass."';
+    const { rows, error } = parseLegacyCsv(csv);
+    expect(error).toBeNull();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      date: '2026-04-29',
+      period: 'Period 3 — Math 2',
+      student: 'Maria Lopez',
+      type: 'Behavior Note',
+      category: 'behavior',
+      flagged: false,
+      tags: ['break', 'regulation'],
+      observation: 'Used break pass.',
+    });
+  });
+
+  test('handles embedded commas and escaped quotes inside quoted fields', () => {
+    const csv = HEADER_PREFIX + '\n' +
+      '"2026-04-29","p3","Maria Lopez","Note","g","Yes","","Said ""hi, friend"" loudly"';
+    const { rows } = parseLegacyCsv(csv);
+    expect(rows[0].observation).toBe('Said "hi, friend" loudly');
+    expect(rows[0].flagged).toBe(true);
+    expect(rows[0].tags).toEqual([]);
+  });
+
+  test('accepts post-fix schema with extra columns and ignores them', () => {
+    // Post-fix exports added "Period ID" + "Para App Number" columns. Parser
+    // must accept these without error and ignore unknown columns.
+    const post = 'Date,Period,Period ID,Student,Para App Number,Type,Category,Flagged,Tags,Observation\n' +
+      '"2026-04-29","Period 3","p3","Maria Lopez","847293","Note","g","No","","obs"';
+    const { rows, error } = parseLegacyCsv(post);
+    expect(error).toBeNull();
+    expect(rows[0].student).toBe('Maria Lopez');
+    expect(rows[0].observation).toBe('obs');
+  });
+
+  test('rejects a file whose header does not match either expected schema', () => {
+    const bad = 'name,age\n"Bob","12"';
+    const { rows, error } = parseLegacyCsv(bad);
+    expect(rows).toEqual([]);
+    expect(error).toMatch(/doesn't look like/i);
+  });
+
+  test('skips rows missing required fields and reports them', () => {
+    const csv = HEADER_PREFIX + '\n' +
+      '"","p3","Maria","Note","g","No","","obs"\n' +                           // missing date
+      '"2026-04-29","p3","","Note","g","No","","obs"\n' +                      // missing student
+      '"2026-04-29","p3","Maria","Note","g","No","",""\n' +                    // missing observation
+      '"2026-04-29","p3","Maria","Note","g","No","","kept"';
+    const { rows, skipped } = parseLegacyCsv(csv);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].observation).toBe('kept');
+    expect(skipped).toHaveLength(3);
+    expect(skipped[0].reason).toMatch(/date/i);
+    expect(skipped[1].reason).toMatch(/student/i);
+    expect(skipped[2].reason).toMatch(/observation/i);
+  });
+});
