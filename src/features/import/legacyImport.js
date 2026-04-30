@@ -206,3 +206,37 @@ export function matchRowsToVault(rows, vaultEntries) {
     return { ...r, match: { kind: 'none', candidates: [] } };
   });
 }
+
+// Dedupe key: paraAppNumber|date|trimmed-observation. Plain string equality
+// on the composite key — no crypto dep needed and equivalent for our scale.
+// Trim normalization catches whitespace-only differences.
+function dupeKey(paraAppNumber, date, text) {
+  return `${paraAppNumber}|${date}|${(text || '').trim()}`;
+}
+
+// Splits matched rows into (fresh, duplicates) based on the existing log set.
+// Existing logs may come from the merged vaultLogs (paraLogsV1 + adapted
+// cloud sharedLogs). Logs without paraAppNumber are skipped from the dedupe
+// index (we can't compute a comparable key).
+export function dedupeAgainstLogs(rows, existingLogs) {
+  const seen = new Set();
+  for (const l of existingLogs || []) {
+    if (!l || !l.paraAppNumber) continue;
+    const text = l.note || l.text || '';
+    seen.add(dupeKey(l.paraAppNumber, l.date, text));
+  }
+  const fresh = [];
+  const duplicates = [];
+  for (const r of rows) {
+    if (!r.match || r.match.kind !== 'exact') {
+      // Only "exact" rows have a confirmed paraAppNumber at dedupe time;
+      // ambiguous/fuzzy/none go to review and run dedupe again post-pick.
+      fresh.push(r);
+      continue;
+    }
+    const key = dupeKey(r.match.paraAppNumber, r.date, r.observation);
+    if (seen.has(key)) duplicates.push(r);
+    else { fresh.push(r); seen.add(key); }
+  }
+  return { fresh, duplicates };
+}

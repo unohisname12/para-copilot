@@ -226,3 +226,58 @@ describe('matchRowsToVault', () => {
     expect(out[0].match.kind).toBe('vault_empty');
   });
 });
+
+import { dedupeAgainstLogs } from '../features/import/legacyImport';
+
+describe('dedupeAgainstLogs', () => {
+  function row(overrides = {}) {
+    return {
+      rowIndex: 1, date: '2026-04-29', student: 'Maria Lopez',
+      observation: 'Used break pass.', tags: [],
+      match: { kind: 'exact', paraAppNumber: '111111', studentId: 'stu_a', realName: 'Maria Lopez' },
+      ...overrides,
+    };
+  }
+
+  test('exact duplicate (same paraAppNumber + date + observation) is detected', () => {
+    const existingLogs = [
+      { paraAppNumber: '111111', date: '2026-04-29', note: 'Used break pass.' },
+    ];
+    const { fresh, duplicates } = dedupeAgainstLogs([row()], existingLogs);
+    expect(fresh).toHaveLength(0);
+    expect(duplicates).toHaveLength(1);
+  });
+
+  test('observation differing only by trailing whitespace is treated as duplicate', () => {
+    const existingLogs = [
+      { paraAppNumber: '111111', date: '2026-04-29', note: 'Used break pass.   ' },
+    ];
+    const { fresh, duplicates } = dedupeAgainstLogs([row()], existingLogs);
+    expect(duplicates).toHaveLength(1);
+    expect(fresh).toHaveLength(0);
+  });
+
+  test('same kid + same day but different text is NOT a duplicate', () => {
+    const existingLogs = [
+      { paraAppNumber: '111111', date: '2026-04-29', note: 'Different observation.' },
+    ];
+    const { fresh, duplicates } = dedupeAgainstLogs([row()], existingLogs);
+    expect(fresh).toHaveLength(1);
+    expect(duplicates).toHaveLength(0);
+  });
+
+  test('rows whose match.kind is not "exact" are returned as fresh (review path handles them)', () => {
+    const r = row({ match: { kind: 'fuzzy', candidates: [] } });
+    const { fresh, duplicates } = dedupeAgainstLogs([r], []);
+    expect(fresh).toHaveLength(1);
+    expect(duplicates).toHaveLength(0);
+  });
+
+  test('logs without paraAppNumber are skipped during dedupe (legacy local logs)', () => {
+    const existingLogs = [
+      { date: '2026-04-29', note: 'Used break pass.' }, // no paraAppNumber on this log
+    ];
+    const { fresh } = dedupeAgainstLogs([row()], existingLogs);
+    expect(fresh).toHaveLength(1);
+  });
+});
