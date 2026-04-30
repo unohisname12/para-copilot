@@ -1,34 +1,36 @@
 # SupaPara — Changelog
 
-A running log of meaningful changes to the app — fixes, new features, schema changes, and infra moves. Most recent first. An automated agent appends a new dated section every 3 days based on the commit history; manual entries are welcome too.
+A running narrative of meaningful changes to the app — what shipped, why it shipped, and how it lands in a para's day. Newest entries on top.
 
-The point of this file in the NotebookLM pack: when a teammate asks "what changed recently?" or "is X bug fixed?", NotebookLM has a real answer instead of inferring from code.
+The point of this file in the NotebookLM source pack: when NotebookLM evaluates the app against its other context (para-reality data, school operations, the actual texture of a teacher aide's day), this file gives it the story of what's currently true that wasn't a few weeks ago. So it can ask: does this match the world?
+
+An automated background agent appends new entries every three days based on the commit history. Manual entries from Dre are welcome too — they sit comfortably alongside the auto-generated ones.
 
 ---
 
-## 2026-04-30 — External audit follow-up: 5 stability fixes
+## 2026-04-30 — Stability sweep after an outside audit
 
-An outside AI auditor flagged 7 candidate bugs in the codebase. After verifying each against the live code, **5 turned out to be real** and have been fixed and shipped to production. The other 2 were false alarms (one was looking at the moved `JPDs-gZD` repo path; the other was an environmental issue with the auditor's local port, not the code).
+An outside reviewer flagged seven candidate bugs in SupaPara. After verifying each against the live code, five turned out to be real and were fixed and shipped to production the same day. The other two were noise — one was reading the moved repo path; the other was an environment glitch on the auditor's local machine, not the app. The five that landed:
 
-**Live on `supapara.vercel.app` after this date.** Migration `20260430100000_create_team_owner_code.sql` is applied to the production Supabase project.
+### Owner-code joins now drop the sped teacher straight into the team
 
-### What got fixed
+A sped teacher pasting their `OWN-XXXXXXXX` admin code at sign-in expects to land inside the team. Until today, the join succeeded server-side but the modal never noticed, leaving the teacher staring at a frozen onboarding screen until they manually reloaded. The standard invite-code path already had the right behavior — it reloads the local team list and switches the active team — but the owner-code path was bypassing all of that and calling the service layer raw. Now it goes through the same provider plumbing as invite codes, so the join is one click and you're in.
 
-- **Owner-code join now refreshes the team list.** Joining a team via an `OWN-XXXXXXXX` code was calling the bare service function directly, bypassing `TeamProvider`'s `getMyTeams()` reload that the invite-code path uses. Server-side membership succeeded but the client teams list never updated, so the para stayed stuck on the onboarding modal until a manual reload. `joinTeamAsOwner` is now wired through `TeamProvider` with the same reload + `setActiveTeamId` flow as `joinTeamByCode`.
-- **New teams now get an owner code automatically.** The `create_team` RPC was authored Apr 22, before owner codes existed. The Apr 29 owner-code migration backfilled existing rows but never updated `create_team`, so any team minted after that came back with `owner_code = NULL` — leaving fresh admins with no code to share. New migration replaces the function to call `generate_owner_code()` inline on insert.
-- **Guided case-memory saves no longer create duplicate incidents.** `StudentProfileModal.handleSaveGuided` was pre-creating each record with `createIncident` / `createIntervention` / `createOutcome`, then passing the result into `caseMemory.add*` — which calls those same factories *again* internally and mints fresh ids. The stored records ended up with ids the modal never saw, while the modal kept using the discarded first ids for cross-references (`interventionIds`, `incidentId`, `interventionId`). Every chained link was broken. Now passes raw data to `caseMemory.add*` and uses the returned record's id for chaining.
-- **Drafts re-hydrate when the textarea key changes.** `useDraft`'s hydrate effect ran with empty deps, so the same hook instance kept the first key's draft forever. Switching students or actions on a mounted component never loaded the new key's saved draft, and the previous key's text could leak into the new key's auto-save slot. Hydrate effect now depends on `[key]`, keeping the original "user-loaded data wins" semantic on the initial mount only and re-hydrating (or clearing) on subsequent key changes.
-- **E2E test runner dependency aligned.** `package.json` listed `playwright` as a dev dep instead of `@playwright/test`. The runner imports come from `@playwright/test`, so `npm run test:e2e` was failing to resolve them. Swapped.
+### New teams now ship with an owner code automatically
 
-### Verification
+The owner-code feature itself only landed Apr 29, and the migration that introduced it backfilled every existing team — but it didn't update the function that creates new teams. So any team minted between Apr 29 and today came back with a NULL owner code, leaving freshly-onboarded admins with nothing to share. A small follow-up migration fixes the create function to generate a code at insert time. Existing teams were already taken care of; new teams are now consistent with them.
 
-Full Jest suite: **616/616 passing** across 48 suites. Local `npm run build` clean. Vercel production build clean (one earlier deploy failed on a named ESLint suppression rule that CRA's lint config doesn't ship — fixed in a follow-up commit using a bare `// eslint-disable-next-line`).
+### Guided "add help details" no longer breaks its own paper trail
 
-### Why these matter to a para
+When a para uses the guided follow-up flow under a kid's profile — antecedent, what you tried, did it work, what happened after — those answers are supposed to chain into a single case-memory record: this incident, then this intervention, then this outcome. The chaining was silently broken. Each record was being created twice in a row, and the cross-references all pointed at the first (now-discarded) copy. So a para reviewing a kid's history would see incidents floating without their interventions attached, and outcomes pointing at interventions that didn't seem to exist. The guided flow now creates each record once and uses the right ids, so the trail is intact: the next para checking the same kid's history sees what was tried and how it went.
 
-- The owner-code refresh fix means a sped teacher pasting their `OWN-XXXXXXXX` code actually lands inside the team on first try. Before the fix, the modal looked frozen and they'd give up or call Dre.
-- The duplicate-incident fix means the "Add Help Details" guided flow under a kid's profile actually links the intervention to the incident the para was looking at — so the next para checking case history sees the trail. Before the fix, the trail was silently broken: the incident was saved, the intervention was saved, but they pointed at IDs that didn't exist.
-- The draft fix means typing a partial note for one student, opening another student's profile, and coming back doesn't clobber the first student's saved draft.
+### Drafts now follow you when you switch students mid-thought
+
+Paras work in motion. They're typing about one student when another erupts, tap over to log the new incident, and come back to finish the first thought. The Dashboard's draft system already handled full reloads — your typing survived a flaky wifi reconnect or a Chromebook hiccup — but it didn't handle switching student profiles within the same session. The textbox identifier changes when you tap a different kid, and the draft system wasn't watching for that change. Now it is. Half-typed notes follow you across student tabs, clear themselves once you save, and remain safe across reloads.
+
+### Smaller infra fix: test runner dependency
+
+The end-to-end test command was failing to resolve its imports because `package.json` listed the wrong Playwright package name. Not user-visible, but it meant the e2e suite was blind. Swapped to the correct one. Full unit-test suite (616 tests) is green.
 
 ---
 
