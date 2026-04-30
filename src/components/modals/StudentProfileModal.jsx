@@ -10,7 +10,6 @@ import {
 } from '../../models/supports';
 import { resolveLabel } from '../../privacy/nameResolver';
 import { matchCaseKeywords, isHelpWorthy } from '../../engine';
-import { createIncident, createIntervention, createOutcome } from '../../models';
 import { useEscape } from '../../hooks/useEscape';
 import { useTeamOptional } from '../../context/TeamProvider';
 import ParentNotesSection from '../ParentNotesSection';
@@ -147,16 +146,16 @@ function StudentProfileModalInner({ studentId, logs, currentDate, activePeriod, 
     if (!logNote.trim()) return;
     // 1. Save plain log
     onLog(studentId, logNote, logType);
-    // 2. Save structured case memory if caseMemory hooks are available
+    // 2. Save structured case memory if caseMemory hooks are available.
+    // addIncident/addIntervention/addOutcome each call their createX factory
+    // internally — pass raw data and use the returned record's id so the
+    // intervention → incident and outcome → intervention links stay intact.
     if (caseMemory?.addIncident) {
-      const inc = createIncident({ studentId, description: logNote, date: currentDate, periodId: activePeriod || "p1", category: "behavior", antecedent: antecedent || "", setting: "other", source: "guided" });
-      caseMemory.addIncident(inc);
+      const inc = caseMemory.addIncident({ studentId, description: logNote, date: currentDate, periodId: activePeriod || "p1", category: "behavior", antecedent: antecedent || "", setting: "other", source: "guided" });
       if (intervention) {
-        const intv = createIntervention({ incidentId: inc.id, studentId, strategyLabel: intervention, staffNote: staffNote || "", source: "guided" });
-        caseMemory.addIntervention(intv);
+        const intv = caseMemory.addIntervention({ incidentId: inc.id, studentId, strategyLabel: intervention, staffNote: staffNote || "", source: "guided" });
         if (result) {
-          const out = createOutcome({ interventionId: intv.id, incidentId: inc.id, studentId, result: result, studentResponse: aftermath || "", wouldRepeat: result === "worked" || result === "partly" ? true : false, note: staffNote || "" });
-          caseMemory.addOutcome(out);
+          caseMemory.addOutcome({ interventionId: intv.id, incidentId: inc.id, studentId, result: result, studentResponse: aftermath || "", wouldRepeat: result === "worked" || result === "partly" ? true : false, note: staffNote || "" });
         }
       }
     }
