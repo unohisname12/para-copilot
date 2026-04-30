@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useTeam } from '../context/TeamProvider';
 import { useEscape } from '../hooks/useEscape';
-import { findSimilarTeam, isOwnerCode, joinTeamAsOwner, requestToJoinTeam } from '../services/teamSync';
+import { findSimilarTeam, isOwnerCode, requestToJoinTeam } from '../services/teamSync';
 
 export default function TeamOnboardingModal({ onClose, mustChoose = false }) {
-  const { user, teams, activeTeamId, setActiveTeamId, createTeam, joinTeamByCode, signOut } = useTeam();
+  const { user, teams, activeTeamId, setActiveTeamId, createTeam, joinTeamByCode, joinTeamAsOwner, signOut } = useTeam();
   const hasExistingTeams = (teams || []).length > 0;
   // Default to "switch" if the user is already in teams; otherwise start on "create".
   const [tab, setTab] = useState(hasExistingTeams ? 'switch' : 'create');

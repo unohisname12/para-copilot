@@ -10,6 +10,7 @@ import {
   getMyTeams,
   createTeam,
   joinTeamByCode,
+  joinTeamAsOwner,
   regenerateInviteCode,
   getTeamStudents,
   getMyAssignedStudents,
@@ -323,6 +324,14 @@ export function TeamProvider({ children }) {
       // We don't know the final role without a reload (server validates and
       // may coerce to 'para' if requestedRole was invalid). Reload instead
       // of guessing.
+      const all = await getMyTeams();
+      setTeams(all);
+      setActiveTeamId(t.id);
+      return all.find(x => x.id === t.id);
+    },
+    joinTeamAsOwner: async (code, display) => {
+      const t = await joinTeamAsOwner(code, display);
+      await claimPendingAssignments().catch(() => {});
       const all = await getMyTeams();
       setTeams(all);
       setActiveTeamId(t.id);
