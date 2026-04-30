@@ -11,12 +11,14 @@ A para uses SupaPara to:
 - Get one-tap support strategies for situations like meltdowns, work refusal, transitions
 - Talk to an AI copilot that already knows each student's plan
 - Hand off notes to the next para with one click
+- Maintain the **Tools & Supports** fact base for each kid — break access, BIP status, reinforcement system — so the next para or sub isn't starting from zero
 - Generate **Topics for Next Check-in** — a short list of patterns from their own recent logs worth bringing up with their sped teacher
 
 An owner or sped teacher uses SupaPara to:
 - Create a school team and invite paras/subs with a code
 - Assign students to specific paras or pre-register assignments by school email
 - Manage roles, pause/resume members, remove members, and transfer ownership
+- Approve or deny **join requests** — paras who don't have an invite code can request access, and the admin grants it from the Members tab
 - Toggle all sub access off when needed
 - Regenerate invite codes
 - Add private parent notes that paras cannot see
@@ -32,10 +34,14 @@ It is built and maintained by **Deandre ("Dre") Sample**, a paraprofessional at 
 
 | Role | What they do | Permissions |
 |---|---|---|
-| **Para** | Logs notes, reads handoffs, opens student cards | Sees IEP summary + their own + shared team logs. No parent notes. |
-| **Special-Ed Teacher** | Edits IEP summaries, adds parent notes, manages goals | Full access including parent notes. |
-| **Owner / Team Admin** | Creates the team, invites paras, manages roles, can transfer ownership | Full control. Multiple owners allowed (good for co-leads). |
+| **Para** | Logs notes, reads handoffs, opens student cards, edits the per-student Tools & Supports tab | Sees IEP summary + their own + shared team logs. No parent notes. |
+| **Special-Ed Teacher (Sped Teacher)** | Edits IEP summaries, adds parent notes, manages goals, approves join requests, sees the Coaching tab | Full admin access including parent notes. Reaches this role by joining via an `OWN-XXXXXXXX` owner code (not the 6-letter para invite code). |
+| **Owner / Team Admin** | Creates the team, invites paras, manages roles, can transfer ownership, approves join requests | Full control. Multiple owners allowed (good for co-leads). Same in-app permissions as Sped Teacher — distinction is just whether you created the team or joined into it. |
 | **Sub** | Substitute para — temporary, locked-down view | Same as para but admin can disable all subs with one switch. |
+
+Owner and Sped Teacher have identical permissions inside the app; the difference is *how* the role got assigned. The Owner created the team. A Sped Teacher joined an existing team via an owner code (or by being promoted later). This split exists so the original owner doesn't have to manually promote every sped teacher who joins — the owner just hands them an `OWN-` code and they land with full admin rights.
+
+The **Tools & Supports** tab inside each student's profile is a small fact base — break access, BIP status, reinforcement system — and it is **para-editable**, not admin-only. Paras live with these systems daily, so they're the right people to keep the record current.
 
 A "team" in SupaPara = one school's special-ed support team (typically 1 sped teacher + 3–8 paras + occasional subs). Most schools will have one team.
 
