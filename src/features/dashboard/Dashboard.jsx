@@ -71,6 +71,7 @@ export function Dashboard({
   hasVault = false,
   onFindMyStudents,
   bannerHiddenAlways = false,
+  onScheduleFollowUp,
 }) {
   // ── Persisted layout ──────────────────────────────────────
   const [layout, setLayout] = useLS(LAYOUT_KEY, { cols: 2, chatOpen: false, chatH: 320 });
@@ -1258,6 +1259,7 @@ export function Dashboard({
             addIntervention={caseMemory.addIntervention}
             addOutcome={caseMemory.addOutcome}
             addLog={addLog}
+            onScheduleFollowUp={onScheduleFollowUp}
             currentDate={currentDate}
             activePeriod={activePeriod}
             lastChatMessage={lastUserMsg}

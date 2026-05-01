@@ -25,6 +25,7 @@ import { useDocuments } from './hooks/useDocuments';
 import { useKnowledgeBase } from './hooks/useKnowledgeBase';
 import { useOllamaInsights } from './hooks/useOllamaInsights';
 import { useCaseMemory } from './hooks/useCaseMemory';
+import { useFollowUps } from './hooks/useFollowUps';
 
 // Utilities
 import { exportCSV, exportCSVPrivate } from './utils/exportCSV';
@@ -51,6 +52,7 @@ import BugReportButton from './components/BugReportButton';
 import FindMyStudentsModal from './components/FindMyStudentsModal';
 import SettingsModal, { isFindStudentsBannerHidden } from './components/SettingsModal';
 import { LegacyImportModal } from './features/import/LegacyImportModal';
+import { FollowUpPrompt, FollowUpsPanel } from './features/help';
 import { claimPendingAssignments } from './services/paraAssignments';
 import SubLockedScreen from './components/SubLockedScreen';
 import { VaultProvider, useVault, enrichStudentsWithNames } from './context/VaultProvider';
@@ -363,6 +365,63 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
 
   // ── Case Memory ────────────────────────────────────────────
   const caseMemory = useCaseMemory();
+  const followUps = useFollowUps();
+  const [activeFollowUpId, setActiveFollowUpId] = useState(null);
+
+  const activeFollowUp = activeFollowUpId
+    ? followUps.pendingFollowUps.find(f => f.id === activeFollowUpId)
+    : null;
+  const activeFollowUpIncident = activeFollowUp
+    ? caseMemory.incidents.find(i => i.id === activeFollowUp.incidentId)
+    : null;
+  const activeFollowUpIntervention = activeFollowUp
+    ? caseMemory.interventions.find(i => i.id === activeFollowUp.interventionId)
+    : null;
+  const activeFollowUpStudent = activeFollowUp
+    ? allStudents[activeFollowUp.studentId]
+    : null;
+
+  const openNextDueFollowUp = () => {
+    const next = followUps.dueFollowUps.find(f => allStudents[f.studentId]);
+    if (next) setActiveFollowUpId(next.id);
+  };
+
+  const handleFollowUpAnswer = (followUp, data) => {
+    const out = caseMemory.addOutcome({
+      interventionId: followUp.interventionId,
+      incidentId: followUp.incidentId,
+      studentId: followUp.studentId,
+      result: data.result,
+      studentResponse: data.studentResponse || '',
+      wouldRepeat: data.wouldRepeat,
+    });
+    const resultLabel = data.result === 'worked'
+      ? 'helped'
+      : data.result === 'failed'
+        ? 'got worse'
+        : data.result === 'partly'
+          ? 'no change yet'
+          : 'not sure';
+    addLog(followUp.studentId, `[Follow-up] ${resultLabel}${data.studentResponse ? ' — ' + data.studentResponse : ''}`, 'Outcome', {
+      source: 'follow_up',
+      tags: ['follow_up', 'help_outcome'],
+      incidentId: followUp.incidentId,
+      interventionId: followUp.interventionId,
+      outcomeId: out.id,
+    });
+    followUps.markAnswered(followUp.id);
+    setActiveFollowUpId(null);
+  };
+
+  const handleFollowUpSnooze = (id, minutes = 15) => {
+    followUps.snooze(id, minutes);
+    setActiveFollowUpId(null);
+  };
+
+  const handleFollowUpDismiss = (id) => {
+    followUps.dismiss(id);
+    setActiveFollowUpId(null);
+  };
 
   // ── Showcase (demo mode) ──────────────────────────────────
   const handleLoadDemo = ({ incidents, interventions, outcomes, logs: demoLogs }) => {
@@ -372,6 +431,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
   };
   const handleClearDemo = () => {
     caseMemory.clearCaseMemory();
+    followUps.clearFollowUps();
     clearDemoLogs();
   };
 
@@ -427,6 +487,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
   const toolboxTools = [
     { id: "situations", label: "🧠 Situations", tip: "Pick a classroom situation and get instant recommended moves, support cards, and tools.", component: <SituationPicker onSelect={s => setSituationModal(s)} /> },
     { id: "quickactions", label: "⚡ Quick Actions", tip: "One-tap logging — pick an action then tap the student to log instantly.", component: <QuickActionPanel students={effectivePeriodStudents} studentsMap={allStudents} onLog={addLog} /> },
+    { id: "followups", label: `Check-ins${followUps.dueFollowUps.length ? ` (${followUps.dueFollowUps.length})` : ""}`, tip: "Outcome check-ins you saved for later.", component: <FollowUpsPanel followUps={followUps.pendingFollowUps} dueFollowUps={followUps.dueFollowUps} allStudents={allStudents} incidents={caseMemory.incidents} interventions={caseMemory.interventions} onSelect={setActiveFollowUpId} onSnooze={handleFollowUpSnooze} onDismiss={handleFollowUpDismiss} /> },
     { id: "cards", label: "📋 Support Cards", tip: "Step-by-step reference cards for common situations.", component: <SupportCardPanel /> },
     { id: "abc", label: "📊 ABC Builder", tip: "Build structured behavior records: Antecedent, Behavior, Consequence.", component: <ABCBuilder students={effectivePeriodStudents} studentsMap={allStudents} onSave={addLog} periodLabel={period.label} currentDate={currentDate} /> },
     { id: "goals", label: "🎯 Goal Tracker", tip: "Mark IEP goal progress for any student with one tap.", component: <GoalTracker students={effectivePeriodStudents} studentsMap={allStudents} logs={logs} onSave={addLog} /> },
@@ -1017,6 +1078,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
                   logsBag.setLogs([]);
                   students.resetImports();
                   caseMemory.clearCaseMemory();
+                  followUps.clearFollowUps();
                   kb.setKnowledgeBase([]);
                   try { await vaultCtx.purgeVault(); } catch { /* noop */ }
                   setTimeout(() => window.alert('This computer cleared. Cloud roster untouched. Reload to see the demo state.'), 50);
@@ -1083,6 +1145,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
                   fetchDoc={fetchDoc} docLoading={docs.docLoading}
                   setProfileStu={setProfileStu}
                   caseMemory={caseMemory}
+                  onScheduleFollowUp={followUps.scheduleFollowUp}
                   onLoadDemo={handleLoadDemo}
                   onClearDemo={handleClearDemo}
                   hasVault={vaultCtx?.hasVault}
@@ -1139,6 +1202,51 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
       {insights.emailModal && (<EmailModal studentId={insights.emailModal.studentId} studentData={allStudents[insights.emailModal.studentId]} emailLoading={insights.emailLoading} emailDraft={insights.emailDraft} setEmailDraft={insights.setEmailDraft} onClose={() => { insights.setEmailModal(null); insights.setEmailDraft(""); }} />)}
       {situationModal && (<SituationResponseModal situation={situationModal} students={effectivePeriodStudents} studentsMap={allStudents} onClose={() => setSituationModal(null)} onLog={(id, note, type) => addLog(id, note, type)} onOpenCard={() => { setSituationModal(null); setActiveToolbox("cards"); }} />)}
       {insights.ollamaModal && (<OllamaInsightModal feature={insights.ollamaModal.feature} text={insights.ollamaModal.text} studentId={insights.ollamaModal.studentId} onClose={() => insights.setOllamaModal(null)} onLog={addLog} />)}
+
+      {!stealthMode && !activeFollowUp && followUps.dueFollowUps.length > 0 && (
+        <div
+          role="status"
+          style={{
+            position: 'fixed',
+            right: 20,
+            top: 64,
+            zIndex: 9300,
+            width: 'min(360px, calc(100vw - 40px))',
+            padding: 14,
+            background: 'var(--panel-raised)',
+            border: '1px solid var(--accent-border)',
+            borderRadius: 'var(--radius-lg)',
+            boxShadow: 'var(--shadow-lg)',
+          }}
+        >
+          <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 4 }}>
+            {followUps.dueFollowUps.length} follow-up{followUps.dueFollowUps.length === 1 ? '' : 's'} due
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.45, marginBottom: 10 }}>
+            Check what happened after a support you logged earlier.
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="button" className="btn btn-action btn-sm" onClick={openNextDueFollowUp}>
+              Open
+            </button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => handleFollowUpSnooze(followUps.dueFollowUps[0].id, 15)}>
+              Later
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!stealthMode && activeFollowUp && (
+        <FollowUpPrompt
+          followUp={activeFollowUp}
+          student={activeFollowUpStudent}
+          incident={activeFollowUpIncident}
+          intervention={activeFollowUpIntervention}
+          onAnswer={handleFollowUpAnswer}
+          onSnooze={handleFollowUpSnooze}
+          onDismiss={handleFollowUpDismiss}
+        />
+      )}
 
       {floatingTools.map(tid => { const t = toolboxTools.find(x => x.id === tid); return t ? <FloatingToolWindow key={tid} tool={t} onClose={() => setFloatingTools(prev => prev.filter(x => x !== tid))} onFullscreen={() => { setFullscreenTool(tid); setFloatingTools(prev => prev.filter(x => x !== tid)); }} onDock={() => { setFloatingTools(prev => prev.filter(x => x !== tid)); setActiveToolbox(tid); }} /> : null; })}
 

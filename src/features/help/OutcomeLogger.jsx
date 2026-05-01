@@ -7,7 +7,7 @@ const RESULT_OPTIONS = [
   { value: 'unknown', label: 'Not Sure', icon: '❓', bg: '#0f172a', border: '#334155', color: '#94a3b8' },
 ];
 
-export function OutcomeLogger({ intervention, incident, onSave, onSkip }) {
+export function OutcomeLogger({ intervention, incident, onSave, onSkip, onTrackLater }) {
   const [result, setResult] = useState(null);
   const [studentResponse, setStudentResponse] = useState('');
   const [wouldRepeat, setWouldRepeat] = useState(null);
@@ -77,7 +77,7 @@ export function OutcomeLogger({ intervention, incident, onSave, onSkip }) {
         </>
       )}
 
-      <button onClick={onSkip} style={{
+      <button onClick={onTrackLater || onSkip} style={{
         width: '100%', padding: '8px', marginTop: '6px', fontSize: '12px',
         background: 'transparent', color: '#475569', border: 'none', cursor: 'pointer',
       }}>Track outcome later</button>

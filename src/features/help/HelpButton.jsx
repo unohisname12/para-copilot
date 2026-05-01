@@ -5,6 +5,7 @@ export function HelpButton({
   student, allStudents,
   incidents, interventions, outcomes,
   addIncident, addIntervention, addOutcome, addLog,
+  onScheduleFollowUp,
   currentDate, activePeriod,
   lastChatMessage,
 }) {
@@ -57,6 +58,7 @@ export function HelpButton({
           addIntervention={addIntervention}
           addOutcome={addOutcome}
           addLog={addLog}
+          onScheduleFollowUp={onScheduleFollowUp}
           currentDate={currentDate}
           activePeriod={activePeriod}
           initialDescription={lastChatMessage || ''}

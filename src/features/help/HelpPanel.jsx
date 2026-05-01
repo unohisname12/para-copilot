@@ -9,6 +9,7 @@ export function HelpPanel({
   student, allStudents,
   incidents, interventions, outcomes,
   addIncident, addIntervention, addOutcome, addLog,
+  onScheduleFollowUp,
   currentDate, activePeriod,
   initialDescription,
   onClose,
@@ -111,6 +112,21 @@ export function HelpPanel({
 
     setToast('Outcome recorded');
     setTimeout(() => { setToast(null); onClose(); }, 1500);
+  };
+
+  const handleTrackLater = () => {
+    if (activeIncident && lastIntervention && onScheduleFollowUp) {
+      const followUp = onScheduleFollowUp({
+        incident: activeIncident,
+        intervention: lastIntervention,
+        currentDate,
+        activePeriod,
+      });
+      setToast(followUp ? 'Saved. I will ask again later.' : 'Saved for later.');
+      setTimeout(() => { setToast(null); onClose(); }, 900);
+      return;
+    }
+    onClose();
   };
 
   const handleTryAgain = (pastIntervention) => {
@@ -232,6 +248,7 @@ export function HelpPanel({
             incident={activeIncident}
             onSave={handleSaveOutcome}
             onSkip={onClose}
+            onTrackLater={handleTrackLater}
           />
         )}
       </div>
