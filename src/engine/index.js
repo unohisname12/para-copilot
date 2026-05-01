@@ -245,7 +245,7 @@ export function matchCaseKeywords(text, incidents, interventions, outcomes, maxR
 }
 
 // ── Help-worthy keyword detection ──────────────────────────
-const _helpPatterns = /\b(threw|throw|hit|hitting|yelling|yelled|ran\s*out|refused|shut\s*down|escalat\w*|crying|cried|unsafe|aggressive|left\s*room|meltdown|dysregulated|kicked|punched|screaming|eloped|bolted|destroying|flipped)\b/i;
+const _helpPatterns = /\b(threw|throw|hit|hitting|yelling|yelled|ran\s*out|walked?\s*out|left\s*(room|class|classroom)|without\s+permiss(?:ion|on)|refused|shut\s*down|escalat\w*|crying|cried|unsafe|aggressive|meltdown|dysregulated|kicked|punched|screaming|eloped|bolted|destroying|flipped)\b/i;
 export function isHelpWorthy(text) {
   if (!text || text.trim().length < 5) return false;
   return _helpPatterns.test(text);

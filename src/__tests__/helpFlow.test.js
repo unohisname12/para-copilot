@@ -236,6 +236,8 @@ describe('isHelpWorthy', () => {
     expect(isHelpWorthy('Unsafe behavior in hallway')).toBe(true);
     expect(isHelpWorthy('Student was aggressive towards aide')).toBe(true);
     expect(isHelpWorthy('Left room without permission')).toBe(true);
+    expect(isHelpWorthy('Walked out of class without permission')).toBe(true);
+    expect(isHelpWorthy('Walked out of class without permisson')).toBe(true);
     expect(isHelpWorthy('Full meltdown during transition')).toBe(true);
     expect(isHelpWorthy('Student seemed dysregulated')).toBe(true);
     expect(isHelpWorthy('Hit another student')).toBe(true);

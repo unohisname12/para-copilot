@@ -10,7 +10,7 @@ import "./styles/styles.css";
 import { DB, QUICK_ACTIONS } from './data';
 
 // Engine + Model layer
-import { parseDocForPeriod } from './engine';
+import { isHelpWorthy, parseDocForPeriod } from './engine';
 import { getHealth, hdot } from './models';
 import { resolveLabel } from './privacy/nameResolver';
 
@@ -452,6 +452,36 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
     followUps.dismiss(id);
     setActiveFollowUpId(null);
   };
+
+  const seenLogIdsForFollowUps = React.useRef(new Set((logs || []).map(l => l.id)));
+  React.useEffect(() => {
+    const seen = seenLogIdsForFollowUps.current;
+    (logs || []).forEach(log => {
+      if (!log?.id || seen.has(log.id)) return;
+      seen.add(log.id);
+      if (!log.studentId || log.source === 'follow_up') return;
+      if (['Intervention', 'Outcome', 'Handoff Note', 'Class Note'].includes(log.type)) return;
+      const note = log.note || log.text || '';
+      if (!isHelpWorthy(note)) return;
+      const incident = caseMemory.addIncident({
+        studentId: log.studentId,
+        description: note,
+        date: log.date || currentDate,
+        periodId: log.periodId || activePeriod,
+        category: /academic|goal|assignment|work/i.test(`${log.type} ${note}`) ? 'academic' : 'behavior',
+        tags: ['auto_follow_up'],
+        source: 'auto_note',
+        paraAppNumber: log.paraAppNumber || null,
+      });
+      followUps.scheduleFollowUp({
+        incident: { ...incident, logIds: [log.id], paraAppNumber: log.paraAppNumber || null },
+        intervention: null,
+        currentDate: log.date || currentDate,
+        activePeriod: log.periodId || activePeriod,
+        needsIntervention: true,
+      });
+    });
+  }, [logs, caseMemory, followUps, currentDate, activePeriod]);
 
   // ── Showcase (demo mode) ──────────────────────────────────
   const handleLoadDemo = ({ incidents, interventions, outcomes, logs: demoLogs }) => {

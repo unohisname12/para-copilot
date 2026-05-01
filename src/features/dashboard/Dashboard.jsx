@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { DB } from '../../data';
 import { getHealth, hdot } from '../../models';
 import { resolveLabel } from '../../privacy/nameResolver';
-import { parseDocForPeriod, matchCaseKeywords, isHelpWorthy } from '../../engine';
+import { parseDocForPeriod, matchCaseKeywords } from '../../engine';
 import { useAutoGrammarFix, useGrammarFixSetting } from '../../hooks/useAutoGrammarFix';
 import { useDraft } from '../../hooks/useDraft';
 import { OllamaStatusBadge } from '../../components/OllamaStatusBadge';
@@ -134,32 +134,14 @@ export function Dashboard({
   const quickLog = useCallback((studentId, action, extraNote = "") => {
     const s = allStudents[studentId] || {};
     const note = extraNote.trim() || (topic ? `${action.type} — ${topic}` : action.type);
-    const log = addLog(studentId, note, action.type);
-    if (caseMemory?.addIncident && onScheduleFollowUp && isHelpWorthy(note)) {
-      const incident = caseMemory.addIncident({
-        studentId,
-        description: note,
-        date: currentDate,
-        periodId: activePeriod,
-        category: action.type === 'Academic Support' ? 'academic' : 'behavior',
-        tags: ['auto_follow_up'],
-        source: 'auto_note',
-      });
-      onScheduleFollowUp({
-        incident: { ...incident, logIds: [log.id], paraAppNumber: log.paraAppNumber || null },
-        intervention: null,
-        currentDate,
-        activePeriod,
-        needsIntervention: true,
-      });
-    }
+    addLog(studentId, note, action.type);
     showToast(`✅ ${action.label} → ${resolveLabel(s, "compact")}`);
     // Clear persisted draft — successful save means the in-flight text is done.
     noteDraftStore.clear();
     setActiveAction(null);
     setNoteTarget(null);
     setNoteDraft("");
-  }, [allStudents, topic, addLog, showToast, noteDraftStore, caseMemory, onScheduleFollowUp, currentDate, activePeriod]);
+  }, [allStudents, topic, addLog, showToast, noteDraftStore]);
 
   // Per-card action taps always open the detail sheet. Paras using the
   // dashboard (vs. Simple Mode) want room to write — the sheet has a
