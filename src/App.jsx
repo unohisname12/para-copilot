@@ -391,6 +391,32 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
   };
 
   const handleFollowUpAnswer = (followUp, data) => {
+    if (data.kind === 'intervention') {
+      const incident = caseMemory.incidents.find(i => i.id === followUp.incidentId);
+      if (!incident) return;
+      const intv = caseMemory.addIntervention({
+        incidentId: followUp.incidentId,
+        studentId: followUp.studentId,
+        staffNote: data.staffNote,
+        source: 'follow_up',
+      });
+      addLog(followUp.studentId, `[Follow-up] Tried: ${data.staffNote}`, 'Intervention', {
+        source: 'follow_up',
+        tags: ['follow_up', 'help_intervention'],
+        incidentId: followUp.incidentId,
+        interventionId: intv.id,
+      });
+      followUps.markAnswered(followUp.id);
+      followUps.scheduleFollowUp({
+        incident,
+        intervention: intv,
+        currentDate: followUp.currentDate || currentDate,
+        activePeriod: followUp.activePeriod || activePeriod,
+      });
+      setActiveFollowUpId(null);
+      return;
+    }
+
     const out = caseMemory.addOutcome({
       interventionId: followUp.interventionId,
       incidentId: followUp.incidentId,

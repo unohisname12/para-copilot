@@ -221,7 +221,7 @@ function GrammarFixToggle() {
     <Toggle
       icon="✨"
       title="Auto-cleanup typing"
-      body="Lightly fixes capitalization and double spaces 1.5s after you stop typing. Cursor stays put. Applies to every place you log notes (dashboard, Simple Mode, handoffs, parent notes)."
+      body="Uses local AI when it is running to clean up spelling and grammar after you stop typing. Falls back to light capitalization and spacing fixes when local AI is offline."
       on={!!enabled}
       onChange={() => setEnabled(!enabled)}
     />

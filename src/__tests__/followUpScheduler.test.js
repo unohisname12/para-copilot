@@ -76,6 +76,22 @@ describe('follow-up scheduler', () => {
     expect(followUp.expiresAt).toBe('2026-05-06T10:00:00.000Z');
   });
 
+  test('creates immediate follow-up when note still needs what staff tried', () => {
+    const followUp = createPendingFollowUp({
+      incident: incident('Student threw chair'),
+      intervention: null,
+      currentDate: '2026-05-01',
+      activePeriod: 'p3',
+      needsIntervention: true,
+      now,
+    });
+
+    expect(followUp.needsIntervention).toBe(true);
+    expect(followUp.interventionId).toBe(null);
+    expect(followUp.reason).toBe('needs_intervention');
+    expect(followUp.nextPromptAt).toBe('2026-05-01T10:00:00.000Z');
+  });
+
   test('finds due follow-ups and ignores future ones', () => {
     const due = { id: 'due', status: 'pending', nextPromptAt: '2026-05-01T09:59:00.000Z', expiresAt: '2026-05-06T10:00:00.000Z' };
     const future = { id: 'future', status: 'pending', nextPromptAt: '2026-05-01T10:30:00.000Z', expiresAt: '2026-05-06T10:00:00.000Z' };

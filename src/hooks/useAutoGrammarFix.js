@@ -1,12 +1,13 @@
 import { useEffect } from 'react';
 import { useLocalStorage } from './useLocalStorage';
 import { applyFixWithCursor } from '../utils/grammarFix';
+import { ollamaPolishText } from '../engine/ollama';
 
 // Single source of truth for the auto-grammar-fix toggle. Read it anywhere
 // to know whether to apply the cleanup; write through setEnabled to flip.
-// Persisted under paraAutoGrammarFixV1 (default: off).
+// Persisted under paraAutoGrammarFixV1 (default: on).
 export function useGrammarFixSetting() {
-  const [enabled, setEnabled] = useLocalStorage('paraAutoGrammarFixV1', false);
+  const [enabled, setEnabled] = useLocalStorage('paraAutoGrammarFixV1', true);
   return [enabled, setEnabled];
 }
 
@@ -26,6 +27,7 @@ export function useGrammarFixSetting() {
 export function useAutoGrammarFix({ value, setValue, ref, enabled, delayMs = 1500 }) {
   useEffect(() => {
     if (!enabled || !value || typeof setValue !== 'function') return;
+    let cancelled = false;
     const t = setTimeout(() => {
       const ta = ref?.current;
       const cursor = ta && typeof ta.selectionStart === 'number' ? ta.selectionStart : value.length;
@@ -38,7 +40,21 @@ export function useAutoGrammarFix({ value, setValue, ref, enabled, delayMs = 150
           }
         });
       }
+      if (String(value).trim().length < 12 || String(value).length > 700) return;
+      ollamaPolishText(fixed).then(aiFixed => {
+        if (cancelled || !aiFixed || aiFixed === fixed) return;
+        setValue(aiFixed);
+        requestAnimationFrame(() => {
+          if (ref?.current && typeof ref.current.setSelectionRange === 'function') {
+            const pos = Math.min(aiFixed.length, newCursor);
+            ref.current.setSelectionRange(pos, pos);
+          }
+        });
+      }).catch(() => {});
     }, delayMs);
-    return () => clearTimeout(t);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
   }, [value, enabled, delayMs]);
 }

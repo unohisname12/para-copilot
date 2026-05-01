@@ -12,8 +12,18 @@ export function FollowUpPrompt({ followUp, student, incident, intervention, onAn
   const [details, setDetails] = React.useState('');
   if (!followUp) return null;
 
+  const needsIntervention = followUp.needsIntervention || !intervention;
   const studentLabel = student ? resolveLabel(student, 'compact') : 'this student';
   const tried = intervention?.strategyLabel || intervention?.staffNote || 'what you tried';
+
+  const saveIntervention = () => {
+    const staffNote = details.trim();
+    if (!staffNote) {
+      onSnooze(followUp.id, 5);
+      return;
+    }
+    onAnswer(followUp, { kind: 'intervention', staffNote });
+  };
 
   const handleAnswer = (result) => {
     if (result === 'partly' && !details.trim()) {
@@ -53,7 +63,7 @@ export function FollowUpPrompt({ followUp, student, incident, intervention, onAn
               Follow-up check-in
             </div>
             <h2 style={{ margin: '4px 0 0', fontSize: 20, color: 'var(--text-primary)', letterSpacing: 0 }}>
-              What happened after?
+              {needsIntervention ? 'What did you try?' : 'What happened after?'}
             </h2>
           </div>
           <button
@@ -70,32 +80,51 @@ export function FollowUpPrompt({ followUp, student, incident, intervention, onAn
           <strong style={{ color: 'var(--text-primary)' }}>{studentLabel}</strong>
           {' '}had this note: {incident?.description || 'a saved note'}.
           <br />
-          You tried: <strong style={{ color: 'var(--accent-hover)' }}>{tried}</strong>.
+          {needsIntervention ? (
+            <>Add the support you tried. Then I will ask what happened after.</>
+          ) : (
+            <>You tried: <strong style={{ color: 'var(--accent-hover)' }}>{tried}</strong>.</>
+          )}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8, marginBottom: 12 }}>
-          {OPTIONS.map(opt => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => handleAnswer(opt.value)}
-              style={{
-                minHeight: 52,
-                padding: '10px 12px',
-                borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--border)',
-                background: 'var(--panel-bg)',
-                color: 'var(--text-primary)',
-                cursor: 'pointer',
-                textAlign: 'left',
-                fontFamily: 'inherit',
-              }}
-            >
-              <div style={{ fontSize: 14, fontWeight: 800 }}>{opt.label}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{opt.detail}</div>
-            </button>
-          ))}
-        </div>
+        {needsIntervention ? (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+            {['Gave space', 'Offered break', 'Used calm voice', 'Reduced task', 'Called for help'].map(label => (
+              <button
+                key={label}
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setDetails(label)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8, marginBottom: 12 }}>
+            {OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => handleAnswer(opt.value)}
+                style={{
+                  minHeight: 52,
+                  padding: '10px 12px',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border)',
+                  background: 'var(--panel-bg)',
+                  color: 'var(--text-primary)',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  fontFamily: 'inherit',
+                }}
+              >
+                <div style={{ fontSize: 14, fontWeight: 800 }}>{opt.label}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{opt.detail}</div>
+              </button>
+            ))}
+          </div>
+        )}
 
         <label style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, marginBottom: 5 }}>
           Details optional
@@ -106,7 +135,7 @@ export function FollowUpPrompt({ followUp, student, incident, intervention, onAn
           rows={3}
           spellCheck="true"
           lang="en"
-          placeholder="Add details if you have them."
+          placeholder={needsIntervention ? 'What did you try?' : 'Add details if you have them.'}
           style={{
             width: '100%',
             boxSizing: 'border-box',
@@ -122,12 +151,18 @@ export function FollowUpPrompt({ followUp, student, incident, intervention, onAn
         />
 
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 12 }}>
-          <button type="button" className="btn btn-ghost" onClick={() => onSnooze(followUp.id, 15)}>
+          <button type="button" className="btn btn-ghost" onClick={() => onSnooze(followUp.id, needsIntervention ? 5 : 15)}>
             Ask me later
           </button>
-          <button type="button" className="btn btn-secondary" onClick={() => handleAnswer('unknown')}>
-            Save without details
-          </button>
+          {needsIntervention ? (
+            <button type="button" className="btn btn-action" onClick={saveIntervention}>
+              Save what I tried
+            </button>
+          ) : (
+            <button type="button" className="btn btn-secondary" onClick={() => handleAnswer('unknown')}>
+              Save without details
+            </button>
+          )}
         </div>
       </div>
     </div>

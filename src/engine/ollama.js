@@ -7,6 +7,7 @@
 const OLLAMA_BASE  = "http://127.0.0.1:11434";
 const OLLAMA_MODEL = "qwen2.5:7b-instruct";
 const TIMEOUT_MS   = 60000; // 60s — local inference can be slow
+const POLISH_TIMEOUT_MS = 9000;
 
 // ── Custom error types ────────────────────────────────────────
 export class OllamaOfflineError  extends Error { constructor() { super("Ollama is offline. Run: ollama serve"); this.name = "OllamaOfflineError"; } }
@@ -54,6 +55,41 @@ export async function callOllama(systemPrompt, userPrompt) {
     if (err.name === "AbortError" || err.message === "timeout") throw new OllamaTimeoutError();
     if (err instanceof OllamaResponseError) throw err;
     throw new OllamaOfflineError();
+  }
+}
+
+export async function ollamaPolishText(text) {
+  const input = String(text || '');
+  if (!input.trim() || typeof fetch !== 'function') return input;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort("timeout"), POLISH_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${OLLAMA_BASE}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        stream: false,
+        options: { temperature: 0.1, num_predict: 240 },
+        messages: [
+          {
+            role: "system",
+            content: "Fix spelling, grammar, capitalization, and spacing only. Preserve meaning, names, abbreviations, line breaks, and the writer's voice. Do not add new facts. Return only the corrected text.",
+          },
+          { role: "user", content: input },
+        ],
+      }),
+    });
+    clearTimeout(timer);
+    if (!res.ok) return input;
+    const data = await res.json();
+    const out = data.message?.content?.trim();
+    if (!out || out.length > input.length * 2.5) return input;
+    return out.replace(/^["']|["']$/g, '');
+  } catch {
+    clearTimeout(timer);
+    return input;
   }
 }
 

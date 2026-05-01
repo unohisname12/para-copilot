@@ -25,7 +25,9 @@ export function useFollowUps() {
     if (!followUp) return null;
     setFollowUps(prev => {
       const existing = prev.find(f =>
+        f.incidentId === followUp.incidentId &&
         f.interventionId === followUp.interventionId &&
+        Boolean(f.needsIntervention) === Boolean(followUp.needsIntervention) &&
         ['pending', 'snoozed'].includes(f.status)
       );
       return existing ? prev : [followUp, ...prev];

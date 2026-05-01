@@ -63,17 +63,20 @@ export function formatDelayLabel(minutes) {
   return `about ${minutes} minutes`;
 }
 
-export function createPendingFollowUp({ incident, intervention, currentDate, activePeriod, now = new Date() }) {
-  if (!incident?.id || !intervention?.id || !incident?.studentId) return null;
-  const { reason, delayMinutes } = chooseFollowUpDelay({ incident, intervention });
+export function createPendingFollowUp({ incident, intervention, currentDate, activePeriod, needsIntervention = false, now = new Date() }) {
+  if (!incident?.id || !incident?.studentId) return null;
+  if (!needsIntervention && !intervention?.id) return null;
+  const { reason, delayMinutes } = needsIntervention
+    ? { reason: 'needs_intervention', delayMinutes: 0 }
+    : chooseFollowUpDelay({ incident, intervention });
   const nextPromptAt = addMinutes(now, delayMinutes);
-  const label = intervention.strategyLabel || intervention.staffNote || 'what you tried';
+  const label = intervention?.strategyLabel || intervention?.staffNote || 'what you tried';
   return {
     id: `fu_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     incidentId: incident.id,
-    interventionId: intervention.id,
+    interventionId: intervention?.id || null,
     studentId: incident.studentId,
-    paraAppNumber: incident.paraAppNumber || intervention.paraAppNumber || null,
+    paraAppNumber: incident.paraAppNumber || intervention?.paraAppNumber || null,
     prompt: `What happened after ${label}?`,
     createdAt: now.toISOString(),
     nextPromptAt: nextPromptAt.toISOString(),
@@ -82,6 +85,7 @@ export function createPendingFollowUp({ incident, intervention, currentDate, act
     attempts: 0,
     reason,
     delayMinutes,
+    needsIntervention,
     currentDate: currentDate || incident.date || null,
     activePeriod: activePeriod || incident.periodId || null,
   };

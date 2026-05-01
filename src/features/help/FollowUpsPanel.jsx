@@ -76,6 +76,11 @@ export function FollowUpsPanel({
                 Tried: {intervention.strategyLabel || intervention.staffNote || 'support'}
               </div>
             )}
+            {f.needsIntervention && (
+              <div style={{ fontSize: 11, color: 'var(--yellow)', marginBottom: 10 }}>
+                Needs what you tried
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               <button type="button" className="btn btn-action btn-sm" onClick={() => onSelect(f.id)}>
                 Open
