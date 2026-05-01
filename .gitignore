@@ -21,3 +21,4 @@ yarn-error.log*
 .vercel
 e2e/audit-output/
 supabase/.temp/
+agent-eval/.sealed-link
