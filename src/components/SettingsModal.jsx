@@ -3,6 +3,15 @@ import { useEscape } from '../hooks/useEscape';
 import { useVault } from '../context/VaultProvider';
 import { useTeamOptional } from '../context/TeamProvider';
 import { useGrammarFixSetting } from '../hooks/useAutoGrammarFix';
+import {
+  getCloudApiKey,
+  setCloudApiKey,
+  getDailyCapDollars,
+  setDailyCapDollars,
+  getDailyUsage,
+  DEFAULT_GEMINI_MODEL,
+  GEMINI_FLASH_LITE_MODEL,
+} from '../engine/aiProvider';
 import { ONBOARDING_KEY } from './OnboardingModal';
 import { hasPin, clearPin } from '../features/stealth/pinStorage';
 import { PinEntryModal } from '../features/stealth/PinEntryModal';
@@ -37,6 +46,10 @@ export default function SettingsModal({ open, onClose, onReplayOnboarding, onOpe
   const [bannerHidden, setBannerHidden] = React.useState(() => isFindStudentsBannerHidden());
   const [pinExists, setPinExists] = React.useState(() => hasPin());
   const [pinModal, setPinModal] = React.useState(false);
+  const [geminiKey, setGeminiKey] = React.useState(() => getCloudApiKey());
+  const [dailyCap, setDailyCap] = React.useState(() => getDailyCapDollars());
+  const [aiSaved, setAiSaved] = React.useState(false);
+  const aiUsage = getDailyUsage();
 
   useEscape(open ? onClose : () => {});
   if (!open) return null;
@@ -51,6 +64,13 @@ export default function SettingsModal({ open, onClose, onReplayOnboarding, onOpe
     try { localStorage.removeItem(ONBOARDING_KEY); } catch {}
     onClose?.();
     if (onReplayOnboarding) setTimeout(onReplayOnboarding, 200);
+  }
+
+  function saveAiTesting() {
+    setCloudApiKey(geminiKey.trim());
+    setDailyCapDollars(dailyCap);
+    setAiSaved(true);
+    setTimeout(() => setAiSaved(false), 1800);
   }
 
   async function handleSignOut() {
@@ -81,6 +101,48 @@ export default function SettingsModal({ open, onClose, onReplayOnboarding, onOpe
           <Section label="Editor">
             <AutoPolishToggle />
             <GrammarFixToggle />
+          </Section>
+
+          {/* AI TESTING */}
+          <Section label="AI testing">
+            <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>
+                Gemini API key
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.45, marginBottom: 8 }}>
+                Flash-Lite handles note follow-ups and grammar. Flash handles Smart Import and harder summaries.
+              </div>
+              <input
+                type="password"
+                value={geminiKey}
+                onChange={e => setGeminiKey(e.target.value)}
+                className="period-select"
+                placeholder="Paste Gemini API key"
+                style={{ width: '100%', marginBottom: 8 }}
+              />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center' }}>
+                <label style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                  Daily testing cap ($)
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.25"
+                    value={dailyCap}
+                    onChange={e => setDailyCap(e.target.value)}
+                    className="period-select"
+                    style={{ width: '100%', marginTop: 4 }}
+                  />
+                </label>
+                <button type="button" className="btn btn-action" onClick={saveAiTesting}>
+                  Save
+                </button>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.45 }}>
+                Today: ~${Number(aiUsage.estimatedCost || 0).toFixed(4)} across {aiUsage.calls || 0} calls.
+                {' '}Cheap model: {GEMINI_FLASH_LITE_MODEL}. Harder model: {DEFAULT_GEMINI_MODEL}.
+                {aiSaved && <span style={{ color: 'var(--green)', fontWeight: 700 }}> Saved.</span>}
+              </div>
+            </div>
           </Section>
 
           {/* DISPLAY */}

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ollamaDraftEmail, summarizeStudentPatterns, generateHandoffNote, OllamaOfflineError } from '../engine/ollama';
+import { summarizePatternsWithAI, generateHandoffWithAI, draftEmailWithAI } from '../engine/aiProvider';
 import { buildContextPack, serializeForPatternPrompt, serializeForHandoffPrompt, serializeForEmailPrompt } from '../context/buildContext';
 
 export function useOllamaInsights({
@@ -16,7 +17,8 @@ export function useOllamaInsights({
     setOllamaLoading(true);
     try {
       const pack = buildContextPack({ studentIds: effectivePeriodStudents, allStudents, logs, activePeriod, docContent, currentDate, focusStudentId: studentId, logDaysBack: 14 });
-      const result = await summarizeStudentPatterns(serializeForPatternPrompt(pack));
+      const prompt = serializeForPatternPrompt(pack);
+      const result = await summarizePatternsWithAI(prompt) || await summarizeStudentPatterns(prompt);
       setOllamaModal({ feature: "patterns", text: result, studentId });
     } catch (err) { setCurrentChat(h => [...h, { sender: "app", text: ollamaErrorHandler(err) }]); }
     setOllamaLoading(false);
@@ -26,7 +28,8 @@ export function useOllamaInsights({
     setOllamaLoading(true);
     try {
       const pack = buildContextPack({ studentIds: effectivePeriodStudents, allStudents, logs, activePeriod, docContent, currentDate, focusStudentId: studentId, logDaysBack: 1, handoffAudience: audience, handoffUrgency: urgency });
-      const result = await generateHandoffNote(serializeForHandoffPrompt(pack));
+      const prompt = serializeForHandoffPrompt(pack);
+      const result = await generateHandoffWithAI(prompt) || await generateHandoffNote(prompt);
       setOllamaLoading(false);
       return result;
     } catch (err) { setCurrentChat(h => [...h, { sender: "app", text: ollamaErrorHandler(err) }]); setOllamaLoading(false); return null; }
@@ -38,7 +41,7 @@ export function useOllamaInsights({
     const stuLogs = logs.filter(l => l.studentId === studentId).slice(0, 5);
     const prompt = serializeForEmailPrompt(s, stuLogs);
     try {
-      const draft = await ollamaDraftEmail(prompt);
+      const draft = await draftEmailWithAI(prompt) || await ollamaDraftEmail(prompt);
       setEmailDraft(draft);
     } catch (err) {
       if (err instanceof OllamaOfflineError) setOllamaOnline(false);

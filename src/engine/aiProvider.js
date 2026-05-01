@@ -15,6 +15,15 @@ import {
   getCloudApiKey, setCloudApiKey,
   getCloudModel, setCloudModel,
   DEFAULT_GEMINI_MODEL,
+  GEMINI_FLASH_LITE_MODEL,
+  geminiClassifyNoteForFollowUp,
+  geminiPolishText,
+  geminiSummarizePatterns,
+  geminiGenerateHandoff,
+  geminiDraftEmail,
+  getDailyCapDollars,
+  setDailyCapDollars,
+  getDailyUsage,
 } from './cloudAI';
 
 const PROVIDER_STORAGE_KEY = 'supapara_ai_provider_v1';
@@ -56,6 +65,46 @@ export async function parseIEP(documentText) {
   return ollamaParseIEP(documentText);
 }
 
+export async function classifyNoteForFollowUp(note, context) {
+  if (getCloudApiKey()) {
+    try { return await geminiClassifyNoteForFollowUp(note, context); }
+    catch { return null; }
+  }
+  return null;
+}
+
+export async function polishTextWithAI(text) {
+  if (getCloudApiKey()) {
+    try { return await geminiPolishText(text); }
+    catch { return text; }
+  }
+  return text;
+}
+
+export async function summarizePatternsWithAI(serializedContext) {
+  if (getCloudApiKey()) {
+    try { return await geminiSummarizePatterns(serializedContext); }
+    catch { return null; }
+  }
+  return null;
+}
+
+export async function generateHandoffWithAI(serializedContext) {
+  if (getCloudApiKey()) {
+    try { return await geminiGenerateHandoff(serializedContext); }
+    catch { return null; }
+  }
+  return null;
+}
+
+export async function draftEmailWithAI(contextBlock) {
+  if (getCloudApiKey()) {
+    try { return await geminiDraftEmail(contextBlock); }
+    catch { return null; }
+  }
+  return null;
+}
+
 export async function checkAiHealth() {
   const provider = getAiProvider();
   if (provider === 'cloud') {
@@ -71,4 +120,6 @@ export {
   getCloudApiKey, setCloudApiKey,
   getCloudModel, setCloudModel,
   DEFAULT_GEMINI_MODEL,
+  GEMINI_FLASH_LITE_MODEL,
+  getDailyCapDollars, setDailyCapDollars, getDailyUsage,
 };

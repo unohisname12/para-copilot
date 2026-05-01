@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useLocalStorage } from './useLocalStorage';
 import { applyFixWithCursor } from '../utils/grammarFix';
 import { polishText } from '../utils/spellPolish';
-import { ollamaPolishText } from '../engine/ollama';
+import { polishTextWithAI } from '../engine/aiProvider';
 
 // Single source of truth for the auto-grammar-fix toggle. Read it anywhere
 // to know whether to apply the cleanup; write through setEnabled to flip.
@@ -43,7 +43,7 @@ export function useAutoGrammarFix({ value, setValue, ref, enabled, delayMs = 150
         });
       }
       if (String(value).trim().length < 12 || String(value).length > 700) return;
-      ollamaPolishText(fixed).then(aiFixed => {
+      polishTextWithAI(fixed).then(aiFixed => {
         if (cancelled || !aiFixed || aiFixed === fixed) return;
         setValue(aiFixed);
         requestAnimationFrame(() => {
