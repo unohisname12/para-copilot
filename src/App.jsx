@@ -381,6 +381,10 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
     ? allStudents[activeFollowUp.studentId]
     : null;
 
+  const openFollowUpsPanel = () => {
+    setActiveToolbox("followups");
+  };
+
   const openNextDueFollowUp = () => {
     const next = followUps.dueFollowUps.find(f => allStudents[f.studentId]);
     if (next) setActiveFollowUpId(next.id);
@@ -487,7 +491,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
   const toolboxTools = [
     { id: "situations", label: "🧠 Situations", tip: "Pick a classroom situation and get instant recommended moves, support cards, and tools.", component: <SituationPicker onSelect={s => setSituationModal(s)} /> },
     { id: "quickactions", label: "⚡ Quick Actions", tip: "One-tap logging — pick an action then tap the student to log instantly.", component: <QuickActionPanel students={effectivePeriodStudents} studentsMap={allStudents} onLog={addLog} /> },
-    { id: "followups", label: `Check-ins${followUps.dueFollowUps.length ? ` (${followUps.dueFollowUps.length})` : ""}`, tip: "Outcome check-ins you saved for later.", component: <FollowUpsPanel followUps={followUps.pendingFollowUps} dueFollowUps={followUps.dueFollowUps} allStudents={allStudents} incidents={caseMemory.incidents} interventions={caseMemory.interventions} onSelect={setActiveFollowUpId} onSnooze={handleFollowUpSnooze} onDismiss={handleFollowUpDismiss} /> },
+    { id: "followups", label: `Follow-ups${followUps.dueFollowUps.length ? ` (${followUps.dueFollowUps.length})` : ""}`, tip: "Outcome check-ins you saved for later.", component: <FollowUpsPanel followUps={followUps.pendingFollowUps} dueFollowUps={followUps.dueFollowUps} allStudents={allStudents} incidents={caseMemory.incidents} interventions={caseMemory.interventions} onSelect={setActiveFollowUpId} onSnooze={handleFollowUpSnooze} onDismiss={handleFollowUpDismiss} /> },
     { id: "cards", label: "📋 Support Cards", tip: "Step-by-step reference cards for common situations.", component: <SupportCardPanel /> },
     { id: "abc", label: "📊 ABC Builder", tip: "Build structured behavior records: Antecedent, Behavior, Consequence.", component: <ABCBuilder students={effectivePeriodStudents} studentsMap={allStudents} onSave={addLog} periodLabel={period.label} currentDate={currentDate} /> },
     { id: "goals", label: "🎯 Goal Tracker", tip: "Mark IEP goal progress for any student with one tap.", component: <GoalTracker students={effectivePeriodStudents} studentsMap={allStudents} logs={logs} onSave={addLog} /> },
@@ -1228,6 +1232,9 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
           <div style={{ display: 'flex', gap: 8 }}>
             <button type="button" className="btn btn-action btn-sm" onClick={openNextDueFollowUp}>
               Open
+            </button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={openFollowUpsPanel}>
+              Panel
             </button>
             <button type="button" className="btn btn-ghost btn-sm" onClick={() => handleFollowUpSnooze(followUps.dueFollowUps[0].id, 15)}>
               Later
