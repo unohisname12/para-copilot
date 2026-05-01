@@ -29,6 +29,13 @@ describe('useAutoGrammarFix', () => {
     expect(captured).toBe('Hello world');
   });
 
+  test('applies typo cleanup after debounce without AI', async () => {
+    let captured = '';
+    render(<Harness initial="NOOT WORKING TODAT" onValueChange={(v) => { captured = v; }} />);
+    await act(async () => { jest.advanceTimersByTime(100); });
+    expect(captured).toBe('NOT WORKING TODAY');
+  });
+
   test('no fix when disabled', async () => {
     let captured = '';
     render(<Harness initial="hello world" enabled={false} onValueChange={(v) => { captured = v; }} />);

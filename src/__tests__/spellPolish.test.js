@@ -40,6 +40,10 @@ describe('applyTypoFixes', () => {
     expect(applyTypoFixes('becase he asked').text).toBe('because he asked');
   });
 
+  test('catches fast-typing note mistakes without AI', () => {
+    expect(applyTypoFixes('NOOT WORKING TODAT').text).toBe('NOT WORKING TODAY');
+  });
+
   test('leaves codes/names with digits untouched (e.g. R2rodman)', () => {
     expect(applyTypoFixes('R2rodman is fine').text).toBe('R2rodman is fine');
   });

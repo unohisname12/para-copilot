@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useLocalStorage } from './useLocalStorage';
 import { applyFixWithCursor } from '../utils/grammarFix';
+import { polishText } from '../utils/spellPolish';
 import { ollamaPolishText } from '../engine/ollama';
 
 // Single source of truth for the auto-grammar-fix toggle. Read it anywhere
@@ -31,7 +32,8 @@ export function useAutoGrammarFix({ value, setValue, ref, enabled, delayMs = 150
     const t = setTimeout(() => {
       const ta = ref?.current;
       const cursor = ta && typeof ta.selectionStart === 'number' ? ta.selectionStart : value.length;
-      const { text: fixed, cursor: newCursor } = applyFixWithCursor(value, cursor);
+      const firstPass = polishText(value).polished;
+      const { text: fixed, cursor: newCursor } = applyFixWithCursor(firstPass, Math.min(cursor, firstPass.length));
       if (fixed !== value) {
         setValue(fixed);
         requestAnimationFrame(() => {
