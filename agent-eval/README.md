@@ -19,3 +19,23 @@ Benchmarks AI coding agents against planted bugs in SuperPara.
 
 ## Adding a new bug
 See `~/SupaPara-HQ/agent-eval-sealed/README.md`.
+
+## Adding a new bug
+See `~/SupaPara-HQ/agent-eval-sealed/README.md` for the procedure. Each new bug is one commit on `eval/planted-bugs` with message `eval(tier-N): <slot-id>`, plus an entry appended to the sealed manifest, plus a status flip in `slots.json` on `main`.
+
+## Replanting after a refactor
+When `main` evolves, planted bugs may dissolve (the touched lines change or the file moves). To resync:
+1. Rebase `eval/planted-bugs` onto the new `main`.
+2. For any commit that produced merge conflicts or no longer applies cleanly, re-plant the bug in the new code shape and update the commit SHA in `~/SupaPara-HQ/agent-eval-sealed/manifest.json`.
+
+## Regenerating the leaderboard
+After you add a new result file under `agent-eval/results/`, run:
+
+```bash
+./agent-eval/leaderboard.sh
+git add agent-eval/results/<new-file>.md agent-eval/LEADERBOARD.md
+git commit -m "eval(results): <agent-name> round <date>"
+```
+
+## Auto-scoring (deferred)
+Scoring is currently manual: a human compares the agent's `find.md` output against the sealed manifest and applies `RUBRIC.md`. Future work could parse the agent's structured response (file/line/root-cause per finding) and diff it against the manifest automatically. Out of scope for v1.

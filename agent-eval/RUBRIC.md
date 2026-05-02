@@ -25,3 +25,19 @@ Each planted bug is worth points. Each agent run produces a `find.md` (and optio
 ## Reporting
 Final score: sum of (raw_pts × tier_weight) across all 10 slots.
 Max possible (find mode): 3 × (1+1+2+2+3) × 2 = 54
+
+## Required score footer
+
+Every `agent-eval/results/YYYY-MM-DD-<agent>-find.md` file MUST end with this fenced metadata block. The leaderboard generator parses it.
+
+```
+<!-- AGENT_EVAL_SCORE
+agent: claude-code
+mode: find
+date: 2026-05-01
+raw_points: 42
+weighted_points: 78
+max_possible: 162
+notes: missed T5-B, false-positive on T2-A
+-->
+```
