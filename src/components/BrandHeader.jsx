@@ -46,7 +46,7 @@ export function BrandHeader({ right = null }) {
           letterSpacing: "0.01em",
           display: "var(--tagline-display, block)",
         }}>
-          Powering ParaProfessionals
+          Powering ParaProfesionals
         </span>
       </div>
 
