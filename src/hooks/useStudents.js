@@ -76,7 +76,7 @@ function fromCloudRow(row) {
     healthNotes: row.health_notes || [],
     crossPeriodInfo: row.cross_period || {},
     sourceMeta: row.source_meta || {},
-    paraAppNumber: row.external_key || '',
+    paraAppNumber: row.student_uid || '',
     externalKey: row.external_key || '',
     cloudOnly: true,
     supports: migrateSupports(row.supports),
