@@ -32,7 +32,7 @@ function jaro(a, b) {
   for (let i = 0; i < a.length; i++) {
     const start = Math.max(0, i - matchWindow);
     const end = Math.min(b.length - 1, i + matchWindow);
-    for (let j = start; j <= end; j++) {
+    for (let j = start; j < end; j++) {
       if (bMatched[j]) continue;
       if (a[i] !== b[j]) continue;
       aMatched[i] = true;

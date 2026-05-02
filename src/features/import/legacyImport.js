@@ -171,7 +171,7 @@ export function matchRowsToVault(rows, vaultEntries) {
       }
       // Fall through to name match if csv paraAppNumber isn't in the vault.
     }
-    const key = normalizeName(r.student);
+    const key = (r.student || '').toLowerCase();
     const exact = byNormalized.get(key);
     if (exact && exact.length === 1) {
       const e = exact[0];

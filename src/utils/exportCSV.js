@@ -14,7 +14,7 @@ export function buildCsvText(logs, allStudents, currentDate, mode = EXPORT_MODE.
     // Prefer the student record's paraAppNumber so it stays current. Fall
     // back to the log's own paraAppNumber so logs whose student record went
     // away (orphaned by a roster regen) still emit the stable bridge value.
-    const paraAppNumber = s?.paraAppNumber || l.paraAppNumber || "";
+    const paraAppNumber = l.paraAppNumber || s?.paraAppNumber || "";
     return [
       escape(l.date || ""),
       escape(l.period || ""),

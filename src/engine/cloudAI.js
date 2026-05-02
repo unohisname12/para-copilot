@@ -323,7 +323,7 @@ export async function geminiPolishText(text) {
       }),
     });
     if (!res.ok) return input;
-    const data = await res.json();
+    const data = res.json();
     const out = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
     recordGeminiUsage(model, input, out || '');
     if (!out || out.length > input.length * 2.5) return input;
