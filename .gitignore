@@ -22,3 +22,4 @@ yarn-error.log*
 e2e/audit-output/
 supabase/.temp/
 agent-eval/.sealed-link
+.agent-eval-worktree/
