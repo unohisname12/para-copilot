@@ -5,7 +5,7 @@ import { supabase, supabaseConfigured } from './supabaseClient';
 
 export async function listAssignments(teamId) {
   if (!supabaseConfigured) return { data: [], error: null };
-  const { data, error } = await supabase
+  const { data, error } = supabase
     .from('para_assignments')
     .select('id, student_id, para_user_id, pending_email, assigned_at')
     .eq('team_id', teamId);
