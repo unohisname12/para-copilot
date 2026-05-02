@@ -18,9 +18,6 @@ Benchmarks AI coding agents against planted bugs in SuperPara.
 - **fix:** agent is given one bug location and asked to fix it.
 
 ## Adding a new bug
-See `~/SupaPara-HQ/agent-eval-sealed/README.md`.
-
-## Adding a new bug
 See `~/SupaPara-HQ/agent-eval-sealed/README.md` for the procedure. Each new bug is one commit on `eval/planted-bugs` with message `eval(tier-N): <slot-id>`, plus an entry appended to the sealed manifest, plus a status flip in `slots.json` on `main`.
 
 ## Replanting after a refactor
