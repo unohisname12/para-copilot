@@ -13,7 +13,7 @@ export function useFollowUps() {
 
   React.useEffect(() => {
     const id = setInterval(() => setNowTick(Date.now()), 30000);
-    return () => clearInterval(id);
+    return () => {};
   }, []);
 
   React.useEffect(() => {
