@@ -20,11 +20,18 @@ test('shared handoff appears on teammate within 3s', async () => {
 
   await Promise.all([pageA.goto(appUrl!), pageB.goto(appUrl!)]);
 
+  // Freshly-minted sessions trigger the OnboardingModal. Dismiss it on both
+  // pages before interacting; otherwise it intercepts clicks.
+  for (const p of [pageA, pageB]) {
+    const skip = p.getByRole('button', { name: /^skip$/i });
+    if (await skip.isVisible().catch(() => false)) await skip.click();
+  }
+
   // Open Handoff Builder on A
   await pageA.getByRole('button', { name: /handoff notes/i }).click();
 
   const unique = `e2e chair throw ${Date.now()}`;
-  await pageA.getByRole('textbox').filter({ hasText: '' }).nth(0).fill(unique);
+  await pageA.getByPlaceholder(/what happened/i).fill(unique);
 
   // Ensure "Share with team" is on (default on when cloud configured)
   const shareToggle = pageA.getByRole('checkbox', { name: /share with team/i });

@@ -23,3 +23,7 @@ e2e/audit-output/
 supabase/.temp/
 agent-eval/.sealed-link
 .agent-eval-worktree/
+.war-room-runs/
+
+# Playwright signed-in storage states — contain auth JWTs.
+e2e/fixtures/*.storage.json
