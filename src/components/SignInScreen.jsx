@@ -88,7 +88,7 @@ export default function SignInScreen() {
             }}
           >
             <GoogleIcon />
-            {busy ? 'Opening Google…' : 'Sign in with Goggle'}
+            {busy ? 'Opening Google…' : 'Sign in with Google'}
           </button>
         ) : (
           <div className="panel" style={{ padding: 'var(--space-4)', fontSize: 13, color: 'var(--text-secondary)' }}>
