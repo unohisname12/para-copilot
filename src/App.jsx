@@ -2,7 +2,8 @@
 // APP.JSX — Orchestrator
 // Imports everything, manages state, wires it together.
 // ══════════════════════════════════════════════════════════════
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
+import BulkDeleteBar from './components/vault/BulkDeleteBar';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import "./styles/styles.css";
 
@@ -227,7 +228,35 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
 
   // Destructure for convenience
   const { allStudents: allStudentsRaw, effectivePeriodStudents, identityRegistry } = students;
-  const { logs, addLog, toggleFlag, deleteLog, updateLogText, loadDemoLogs, clearDemoLogs } = logsBag;
+  const { logs, addLog, toggleFlag, deleteLog, bulkDeleteLogs, restoreLogs, updateLogText, loadDemoLogs, clearDemoLogs } = logsBag;
+
+  const [selectedLogIds, setSelectedLogIds] = useState(() => new Set());
+  const [undoSnapshot, setUndoSnapshot] = useState(null);
+  const undoTimerRef = useRef(null);
+
+  const toggleLogSelection = (id) => {
+    setSelectedLogIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const clearLogSelection = () => setSelectedLogIds(new Set());
+  const confirmBulkDelete = () => {
+    if (selectedLogIds.size === 0) return;
+    if (!window.confirm(`Delete ${selectedLogIds.size} log entries? Undo available for 10 seconds.`)) return;
+    const removed = bulkDeleteLogs(selectedLogIds);
+    clearLogSelection();
+    setUndoSnapshot(removed);
+    clearTimeout(undoTimerRef.current);
+    undoTimerRef.current = setTimeout(() => setUndoSnapshot(null), 10000);
+  };
+  const undoBulkDelete = () => {
+    if (!undoSnapshot) return;
+    restoreLogs(undoSnapshot);
+    setUndoSnapshot(null);
+    clearTimeout(undoTimerRef.current);
+  };
   const { knowledgeBase } = kb;
 
   // Vault enrichment — when user flips "Show real names" ON and the vault has
@@ -832,6 +861,21 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
           </div>))}
         </div>)}
       </div>)}
+      {vaultTab !== "knowledge" && (
+        <>
+          <BulkDeleteBar
+            count={selectedLogIds.size}
+            onDelete={confirmBulkDelete}
+            onCancel={clearLogSelection}
+          />
+          {undoSnapshot && (
+            <div style={{ padding: '8px 14px', background: 'rgba(34,197,94,.12)', borderBottom: '1px solid rgba(34,197,94,.35)', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 13, color: '#86EFAC' }}>{undoSnapshot.length} log{undoSnapshot.length === 1 ? '' : 's'} deleted.</span>
+              <button onClick={undoBulkDelete} style={{ background: 'transparent', color: '#86EFAC', border: '1px solid #22C55E', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>Undo</button>
+            </div>
+          )}
+        </>
+      )}
       {vaultTab !== "knowledge" && (filteredLogs.length === 0 ? (
         <div className="empty-doc">
           {vaultTab === "flagged" ? "No flagged entries." :
@@ -842,6 +886,15 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
       ) : (<div className="table-container"><table className="data-table">
         <thead><tr>
           <th style={{ width: 28 }}></th>
+          <th style={{ width: 28 }}><input
+            type="checkbox"
+            aria-label="Select all visible logs"
+            checked={filteredLogs.length > 0 && filteredLogs.every(l => selectedLogIds.has(l.id))}
+            onChange={(e) => {
+              if (e.target.checked) setSelectedLogIds(new Set(filteredLogs.map(l => l.id)));
+              else clearLogSelection();
+            }}
+          /></th>
           <SortableHeader col="date" label="Date" sort={vaultSort} onSort={setVaultSort} />
           <th>Period</th>
           <SortableHeader col="student" label="Student" sort={vaultSort} onSort={setVaultSort} />
@@ -882,6 +935,14 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
                     transition: "transform 120ms ease",
                   }}
                 >▶</button>
+              </td>
+              <td style={{ textAlign: "center", padding: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={selectedLogIds.has(l.id)}
+                  onChange={() => toggleLogSelection(l.id)}
+                  aria-label="Select log for bulk action"
+                />
               </td>
               <td style={{ whiteSpace: "nowrap", color: "var(--text-muted)" }}>{l.date}</td>
               <td style={{ fontSize: "12px", color: "var(--text-muted)", whiteSpace: "nowrap" }}>{l.period}</td>
