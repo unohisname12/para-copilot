@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useLocalStorage } from './useLocalStorage';
 import { createLog } from '../models';
 import { polishText } from '../utils/spellPolish';
+import { relinkLogsByParaAppNumber } from '../utils/relinkLogs';
 
 export function useLogs({ currentDate, periodLabel, activePeriod, onLogCreated, allStudents = {} }) {
   const [logs, setLogs] = useLocalStorage('paraLogsV1', []);
@@ -28,6 +29,17 @@ export function useLogs({ currentDate, periodLabel, activePeriod, onLogCreated, 
     }));
     // We deliberately don't depend on `logs` — that would re-fire on every
     // setLogs and ping-pong. allStudents is the right trigger.
+  }, [allStudents]);
+
+  // Re-link orphan logs when roster reloads. Roster reloads mint new
+  // studentIds; logs that carry a paraAppNumber bridge get their studentId
+  // rewritten in place so byStudent filters and exports include them again.
+  // The pure helper returns the same array reference when nothing changed,
+  // so this effect is idempotent and safe.
+  useEffect(() => {
+    if (!allStudents || !logs?.length) return;
+    setLogs(prev => relinkLogsByParaAppNumber(prev, allStudents));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allStudents]);
 
   const addLog = (studentId, note, type, extras = {}) => {
