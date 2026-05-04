@@ -1,5 +1,6 @@
 import React from 'react';
 import { useEscape } from '../../hooks/useEscape';
+import { lookupAccommodation } from '../../data/accommodationGlossary';
 
 export default function AccommodationDetailModal({ open, onClose, accommodation, student, logs = [], strategies = [] }) {
   useEscape(open ? onClose : () => {});
@@ -8,6 +9,8 @@ export default function AccommodationDetailModal({ open, onClose, accommodation,
   const text = typeof accommodation === 'string' ? accommodation : (accommodation.text || '');
   const sourceFile = student?.iepImport?.fileName || student?.importMeta?.fileName || null;
   const sourceDate = student?.iepImport?.date || student?.importMeta?.date || null;
+
+  const glossary = lookupAccommodation(text);
 
   const snippet = text.toLowerCase().slice(0, 25);
   const linkedStrategies = (strategies || []).filter(s => {
@@ -28,9 +31,36 @@ export default function AccommodationDetailModal({ open, onClose, accommodation,
         </div>
 
         <div style={{ background: 'rgba(0,0,0,.25)', borderRadius: 8, padding: 14, marginBottom: 14 }}>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 6 }}>Text</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 6 }}>From the IEP</div>
           <div style={{ fontSize: 14, lineHeight: 1.5 }}>{text}</div>
         </div>
+
+        {glossary ? (
+          <div style={{ background: 'rgba(167,139,250,.08)', border: '1px solid rgba(167,139,250,.3)', borderRadius: 8, padding: 14, marginBottom: 14 }}>
+            <div style={{ fontSize: 11, color: '#A78BFA', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 6, fontWeight: 700 }}>What this means — {glossary.title}</div>
+            <div style={{ fontSize: 14, lineHeight: 1.55, marginBottom: 12 }}>{glossary.plain}</div>
+
+            <div style={{ fontSize: 11, color: '#86EFAC', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 6, fontWeight: 700 }}>What it looks like in class</div>
+            <ul style={{ margin: 0, paddingLeft: 20, marginBottom: 12 }}>
+              {glossary.looksLike.map((tip, i) => (
+                <li key={i} style={{ fontSize: 13, lineHeight: 1.55, marginBottom: 4 }}>{tip}</li>
+              ))}
+            </ul>
+
+            {glossary.watchOut && (
+              <>
+                <div style={{ fontSize: 11, color: '#FCA5A5', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 6, fontWeight: 700 }}>Watch out</div>
+                <div style={{ fontSize: 13, lineHeight: 1.55, color: '#FCA5A5' }}>{glossary.watchOut}</div>
+              </>
+            )}
+          </div>
+        ) : (
+          <div style={{ background: 'rgba(255,255,255,.03)', border: '1px dashed rgba(255,255,255,.15)', borderRadius: 8, padding: 14, marginBottom: 14 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+              No quick explainer in the glossary for this accommodation. Ask the case manager or sped teacher what it should look like in your room — and add it to the team's shared notes once you know.
+            </div>
+          </div>
+        )}
 
         {(sourceFile || sourceDate) && (
           <div style={{ marginBottom: 14, fontSize: 12, color: 'var(--text-muted)' }}>
