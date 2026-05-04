@@ -72,7 +72,6 @@ export function Dashboard({
   hasVault = false,
   onFindMyStudents,
   bannerHiddenAlways = false,
-  onOpenMassLog,
   onScheduleFollowUp,
 }) {
   // ── Persisted layout ──────────────────────────────────────
@@ -91,6 +90,7 @@ export function Dashboard({
   const [exportOpen,  setExportOpen]  = useState(false);
   const [findStudentsBannerDismissed, setFindStudentsBannerDismissed] = useState(false);
   const [activeAction, setActiveAction] = useState(null); // class-wide action selector
+  const [selectedIds, setSelectedIds] = useState(() => new Set()); // mass-log selection
   const [noteTarget,  setNoteTarget]  = useState(null);   // { studentId, action }
   const [noteDraft,   setNoteDraft]   = useState("");
   const [toast,       setToast]       = useState(null);
@@ -154,11 +154,39 @@ export function Dashboard({
     setNoteDraft("");
   }, []);
 
+  // Mass-log flow: tap action → tap as many cards as you want (each tap toggles
+  // selection) → tap "Log for N" to fire one log per selected student.
+  // The Cancel button still clears action + selection without writing.
   const handleClassTap = useCallback((studentId) => {
     if (!activeAction) return;
-    if (activeAction.needsNote) { setNoteTarget({ studentId, action: activeAction }); setNoteDraft(""); }
-    else quickLog(studentId, activeAction);
-  }, [activeAction, quickLog]);
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(studentId)) next.delete(studentId); else next.add(studentId);
+      return next;
+    });
+  }, [activeAction]);
+
+  const commitMassLog = useCallback(() => {
+    if (!activeAction || selectedIds.size === 0) return;
+    const action = activeAction;
+    const ids = Array.from(selectedIds);
+    for (const sid of ids) {
+      const s = allStudents[sid] || {};
+      const note = topic ? `${action.type} — ${topic}` : action.type;
+      addLog(sid, note, action.type, { source: 'mass_log' });
+      // Per-student toast would spam; one summary toast below.
+      // eslint-disable-next-line no-unused-vars
+      const _ = s;
+    }
+    showToast(`✅ ${action.label} → ${ids.length} student${ids.length === 1 ? '' : 's'}`);
+    setSelectedIds(new Set());
+    setActiveAction(null);
+  }, [activeAction, selectedIds, allStudents, topic, addLog, showToast]);
+
+  const cancelMassLog = useCallback(() => {
+    setSelectedIds(new Set());
+    setActiveAction(null);
+  }, []);
 
   const saveTopic = useCallback(() => {
     setTopic(topicDraft);
@@ -419,16 +447,6 @@ export function Dashboard({
             </div>
             <div style={{ display: "flex", gap: 6, flexShrink: 0, alignItems: 'center' }}>
               <PrivacyToggle />
-              {onOpenMassLog && (
-                <button
-                  onClick={onOpenMassLog}
-                  className="btn btn-secondary btn-sm"
-                  title="Log the same action for several students at once"
-                  style={{ whiteSpace: "nowrap", color: '#A78BFA', borderColor: 'rgba(167,139,250,.4)' }}
-                >
-                  📋 Mass log
-                </button>
-              )}
               <button
                 onClick={async () => {
                   try {
@@ -626,9 +644,9 @@ export function Dashboard({
             {activeAction ? (
               <>
                 <span style={{ color: "var(--accent)" }}>▶</span>
-                Tap a student card below to log "{activeAction.label}"
+                Tap student cards to highlight. {selectedIds.size > 0 ? `${selectedIds.size} selected — tap "Log for ${selectedIds.size}" when done.` : `Then tap "Log for N" to log "${activeAction.label}" for all of them.`}
               </>
-            ) : "Quick Log — tap an action, then tap a student"}
+            ) : "Quick Log — tap an action, then highlight any students you want to log it for"}
           </div>
           <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
             {DASH_ACTIONS.map(action => {
@@ -660,17 +678,35 @@ export function Dashboard({
               );
             })}
             {activeAction && (
-              <button
-                onClick={() => setActiveAction(null)}
-                className="btn btn-secondary"
-                style={{
-                  minHeight: 44,
-                  color: "var(--red)",
-                  borderColor: "rgba(248,113,113,0.3)",
-                }}
-              >
-                ✕ Cancel
-              </button>
+              <>
+                <button
+                  onClick={commitMassLog}
+                  disabled={selectedIds.size === 0}
+                  className="btn btn-primary"
+                  style={{
+                    minHeight: 44,
+                    background: selectedIds.size === 0 ? "var(--bg-dark)" : activeAction.bg,
+                    color: selectedIds.size === 0 ? "var(--text-muted)" : activeAction.color,
+                    border: `1.5px solid ${selectedIds.size === 0 ? "var(--border)" : activeAction.border}`,
+                    fontWeight: 700,
+                    cursor: selectedIds.size === 0 ? "not-allowed" : "pointer",
+                    opacity: selectedIds.size === 0 ? 0.5 : 1,
+                  }}
+                >
+                  ✓ Log for {selectedIds.size}
+                </button>
+                <button
+                  onClick={cancelMassLog}
+                  className="btn btn-secondary"
+                  style={{
+                    minHeight: 44,
+                    color: "var(--red)",
+                    borderColor: "rgba(248,113,113,0.3)",
+                  }}
+                >
+                  ✕ Cancel
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -699,6 +735,7 @@ export function Dashboard({
             const todayLogs = stuLogs.filter(l => l.date === currentDate);
             const lastLog   = stuLogs[0];
             const isTarget  = activeAction !== null;
+            const isSelected = isTarget && selectedIds.has(id);
 
             return (
               <div
@@ -707,14 +744,18 @@ export function Dashboard({
                 style={{
                   borderRadius: "var(--radius-lg)",
                   overflow: "hidden",
-                  background: `linear-gradient(180deg, ${s.color}0a 0%, var(--panel-bg) 40%)`,
-                  border: `1px solid ${isTarget ? s.color : s.color + "30"}`,
+                  background: isSelected
+                    ? `linear-gradient(180deg, ${s.color}22 0%, ${s.color}0d 100%)`
+                    : `linear-gradient(180deg, ${s.color}0a 0%, var(--panel-bg) 40%)`,
+                  border: `${isSelected ? 2 : 1}px solid ${isSelected ? s.color : (isTarget ? s.color : s.color + "30")}`,
                   cursor: isTarget ? "pointer" : "default",
                   transition: "all 200ms cubic-bezier(0.16,1,0.3,1)",
-                  boxShadow: isTarget
-                    ? `0 12px 32px ${s.color}28, 0 0 0 1px ${s.color}60`
-                    : "var(--shadow-sm)",
-                  transform: isTarget ? "translateY(-2px)" : "translateY(0)",
+                  boxShadow: isSelected
+                    ? `0 16px 40px ${s.color}55, 0 0 0 2px ${s.color}, inset 0 0 0 1px ${s.color}80`
+                    : isTarget
+                      ? `0 12px 32px ${s.color}28, 0 0 0 1px ${s.color}60`
+                      : "var(--shadow-sm)",
+                  transform: isSelected ? "translateY(-3px) scale(1.01)" : isTarget ? "translateY(-2px)" : "translateY(0)",
                   position: "relative",
                 }}
               >

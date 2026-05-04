@@ -4,7 +4,6 @@
 // ══════════════════════════════════════════════════════════════
 import React, { useState, useRef } from "react";
 import BulkDeleteBar from './components/vault/BulkDeleteBar';
-import MassLogModal from './components/panels/MassLogModal';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import "./styles/styles.css";
 
@@ -234,7 +233,6 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
   const [selectedLogIds, setSelectedLogIds] = useState(() => new Set());
   const [undoSnapshot, setUndoSnapshot] = useState(null);
   const undoTimerRef = useRef(null);
-  const [massLogOpen, setMassLogOpen] = useState(false);
 
   const toggleLogSelection = (id) => {
     setSelectedLogIds(prev => {
@@ -1286,7 +1284,6 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
                   hasVault={vaultCtx?.hasVault}
                   onFindMyStudents={() => setFindStudentsOpen(true)}
                   bannerHiddenAlways={bannerHiddenAlways}
-                  onOpenMassLog={() => setMassLogOpen(true)}
                 />
               )}
               {view === "vault" && renderVault()}
@@ -1447,13 +1444,6 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
         open={findStudentsOpen}
         onClose={() => setFindStudentsOpen(false)}
         onIdentityLoad={students.handleIdentityLoad}
-      />
-      <MassLogModal
-        open={massLogOpen}
-        onClose={() => setMassLogOpen(false)}
-        students={effectivePeriodStudents}
-        studentsMap={allStudents}
-        onLog={addLog}
       />
       <SettingsModal
         open={settingsOpen}
