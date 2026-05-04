@@ -13,6 +13,7 @@ import { matchCaseKeywords, isHelpWorthy } from '../../engine';
 import { useEscape } from '../../hooks/useEscape';
 import { useTeamOptional } from '../../context/TeamProvider';
 import ParentNotesSection from '../ParentNotesSection';
+import AccommodationDetailModal from './AccommodationDetailModal';
 
 // ── Guided follow-up chip options ────────────────────────────
 const ANTECEDENT_OPTIONS = ["Work demand", "Loud room", "Transition", "Peer conflict", "Schedule change", "Unclear directions", "Other"];
@@ -107,6 +108,7 @@ function StudentProfileModalInner({ studentId, logs, currentDate, activePeriod, 
   );
   const health = getHealth(studentId, logs, currentDate);
   const [tab, setTab] = useState("overview"), [logNote, setLogNote] = useState(""), [logType, setLogType] = useState("General Observation");
+  const [accDetail, setAccDetail] = useState(null);
 
   const caseSuggestions = useMemo(() => {
     if (!logNote || !caseMemory) return [];
@@ -424,7 +426,21 @@ function StudentProfileModalInner({ studentId, logs, currentDate, activePeriod, 
                 ))}</div>
               </div>);
           })}{(s.goals || []).length === 0 && <div style={{ color: "var(--text-muted)", padding: "20px", textAlign: "center" }}>No goals listed.</div>}</div>)}
-          {tab === "accs" && (<div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>{(s.accs || []).map((a, i) => (<div key={i} style={{ background: "rgba(0,0,0,.2)", borderRadius: "8px", padding: "10px 14px", display: "flex", alignItems: "center", gap: "10px", borderLeft: `3px solid ${c}30` }}><span style={{ fontSize: "16px", color: c }}>✓</span><span style={{ fontSize: "13px" }}>{a}</span></div>))}{(s.accs || []).length === 0 && <div style={{ color: "var(--text-muted)", padding: "20px", textAlign: "center" }}>No accommodations listed.</div>}</div>)}
+          {tab === "accs" && (<div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>{(s.accs || []).map((a, i) => (
+            <div
+              key={i}
+              onDoubleClick={() => setAccDetail(a)}
+              onKeyDown={(e) => { if (e.key === 'Enter') setAccDetail(a); }}
+              tabIndex={0}
+              role="button"
+              aria-label="Open accommodation details"
+              title="Double-click for details"
+              style={{ background: "rgba(0,0,0,.2)", borderRadius: "8px", padding: "10px 14px", display: "flex", alignItems: "center", gap: "10px", borderLeft: `3px solid ${c}30`, cursor: 'pointer' }}
+            >
+              <span style={{ fontSize: "16px", color: c }}>✓</span>
+              <span style={{ fontSize: "13px" }}>{typeof a === 'string' ? a : (a.text || '')}</span>
+            </div>
+          ))}{(s.accs || []).length === 0 && <div style={{ color: "var(--text-muted)", padding: "20px", textAlign: "center" }}>No accommodations listed.</div>}</div>)}
           {tab === "strategies" && (<div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>{(s.strategies || []).map((st, i) => (<div key={i} style={{ background: "rgba(0,0,0,.2)", borderRadius: "8px", padding: "12px 14px", borderLeft: `3px solid ${c}60` }}><span style={{ fontSize: "13px", lineHeight: "1.6" }}>{st}</span></div>))}{(s.strategies || []).length === 0 && <div style={{ color: "var(--text-muted)", padding: "20px", textAlign: "center" }}>No strategies listed.</div>}</div>)}
 
           {tab === "tools" && (
@@ -472,6 +488,14 @@ function StudentProfileModalInner({ studentId, logs, currentDate, activePeriod, 
           )}
         </div>
       </div>
+      <AccommodationDetailModal
+        open={!!accDetail}
+        onClose={() => setAccDetail(null)}
+        accommodation={accDetail}
+        student={s}
+        logs={stuLogs}
+        strategies={s?.strategies}
+      />
     </div>
   );
 }
