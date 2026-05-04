@@ -3,6 +3,7 @@ import { useLocalStorage } from './useLocalStorage';
 import { createLog } from '../models';
 import { polishText } from '../utils/spellPolish';
 import { relinkLogsByParaAppNumber } from '../utils/relinkLogs';
+import { removeLogsByIds, restoreLogsAtTop } from '../utils/bulkLogOps';
 
 export function useLogs({ currentDate, periodLabel, activePeriod, onLogCreated, allStudents = {} }) {
   const [logs, setLogs] = useLocalStorage('paraLogsV1', []);
@@ -39,7 +40,6 @@ export function useLogs({ currentDate, periodLabel, activePeriod, onLogCreated, 
   useEffect(() => {
     if (!allStudents || !logs?.length) return;
     setLogs(prev => relinkLogsByParaAppNumber(prev, allStudents));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allStudents]);
 
   const addLog = (studentId, note, type, extras = {}) => {
@@ -89,6 +89,21 @@ export function useLogs({ currentDate, periodLabel, activePeriod, onLogCreated, 
     }
   };
 
+  // Returns the deleted entries so callers can wire Undo without re-reading
+  // state. No confirm — caller is expected to confirm at the bar level.
+  const bulkDeleteLogs = (ids) => {
+    const set = ids instanceof Set ? ids : new Set(ids || []);
+    if (set.size === 0) return [];
+    const removed = logs.filter(l => set.has(l.id));
+    setLogs(prev => removeLogsByIds(prev, set));
+    return removed;
+  };
+
+  const restoreLogs = (snapshot) => {
+    if (!snapshot || snapshot.length === 0) return;
+    setLogs(prev => restoreLogsAtTop(prev, snapshot));
+  };
+
   const updateLogText = (id, newText) =>
     setLogs(prev => prev.map(l => l.id === id ? { ...l, note: newText, text: newText } : l));
 
@@ -105,5 +120,5 @@ export function useLogs({ currentDate, periodLabel, activePeriod, onLogCreated, 
     setLogs(prev => prev.filter(l => l.source !== 'demo'));
   };
 
-  return { logs, setLogs, addLog, toggleFlag, deleteLog, updateLogText, loadDemoLogs, clearDemoLogs };
+  return { logs, setLogs, addLog, toggleFlag, deleteLog, bulkDeleteLogs, restoreLogs, updateLogText, loadDemoLogs, clearDemoLogs };
 }
