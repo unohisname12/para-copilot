@@ -14,6 +14,7 @@ import { ShowcaseBanner } from '../showcase';
 import { DEMO_INCIDENTS, DEMO_INTERVENTIONS, DEMO_OUTCOMES, DEMO_LOGS } from '../../data/demoSeedData';
 import { getStudentPatterns } from '../analytics/getStudentPatterns';
 import PatternsCard from '../analytics/PatternsCard';
+import PrivacyToggle from '../../components/PrivacyToggle';
 
 // ── Constants ────────────────────────────────────────────────
 const LAYOUT_KEY  = "dashLayoutV3";
@@ -415,7 +416,8 @@ export function Dashboard({
                 </button>
               ))}
             </div>
-            <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+            <div style={{ display: "flex", gap: 6, flexShrink: 0, alignItems: 'center' }}>
+              <PrivacyToggle />
               <button
                 onClick={async () => {
                   try {
