@@ -7,9 +7,16 @@ import { QUICK_ACTIONS } from '../../data';
 import { resolveLabel } from '../../privacy/nameResolver';
 import { buildQuickActionGroups } from './quickActionGroups';
 import { ClarifierModal, hasClarifier, resolveClarifierLog } from '../modals/ClarifierModal';
+import { usePrivacyMode } from '../../hooks/usePrivacyMode';
+import { maskName } from '../../utils/privacyMask';
 
 export function QuickActionPanel({ students, onLog, studentsMap }) {
   const lookup = studentsMap || {};
+  const { on: privacyOn } = usePrivacyMode();
+  const labelFor = (s) => {
+    const raw = resolveLabel(s, 'compact');
+    return privacyOn ? maskName(raw) : raw;
+  };
   const [pickingFor, setPickingFor] = useState(null); // action.id | null
   const [recentLog, setRecentLog] = useState(null);   // { actionId, studentLabel } | null
   const [clarifying, setClarifying] = useState(null); // { action, studentId } | null
@@ -25,7 +32,7 @@ export function QuickActionPanel({ students, onLog, studentsMap }) {
       source: 'quick_action',
       tags,
     });
-    const studentLabel = resolveLabel(lookup[studentId], 'compact');
+    const studentLabel = labelFor(lookup[studentId]);
     setRecentLog({ actionId: action.id, studentLabel });
     setPickingFor(null);
     clearTimeout(recentTimer.current);
@@ -64,7 +71,7 @@ export function QuickActionPanel({ students, onLog, studentsMap }) {
       {clarifying && (
         <ClarifierModal
           action={clarifying.action}
-          studentLabel={resolveLabel(lookup[clarifying.studentId], 'compact')}
+          studentLabel={labelFor(lookup[clarifying.studentId])}
           onPick={handleClarifierPick}
           onCancel={() => setClarifying(null)}
         />
@@ -146,7 +153,7 @@ export function QuickActionPanel({ students, onLog, studentsMap }) {
                             whiteSpace: 'nowrap',
                           }}
                         >
-                          {resolveLabel(s, 'compact')}
+                          {labelFor(s)}
                         </button>
                       );
                     })}
