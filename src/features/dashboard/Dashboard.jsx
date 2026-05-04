@@ -72,6 +72,7 @@ export function Dashboard({
   hasVault = false,
   onFindMyStudents,
   bannerHiddenAlways = false,
+  onOpenMassLog,
   onScheduleFollowUp,
 }) {
   // ── Persisted layout ──────────────────────────────────────
@@ -418,6 +419,16 @@ export function Dashboard({
             </div>
             <div style={{ display: "flex", gap: 6, flexShrink: 0, alignItems: 'center' }}>
               <PrivacyToggle />
+              {onOpenMassLog && (
+                <button
+                  onClick={onOpenMassLog}
+                  className="btn btn-secondary btn-sm"
+                  title="Log the same action for several students at once"
+                  style={{ whiteSpace: "nowrap", color: '#A78BFA', borderColor: 'rgba(167,139,250,.4)' }}
+                >
+                  📋 Mass log
+                </button>
+              )}
               <button
                 onClick={async () => {
                   try {
