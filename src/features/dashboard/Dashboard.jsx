@@ -91,6 +91,13 @@ export function Dashboard({
   const [findStudentsBannerDismissed, setFindStudentsBannerDismissed] = useState(false);
   const [activeAction, setActiveAction] = useState(null); // class-wide action selector
   const [selectedIds, setSelectedIds] = useState(() => new Set()); // mass-log selection
+  const [barFlash, setBarFlash] = useState(false);
+  const actionBarRef = useRef(null);
+  const flashActionBar = useCallback(() => {
+    actionBarRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setBarFlash(true);
+    setTimeout(() => setBarFlash(false), 1600);
+  }, []);
   const [noteTarget,  setNoteTarget]  = useState(null);   // { studentId, action }
   const [noteDraft,   setNoteDraft]   = useState("");
   const [toast,       setToast]       = useState(null);
@@ -448,6 +455,20 @@ export function Dashboard({
             <div style={{ display: "flex", gap: 6, flexShrink: 0, alignItems: 'center' }}>
               <PrivacyToggle />
               <button
+                onClick={flashActionBar}
+                className="btn btn-secondary btn-sm"
+                title="Highlight kids and log the same action for all of them"
+                style={{
+                  whiteSpace: "nowrap",
+                  color: '#A78BFA',
+                  borderColor: 'rgba(167,139,250,.4)',
+                  background: 'rgba(167,139,250,.12)',
+                  fontWeight: 700,
+                }}
+              >
+                📋 Mass log
+              </button>
+              <button
                 onClick={async () => {
                   try {
                     const { buildTodayWorkbook, downloadWorkbook } = await import('../export/exportWorkbook');
@@ -633,7 +654,17 @@ export function Dashboard({
         </div>
 
         {/* ── CLASS-WIDE QUICK ACTION BAR ───────────────── */}
-        <div className="panel" style={{ padding: "var(--space-4) var(--space-5)" }}>
+        <div
+          ref={actionBarRef}
+          className="panel"
+          style={{
+            padding: "var(--space-4) var(--space-5)",
+            outline: barFlash ? "3px solid #A78BFA" : "none",
+            outlineOffset: barFlash ? 4 : 0,
+            boxShadow: barFlash ? "0 0 0 6px rgba(167,139,250,.25)" : undefined,
+            transition: "outline 200ms, box-shadow 200ms",
+          }}
+        >
           <div style={{
             fontSize: 11, fontWeight: 700,
             textTransform: "uppercase", letterSpacing: "0.1em",
