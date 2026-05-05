@@ -1,21 +1,19 @@
 import React from 'react';
-import { usePrivacyMode } from '../hooks/usePrivacyMode';
 
 // Floating privacy toggle. Mounted once at the App root so it follows
 // the para across every screen — Dashboard, Vault, Simple Mode, modals,
 // settings — without per-screen wiring. Bottom-right, fixed position,
 // thumb-sized hit target. Icon-only so it doesn't take real estate.
 //
-// State source: usePrivacyMode (paraPrivacyModeV1 in localStorage).
-// CSS in styles.css already keys off [data-privacy="on"] on the app
-// shell, so flipping this hook flips every .privacy-blur surface.
-export default function PrivacyFab() {
-  const { on, toggle } = usePrivacyMode();
-
+// State is OWNED BY APP.JSX so the sidebar button, the FAB, and the
+// data-privacy attribute on .app-layout all share one source of truth.
+// (Calling usePrivacyMode() inside this component would create an
+// independent React state tree and leave the rest of the app stale.)
+export default function PrivacyFab({ on, onToggle }) {
   return (
     <button
       type="button"
-      onClick={toggle}
+      onClick={onToggle}
       aria-pressed={on}
       title={on
         ? 'Privacy mode ON — student data blurred. Click to turn OFF.'

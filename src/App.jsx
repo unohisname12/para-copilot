@@ -1064,7 +1064,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
       )}
 
     <div className="app-layout" data-privacy={privacyOn ? "on" : "off"} style={{ flex: 1, minWidth: 0 }}>
-      <PrivacyFab />
+      <PrivacyFab on={privacyOn} onToggle={togglePrivacy} />
       <aside className={`sidebar${sidebarCollapsed ? ' collapsed' : ''}`} style={{ position: 'relative' }}>
         <button
           type="button"

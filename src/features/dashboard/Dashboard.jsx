@@ -461,6 +461,7 @@ export function Dashboard({
           transition: "all 200ms cubic-bezier(0.16,1,0.3,1)",
           boxShadow: "var(--shadow-sm)",
           position: "relative",
+          flexShrink: 0,
         }}>
           <button
             onClick={() => setPlanOpen(false)}
