@@ -653,31 +653,48 @@ export function Dashboard({
           )}
         </div>
 
-        {/* ── CLASS-WIDE QUICK ACTION BAR ───────────────── */}
+        {/* ── CLASS-WIDE QUICK ACTION BAR (Mass Log) ────── */}
         <div
           ref={actionBarRef}
           className="panel"
           style={{
             padding: "var(--space-4) var(--space-5)",
-            outline: barFlash ? "3px solid #A78BFA" : "none",
+            outline: barFlash ? "3px solid #A78BFA" : "1px solid rgba(167,139,250,.35)",
             outlineOffset: barFlash ? 4 : 0,
             boxShadow: barFlash ? "0 0 0 6px rgba(167,139,250,.25)" : undefined,
             transition: "outline 200ms, box-shadow 200ms",
+            background: "linear-gradient(180deg, rgba(167,139,250,.08) 0%, var(--panel-bg) 100%)",
           }}
         >
           <div style={{
-            fontSize: 11, fontWeight: 700,
-            textTransform: "uppercase", letterSpacing: "0.1em",
-            color: activeAction ? "var(--accent-hover)" : "var(--text-muted)",
-            marginBottom: "var(--space-3)",
             display: "flex", alignItems: "center", gap: "var(--space-2)",
+            marginBottom: "var(--space-3)",
           }}>
-            {activeAction ? (
-              <>
-                <span style={{ color: "var(--accent)" }}>▶</span>
-                Tap student cards to highlight. {selectedIds.size > 0 ? `${selectedIds.size} selected — tap "Log for ${selectedIds.size}" when done.` : `Then tap "Log for N" to log "${activeAction.label}" for all of them.`}
-              </>
-            ) : "Quick Log — tap an action, then highlight any students you want to log it for"}
+            <span style={{
+              background: "rgba(167,139,250,.18)",
+              color: "#A78BFA",
+              border: "1px solid rgba(167,139,250,.4)",
+              borderRadius: 999,
+              padding: "4px 12px",
+              fontSize: 11,
+              fontWeight: 800,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+            }}>
+              📋 Mass Log
+            </span>
+            <span style={{
+              fontSize: 12.5,
+              color: activeAction ? "var(--accent-hover)" : "var(--text-secondary)",
+            }}>
+              {activeAction ? (
+                <>
+                  <strong style={{ color: "#A78BFA" }}>Step 2:</strong> Tap student cards to highlight. {selectedIds.size > 0 ? `${selectedIds.size} selected — tap "Log for ${selectedIds.size}" when done.` : `Then tap "Log for N" to log "${activeAction.label}" for all of them.`}
+                </>
+              ) : (
+                <><strong style={{ color: "#A78BFA" }}>Step 1:</strong> Tap an action below, then tap each student you want to log it for.</>
+              )}
+            </span>
           </div>
           <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
             {DASH_ACTIONS.map(action => {
