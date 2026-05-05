@@ -92,6 +92,7 @@ export function Dashboard({
   const [findStudentsBannerDismissed, setFindStudentsBannerDismissed] = useState(false);
   const [activeAction, setActiveAction] = useState(null); // class-wide action selector
   const [selectedIds, setSelectedIds] = useState(() => new Set()); // mass-log selection
+  const [planOpen, setPlanOpen] = useLS('planPanelOpenV1', true);
   const [noteTarget,  setNoteTarget]  = useState(null);   // { studentId, action }
   const [noteDraft,   setNoteDraft]   = useState("");
   const [toast,       setToast]       = useState(null);
@@ -376,6 +377,31 @@ export function Dashboard({
         )}
 
         {/* ── TODAY'S PLAN CARD (merged Topic + Class Notes Doc) ─ */}
+        {!planOpen && (
+          <button
+            onClick={() => setPlanOpen(true)}
+            style={{
+              width: '100%',
+              padding: '8px 14px',
+              background: 'rgba(167,139,250,.05)',
+              border: '1px dashed rgba(167,139,250,.3)',
+              borderRadius: 'var(--radius-md)',
+              color: 'var(--text-muted)',
+              cursor: 'pointer',
+              fontSize: 12,
+              fontFamily: 'inherit',
+              textAlign: 'left',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            <span style={{ fontSize: 14 }}>📚</span>
+            <span style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>Today's Plan</span>
+            <span style={{ marginLeft: 'auto' }}>Click to open ▾</span>
+          </button>
+        )}
+        {planOpen && (
         <div style={{
           background: "var(--panel-bg)",
           border: `1px solid ${(topic || docContent) ? "var(--accent-border)" : "var(--border)"}`,
@@ -383,7 +409,27 @@ export function Dashboard({
           overflow: "hidden",
           transition: "all 200ms cubic-bezier(0.16,1,0.3,1)",
           boxShadow: "var(--shadow-sm)",
+          position: "relative",
         }}>
+          <button
+            onClick={() => setPlanOpen(false)}
+            title="Hide today's plan panel"
+            aria-label="Hide today's plan panel"
+            style={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              zIndex: 2,
+              background: 'rgba(0,0,0,.3)',
+              border: '1px solid rgba(255,255,255,.1)',
+              color: 'var(--text-muted)',
+              fontSize: 11,
+              padding: '3px 8px',
+              borderRadius: 6,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >Hide ▴</button>
           {/* Header row: icon + label + mode selector + export */}
           <div style={{
             padding: "var(--space-4) var(--space-5)",
@@ -446,6 +492,21 @@ export function Dashboard({
             </div>
             <div style={{ display: "flex", gap: 6, flexShrink: 0, alignItems: 'center' }}>
               <PrivacyToggle />
+              <button
+                onClick={() => setPlanOpen(o => !o)}
+                title={planOpen ? "Hide today's plan + class doc panel" : "Show today's plan + class doc panel"}
+                aria-pressed={planOpen}
+                className="btn btn-secondary btn-sm"
+                style={{
+                  whiteSpace: "nowrap",
+                  color: planOpen ? '#A78BFA' : 'var(--text-muted)',
+                  borderColor: planOpen ? 'rgba(167,139,250,.4)' : 'var(--border)',
+                  background: planOpen ? 'rgba(167,139,250,.1)' : 'transparent',
+                  fontWeight: 600,
+                }}
+              >
+                📚 Plan {planOpen ? 'ON' : 'OFF'}
+              </button>
               <button
                 onClick={async () => {
                   try {
@@ -630,6 +691,7 @@ export function Dashboard({
             </div>
           )}
         </div>
+        )}
 
         {/* ── MASS LOG STRIP (subtle, sticky to top of dashboard) ── */}
         <MassLogStrip
