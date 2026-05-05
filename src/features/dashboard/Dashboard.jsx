@@ -441,38 +441,17 @@ export function Dashboard({
           </div>
         )}
 
-        {/* ── TODAY'S PLAN CARD (merged Topic + Class Notes Doc) ─ */}
-        {!planOpen && (
-          <button
-            type="button"
-            onClick={() => {
-              // If the user explicitly opens the panel from the collapsed
-              // pill, default to Write mode so they land on something
-              // actionable instead of a stale 'none' / empty state.
-              if (planMode === 'none') setPlanMode('write');
-              setPlanOpen(true);
-            }}
-            style={{
-              width: '100%',
-              padding: '10px 14px',
-              background: 'rgba(167,139,250,.08)',
-              border: '1px dashed rgba(167,139,250,.4)',
-              borderRadius: 'var(--radius-md)',
-              color: 'var(--text-muted)',
-              cursor: 'pointer',
-              fontSize: 12,
-              fontFamily: 'inherit',
-              textAlign: 'left',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
-            <span style={{ fontSize: 14 }}>📚</span>
-            <span style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>Today's Plan</span>
-            <span style={{ marginLeft: 'auto', color: 'var(--accent-hover)', fontWeight: 600 }}>Click to open ▾</span>
-          </button>
-        )}
+        {/* ── MASS LOG STRIP (sticky to top of dashboard) ── */}
+        <MassLogStrip
+          actions={DASH_ACTIONS}
+          activeAction={activeAction}
+          setActiveAction={setActiveAction}
+          selectedCount={selectedIds.size}
+          onCommit={commitMassLog}
+          onCancel={cancelMassLog}
+        />
+
+        {/* ── TODAY'S PLAN CARD — full UI between Mass Log and student grid ─ */}
         {planOpen && (
         <div style={{
           background: "var(--panel-bg)",
@@ -886,16 +865,6 @@ export function Dashboard({
           )}
         </div>
         )}
-
-        {/* ── MASS LOG STRIP (subtle, sticky to top of dashboard) ── */}
-        <MassLogStrip
-          actions={DASH_ACTIONS}
-          activeAction={activeAction}
-          setActiveAction={setActiveAction}
-          selectedCount={selectedIds.size}
-          onCommit={commitMassLog}
-          onCancel={cancelMassLog}
-        />
 
         {/* ── SHOWCASE BANNER ────────────────────────────── */}
         {onLoadDemo && (

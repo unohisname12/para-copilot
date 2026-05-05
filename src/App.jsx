@@ -49,6 +49,7 @@ import TeamSwitcher from './components/TeamSwitcher';
 import HandoffInbox from './components/HandoffInbox';
 import OnboardingModal, { hasSeenOnboarding } from './components/OnboardingModal';
 import { usePrivacyMode } from './hooks/usePrivacyMode';
+import PrivacyFab from './components/PrivacyFab';
 import AdminDashboard from './components/AdminDashboard';
 import BugReportButton from './components/BugReportButton';
 import FindMyStudentsModal from './components/FindMyStudentsModal';
@@ -1063,6 +1064,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
       )}
 
     <div className="app-layout" data-privacy={privacyOn ? "on" : "off"} style={{ flex: 1, minWidth: 0 }}>
+      <PrivacyFab />
       <aside className={`sidebar${sidebarCollapsed ? ' collapsed' : ''}`} style={{ position: 'relative' }}>
         <button
           type="button"
@@ -1182,7 +1184,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
                     cursor: "pointer", fontSize: "11px", fontWeight: "600",
                   }}
                 >
-                  {privacyOn ? "🛡 Privacy ON" : "🛡 Privacy mode"}
+                  🛡 Privacy: {privacyOn ? "ON" : "OFF"}
                 </button>
               </Tip>
               <Tip text="Show or hide the Today's Plan + Class Notes Doc panel on the dashboard." pos="right">
@@ -1197,7 +1199,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
                     cursor: "pointer", fontSize: "11px", fontWeight: "600",
                   }}
                 >
-                  📚 Today's Plan {planPanelOpen ? "ON" : "OFF"}
+                  📚 Plan: {planPanelOpen ? "ON" : "OFF"}
                 </button>
               </Tip>
               {supabaseConfigured && <HandoffInbox />}
