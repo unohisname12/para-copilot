@@ -1061,3 +1061,28 @@ svg rect title { font-family: 'JetBrains Mono', monospace; }
 .tip-pos-left  { right: calc(100% + 10px); top: 0; }
 .tip-pos-top   { bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); }
 .tip-pos-bottom{ top: calc(100% + 8px); left: 50%; transform: translateX(-50%); }
+
+/* ── PRIVACY MODE ──────────────────────────────────────────
+ * When data-privacy="on" is set on the app shell, anything tagged
+ * with .privacy-blur is blurred until the user hovers / focuses /
+ * focuses-within. Lets the para keep notes on screen without a kid
+ * passing by being able to read them.
+ */
+[data-privacy="on"] .privacy-blur {
+  filter: blur(5px);
+  transition: filter 140ms ease;
+  outline: none;
+}
+[data-privacy="on"] .privacy-blur:hover,
+[data-privacy="on"] .privacy-blur:focus,
+[data-privacy="on"] .privacy-blur:focus-within {
+  filter: none;
+}
+[data-privacy="on"] textarea.privacy-blur,
+[data-privacy="on"] input.privacy-blur {
+  filter: blur(4px);
+}
+[data-privacy="on"] textarea.privacy-blur:focus,
+[data-privacy="on"] input.privacy-blur:focus {
+  filter: none;
+}

@@ -72,6 +72,8 @@ export function Dashboard({
   hasVault = false,
   onFindMyStudents,
   bannerHiddenAlways = false,
+  planPanelOpen = true,
+  onTogglePlanPanel,
   onScheduleFollowUp,
 }) {
   // ── Persisted layout ──────────────────────────────────────
@@ -91,7 +93,10 @@ export function Dashboard({
   const [findStudentsBannerDismissed, setFindStudentsBannerDismissed] = useState(false);
   const [activeAction, setActiveAction] = useState(null); // class-wide action selector
   const [selectedIds, setSelectedIds] = useState(() => new Set()); // mass-log selection
-  const [planOpen, setPlanOpen] = useLS('planPanelOpenV1', true);
+  // Plan panel show/hide is owned by App.jsx so the sidebar toggle and
+  // the in-panel hide button stay in sync. We just consume the prop.
+  const planOpen = planPanelOpen;
+  const setPlanOpen = (next) => onTogglePlanPanel?.(typeof next === 'function' ? next(planOpen) : next);
   const [noteTarget,  setNoteTarget]  = useState(null);   // { studentId, action }
   const [noteDraft,   setNoteDraft]   = useState("");
   const [toast,       setToast]       = useState(null);
@@ -888,7 +893,7 @@ export function Dashboard({
                 </div>
 
                 {/* Last log preview */}
-                <div style={{
+                <div className="privacy-blur" tabIndex={0} style={{
                   padding: "var(--space-2) var(--space-4) var(--space-3)",
                   fontSize: 11,
                   color: lastLog ? "var(--text-muted)" : "var(--text-dim)",
@@ -1161,6 +1166,7 @@ export function Dashboard({
                     ref={noteTextareaRef}
                     spellCheck="true"
                     lang="en"
+                    className="privacy-blur"
                     value={noteDraft}
                     onChange={e => setNoteDraft(e.target.value)}
                     onKeyDown={e => {

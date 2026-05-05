@@ -989,7 +989,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
                   >{tag}</button>
                 ))}
               </td>
-              <td>{editingLog === l.id ? (<div style={{ display: "flex", gap: "6px" }}><input defaultValue={l.note || l.text} id={`edit_${l.id}`} style={{ flex: 1, padding: "4px 8px", background: "var(--bg-dark)", border: "1px solid var(--border)", borderRadius: "4px", color: "white", fontSize: "12px" }} /><button className="btn btn-primary" style={{ fontSize: "11px", padding: "4px 8px" }} onClick={() => saveEdit(l.id, document.getElementById(`edit_${l.id}`).value)}>Save</button><button className="btn btn-secondary" style={{ fontSize: "11px", padding: "4px 8px" }} onClick={() => setEditingLog(null)}>Cancel</button></div>) : <span style={{ fontSize: "13px" }}>{l.note || l.text}</span>}</td>
+              <td className="privacy-blur" tabIndex={0}>{editingLog === l.id ? (<div style={{ display: "flex", gap: "6px" }}><input defaultValue={l.note || l.text} id={`edit_${l.id}`} style={{ flex: 1, padding: "4px 8px", background: "var(--bg-dark)", border: "1px solid var(--border)", borderRadius: "4px", color: "white", fontSize: "12px" }} /><button className="btn btn-primary" style={{ fontSize: "11px", padding: "4px 8px" }} onClick={() => saveEdit(l.id, document.getElementById(`edit_${l.id}`).value)}>Save</button><button className="btn btn-secondary" style={{ fontSize: "11px", padding: "4px 8px" }} onClick={() => setEditingLog(null)}>Cancel</button></div>) : <span style={{ fontSize: "13px" }}>{l.note || l.text}</span>}</td>
               <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
                 <button onClick={() => toggleFlag(l.id)} title="Flag for IEP" style={{ background: "none", border: "none", cursor: "pointer", fontSize: "14px", color: l.flagged ? "#f59e0b" : "#334155" }}>⚑</button>
                 <button onClick={() => setEditingLog(l.id)} title="Edit" style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", color: "#60a5fa", marginLeft: "4px" }}>✏</button>
@@ -1060,7 +1060,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
         />
       )}
 
-    <div className="app-layout" style={{ flex: 1, minWidth: 0 }}>
+    <div className="app-layout" data-privacy={privacyOn ? "on" : "off"} style={{ flex: 1, minWidth: 0 }}>
       <aside className={`sidebar${sidebarCollapsed ? ' collapsed' : ''}`} style={{ position: 'relative' }}>
         <button
           type="button"
@@ -1309,6 +1309,8 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
                   hasVault={vaultCtx?.hasVault}
                   onFindMyStudents={() => setFindStudentsOpen(true)}
                   bannerHiddenAlways={bannerHiddenAlways}
+                  planPanelOpen={planPanelOpen}
+                  onTogglePlanPanel={(next) => setPlanPanelOpen(typeof next === 'function' ? next(planPanelOpen) : next)}
                 />
               )}
               {view === "vault" && renderVault()}

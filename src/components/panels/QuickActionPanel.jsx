@@ -115,7 +115,7 @@ export function QuickActionPanel({ students, onLog, studentsMap }) {
                   <span style={{ fontSize: 18, lineHeight: 1 }}>{action.icon}</span>
                   <span style={{ flex: 1 }}>{action.label}</span>
                   {isRecent ? (
-                    <span style={{
+                    <span className="privacy-blur" tabIndex={0} style={{
                       fontSize: 10, color: 'var(--green)', fontWeight: 700,
                       whiteSpace: 'nowrap',
                     }}>
