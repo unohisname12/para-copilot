@@ -48,7 +48,7 @@ import { BrandHeader } from './components/BrandHeader';
 import TeamSwitcher from './components/TeamSwitcher';
 import HandoffInbox from './components/HandoffInbox';
 import OnboardingModal, { hasSeenOnboarding } from './components/OnboardingModal';
-import RealNamesControls from './components/RealNamesControls';
+import { usePrivacyMode } from './hooks/usePrivacyMode';
 import AdminDashboard from './components/AdminDashboard';
 import BugReportButton from './components/BugReportButton';
 import FindMyStudentsModal from './components/FindMyStudentsModal';
@@ -380,8 +380,9 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
   const [stealthPinNudge, setStealthPinNudge] = useState(false);
   const [stealthTool, setStealthTool] = useState("timer");
   const [situationModal, setSituationModal] = useState(null);
-  const [rosterPanelOpen, setRosterPanelOpen] = useState(false);
   const [groups, setGroups] = useState([]);
+  const { on: privacyOn, toggle: togglePrivacy } = usePrivacyMode();
+  const [planPanelOpen, setPlanPanelOpen] = useLocalStorage('planPanelOpenV1', true);
 
   // ── Ollama insights + email (hook) ─────────────────────────
   const insights = useOllamaInsights({
@@ -1048,9 +1049,9 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
       } />
 
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-      {rosterPanelOpen && (
+      {false && (
         <RosterPanel
-          onClose={() => setRosterPanelOpen(false)}
+          onClose={() => {}}
           allStudents={allStudents}
           identityRegistry={identityRegistry}
           activePeriod={activePeriod}
@@ -1167,12 +1168,36 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
               <Tip text="Hide all student data. Screen shows only classroom tools." pos="right">
                 <button onClick={() => setStealthMode(true)} style={{ width: "100%", padding: "6px", borderRadius: "6px", border: "1px solid #7f1d1d", background: "#1a0505", color: "#f87171", cursor: "pointer", fontSize: "11px", fontWeight: "600" }}>🛡️ Stealth Mode</button>
               </Tip>
-              <Tip text="Private local reference panel for real student and class names. Never stored or exported." pos="right">
-                <button onClick={() => setRosterPanelOpen(!rosterPanelOpen)} style={{ width: "100%", padding: "7px", borderRadius: "6px", border: `1px solid ${rosterPanelOpen ? "#1d4ed8" : "#334155"}`, background: rosterPanelOpen ? "#1e3a5f" : "transparent", color: rosterPanelOpen ? "#93c5fd" : "#64748b", cursor: "pointer", fontSize: "11px", fontWeight: "600" }}>
-                  {rosterPanelOpen ? "✓ Private Roster" : "👤 Private Roster"}
+              <Tip text="Mask student names while typing. Vault and exports stay unchanged. Per-device toggle." pos="right">
+                <button
+                  onClick={togglePrivacy}
+                  aria-pressed={privacyOn}
+                  style={{
+                    width: "100%", padding: "7px", borderRadius: "6px",
+                    border: `1px solid ${privacyOn ? "#A78BFA" : "#334155"}`,
+                    background: privacyOn ? "rgba(167,139,250,.15)" : "transparent",
+                    color: privacyOn ? "#A78BFA" : "#64748b",
+                    cursor: "pointer", fontSize: "11px", fontWeight: "600",
+                  }}
+                >
+                  {privacyOn ? "🛡 Privacy ON" : "🛡 Privacy mode"}
                 </button>
               </Tip>
-              <RealNamesControls />
+              <Tip text="Show or hide the Today's Plan + Class Notes Doc panel on the dashboard." pos="right">
+                <button
+                  onClick={() => setPlanPanelOpen(o => !o)}
+                  aria-pressed={planPanelOpen}
+                  style={{
+                    width: "100%", padding: "7px", borderRadius: "6px",
+                    border: `1px solid ${planPanelOpen ? "#1d4ed8" : "#334155"}`,
+                    background: planPanelOpen ? "#1e3a5f" : "transparent",
+                    color: planPanelOpen ? "#93c5fd" : "#64748b",
+                    cursor: "pointer", fontSize: "11px", fontWeight: "600",
+                  }}
+                >
+                  📚 Today's Plan {planPanelOpen ? "ON" : "OFF"}
+                </button>
+              </Tip>
               {supabaseConfigured && <HandoffInbox />}
               <button
                 type="button"

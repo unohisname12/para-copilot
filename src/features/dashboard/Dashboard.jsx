@@ -14,7 +14,6 @@ import { ShowcaseBanner } from '../showcase';
 import { DEMO_INCIDENTS, DEMO_INTERVENTIONS, DEMO_OUTCOMES, DEMO_LOGS } from '../../data/demoSeedData';
 import { getStudentPatterns } from '../analytics/getStudentPatterns';
 import PatternsCard from '../analytics/PatternsCard';
-import PrivacyToggle from '../../components/PrivacyToggle';
 import MassLogStrip from '../../components/dashboard/MassLogStrip';
 
 // ── Constants ────────────────────────────────────────────────
@@ -491,22 +490,6 @@ export function Dashboard({
               ))}
             </div>
             <div style={{ display: "flex", gap: 6, flexShrink: 0, alignItems: 'center' }}>
-              <PrivacyToggle />
-              <button
-                onClick={() => setPlanOpen(o => !o)}
-                title={planOpen ? "Hide today's plan + class doc panel" : "Show today's plan + class doc panel"}
-                aria-pressed={planOpen}
-                className="btn btn-secondary btn-sm"
-                style={{
-                  whiteSpace: "nowrap",
-                  color: planOpen ? '#A78BFA' : 'var(--text-muted)',
-                  borderColor: planOpen ? 'rgba(167,139,250,.4)' : 'var(--border)',
-                  background: planOpen ? 'rgba(167,139,250,.1)' : 'transparent',
-                  fontWeight: 600,
-                }}
-              >
-                📚 Plan {planOpen ? 'ON' : 'OFF'}
-              </button>
               <button
                 onClick={async () => {
                   try {
