@@ -1312,7 +1312,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
                   onFindMyStudents={() => setFindStudentsOpen(true)}
                   bannerHiddenAlways={bannerHiddenAlways}
                   planPanelOpen={planPanelOpen}
-                  onTogglePlanPanel={(next) => setPlanPanelOpen(typeof next === 'function' ? next(planPanelOpen) : next)}
+                  onTogglePlanPanel={setPlanPanelOpen}
                 />
               )}
               {view === "vault" && renderVault()}

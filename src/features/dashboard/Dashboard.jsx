@@ -444,12 +444,19 @@ export function Dashboard({
         {/* ── TODAY'S PLAN CARD (merged Topic + Class Notes Doc) ─ */}
         {!planOpen && (
           <button
-            onClick={() => setPlanOpen(true)}
+            type="button"
+            onClick={() => {
+              // If the user explicitly opens the panel from the collapsed
+              // pill, default to Write mode so they land on something
+              // actionable instead of a stale 'none' / empty state.
+              if (planMode === 'none') setPlanMode('write');
+              setPlanOpen(true);
+            }}
             style={{
               width: '100%',
-              padding: '8px 14px',
-              background: 'rgba(167,139,250,.05)',
-              border: '1px dashed rgba(167,139,250,.3)',
+              padding: '10px 14px',
+              background: 'rgba(167,139,250,.08)',
+              border: '1px dashed rgba(167,139,250,.4)',
               borderRadius: 'var(--radius-md)',
               color: 'var(--text-muted)',
               cursor: 'pointer',
@@ -463,7 +470,7 @@ export function Dashboard({
           >
             <span style={{ fontSize: 14 }}>📚</span>
             <span style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>Today's Plan</span>
-            <span style={{ marginLeft: 'auto' }}>Click to open ▾</span>
+            <span style={{ marginLeft: 'auto', color: 'var(--accent-hover)', fontWeight: 600 }}>Click to open ▾</span>
           </button>
         )}
         {planOpen && (
@@ -865,9 +872,16 @@ export function Dashboard({
             <div style={{
               padding: "var(--space-3) var(--space-5) var(--space-4)",
               borderTop: "1px solid var(--border)",
-              fontSize: 12.5, color: "var(--text-muted)", fontStyle: "italic",
+              display: "flex", flexDirection: "column", gap: "var(--space-2)",
             }}>
-              No plan set for today. Your student logs still export normally.
+              <div style={{ fontSize: 12.5, color: "var(--text-muted)", fontStyle: "italic" }}>
+                No plan set for today. Pick how you want to add one:
+              </div>
+              <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+                <button onClick={() => setPlanMode('write')} className="btn btn-primary btn-sm">✏️ Write topic</button>
+                <button onClick={() => setPlanMode('fetch')} className="btn btn-secondary btn-sm">📄 Doc link</button>
+                <button onClick={() => setPlanMode('pdf')}   className="btn btn-secondary btn-sm">📎 Upload PDF</button>
+              </div>
             </div>
           )}
         </div>
@@ -1323,7 +1337,7 @@ export function Dashboard({
                       background: student.color || "var(--accent)",
                       flexShrink: 0,
                     }} />
-                    {studentLabel}
+                    <PrivacyName>{studentLabel}</PrivacyName>
                   </div>
                 </div>
                 <button
