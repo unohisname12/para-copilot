@@ -1367,7 +1367,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
       {situationModal && (<SituationResponseModal situation={situationModal} students={effectivePeriodStudents} studentsMap={allStudents} onClose={() => setSituationModal(null)} onLog={(id, note, type) => addLog(id, note, type)} onOpenCard={() => { setSituationModal(null); setActiveToolbox("cards"); }} />)}
       {insights.ollamaModal && (<OllamaInsightModal feature={insights.ollamaModal.feature} text={insights.ollamaModal.text} studentId={insights.ollamaModal.studentId} onClose={() => insights.setOllamaModal(null)} onLog={addLog} />)}
 
-      {!stealthMode && !activeFollowUp && followUps.dueFollowUps.length > 0 && (
+      {!stealthMode && !activeFollowUp && !followUps.isSilenced && followUps.dueFollowUps.length > 0 && (
         <div
           role="status"
           style={{
@@ -1384,10 +1384,10 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
           }}
         >
           <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 4 }}>
-            {followUps.dueFollowUps.length} follow-up{followUps.dueFollowUps.length === 1 ? '' : 's'} due
+            {followUps.dueFollowUps.length} follow-up{followUps.dueFollowUps.length === 1 ? '' : 's'} waiting
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.45, marginBottom: 10 }}>
-            Check what happened after a support you logged earlier.
+            Open Follow-ups when you have a moment. Auto-deletes after 2 business days.
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button type="button" className="btn btn-action btn-sm" onClick={openNextDueFollowUp}>
@@ -1396,7 +1396,12 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
             <button type="button" className="btn btn-secondary btn-sm" onClick={openFollowUpsPanel}>
               Panel
             </button>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => handleFollowUpSnooze(followUps.dueFollowUps[0].id, 15)}>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              title="Silence follow-up nags for 2 business days"
+              onClick={() => followUps.silenceAll()}
+            >
               Later
             </button>
           </div>

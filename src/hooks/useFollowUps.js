@@ -1,23 +1,29 @@
 import React from 'react';
 import { useLocalStorage } from './useLocalStorage';
 import {
+  addBusinessDays,
   createPendingFollowUp,
-  expireOldFollowUps,
   getDueFollowUps,
+  purgeExpiredFollowUps,
   snoozeFollowUp,
 } from '../features/help/followUpScheduler';
 
 export function useFollowUps() {
   const [followUps, setFollowUps] = useLocalStorage('paraPendingFollowUpsV1', []);
+  // ISO timestamp; while now < this, the login banner is hidden so the
+  // para isn't nagged. Pending follow-ups still expire on their own.
+  const [silencedUntil, setSilencedUntil] = useLocalStorage('paraFollowUpsSilencedUntilV1', null);
   const [nowTick, setNowTick] = React.useState(() => Date.now());
 
   React.useEffect(() => {
     const id = setInterval(() => setNowTick(Date.now()), 30000);
-    return () => {};
+    return () => clearInterval(id);
   }, []);
 
   React.useEffect(() => {
-    setFollowUps(prev => expireOldFollowUps(prev));
+    // Purge anything past its 2-business-day window so old entries
+    // about things the para has forgotten don't pile up.
+    setFollowUps(prev => purgeExpiredFollowUps(prev));
   }, [setFollowUps]);
 
   const scheduleFollowUp = React.useCallback((data) => {
@@ -51,6 +57,18 @@ export function useFollowUps() {
     setFollowUps([]);
   }, [setFollowUps]);
 
+  // Mass-silence: para taps "Later" on the login banner once and the
+  // banner stays hidden for the next 2 business days. The Follow-ups
+  // panel is still reachable from the sidebar for manual entry.
+  const silenceAll = React.useCallback(() => {
+    setSilencedUntil(addBusinessDays(new Date(), 2).toISOString());
+  }, [setSilencedUntil]);
+
+  const isSilenced = React.useMemo(() => {
+    if (!silencedUntil) return false;
+    return new Date(silencedUntil).getTime() > nowTick;
+  }, [silencedUntil, nowTick]);
+
   const dueFollowUps = React.useMemo(
     () => getDueFollowUps(followUps, new Date(nowTick)),
     [followUps, nowTick]
@@ -72,5 +90,8 @@ export function useFollowUps() {
     markAnswered,
     dismiss,
     clearFollowUps,
+    silenceAll,
+    isSilenced,
+    silencedUntil,
   };
 }

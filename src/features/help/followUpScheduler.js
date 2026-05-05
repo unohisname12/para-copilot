@@ -1,4 +1,25 @@
-const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
+// How many auto-prompts the para gets before they're left alone:
+// 1 initial fire + 1 retry after "Ask me later" = 2 total. After that
+// the entry stays in the Follow-ups panel for manual entry only.
+const MAX_ATTEMPTS = 2;
+
+// Add `n` business days to a date — skip Saturday and Sunday. Used so
+// follow-ups created on Friday don't expire over the weekend before the
+// para is back in school. Uses UTC so the result is the same regardless
+// of the device timezone.
+export function addBusinessDays(date, n) {
+  const d = new Date(date.getTime());
+  let added = 0;
+  while (added < n) {
+    d.setUTCDate(d.getUTCDate() + 1);
+    const day = d.getUTCDay();
+    if (day !== 0 && day !== 6) added += 1;
+  }
+  // Push to UTC end-of-day so the para gets the full final business day
+  // even if their local timezone is east of UTC.
+  d.setUTCHours(23, 59, 59, 999);
+  return d;
+}
 
 const RULES = [
   {
@@ -80,7 +101,7 @@ export function createPendingFollowUp({ incident, intervention, currentDate, act
     prompt: `What happened after ${label}?`,
     createdAt: now.toISOString(),
     nextPromptAt: nextPromptAt.toISOString(),
-    expiresAt: new Date(now.getTime() + FIVE_DAYS_MS).toISOString(),
+    expiresAt: addBusinessDays(now, 2).toISOString(),
     status: 'pending',
     attempts: 0,
     reason,
@@ -95,6 +116,10 @@ export function getDueFollowUps(followUps, now = new Date()) {
   if (!Array.isArray(followUps)) return [];
   return followUps
     .filter(f => ['pending', 'snoozed'].includes(f.status))
+    // Cap auto-prompts: para gets the initial fire plus one snoozed
+    // retry. After that, the entry stays in the Follow-ups panel for
+    // manual entry — no more banner / modal nags during class.
+    .filter(f => (f.attempts || 0) < MAX_ATTEMPTS)
     .filter(f => new Date(f.expiresAt).getTime() > now.getTime())
     .filter(f => new Date(f.nextPromptAt).getTime() <= now.getTime())
     .sort((a, b) => new Date(a.nextPromptAt).getTime() - new Date(b.nextPromptAt).getTime());
@@ -116,5 +141,16 @@ export function expireOldFollowUps(followUps, now = new Date()) {
     return new Date(f.expiresAt).getTime() <= now.getTime()
       ? { ...f, status: 'expired' }
       : f;
+  });
+}
+
+// After 2 business days from creation, the entry is past its useful life
+// — the para has already moved on and asking now would be guessing.
+// Drop the row entirely so localStorage doesn't grow forever.
+export function purgeExpiredFollowUps(followUps, now = new Date()) {
+  if (!Array.isArray(followUps)) return [];
+  return followUps.filter(f => {
+    if (['answered', 'dismissed'].includes(f.status)) return false;
+    return new Date(f.expiresAt).getTime() > now.getTime();
   });
 }
