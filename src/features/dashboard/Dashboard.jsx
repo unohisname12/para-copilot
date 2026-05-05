@@ -15,7 +15,7 @@ import { DEMO_INCIDENTS, DEMO_INTERVENTIONS, DEMO_OUTCOMES, DEMO_LOGS } from '..
 import { getStudentPatterns } from '../analytics/getStudentPatterns';
 import PatternsCard from '../analytics/PatternsCard';
 import PrivacyToggle from '../../components/PrivacyToggle';
-import MassLogFab from '../../components/dashboard/MassLogFab';
+import MassLogStrip from '../../components/dashboard/MassLogStrip';
 
 // ── Constants ────────────────────────────────────────────────
 const LAYOUT_KEY  = "dashLayoutV3";
@@ -92,13 +92,6 @@ export function Dashboard({
   const [findStudentsBannerDismissed, setFindStudentsBannerDismissed] = useState(false);
   const [activeAction, setActiveAction] = useState(null); // class-wide action selector
   const [selectedIds, setSelectedIds] = useState(() => new Set()); // mass-log selection
-  const [barFlash, setBarFlash] = useState(false);
-  const actionBarRef = useRef(null);
-  const flashActionBar = useCallback(() => {
-    actionBarRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    setBarFlash(true);
-    setTimeout(() => setBarFlash(false), 1600);
-  }, []);
   const [noteTarget,  setNoteTarget]  = useState(null);   // { studentId, action }
   const [noteDraft,   setNoteDraft]   = useState("");
   const [toast,       setToast]       = useState(null);
@@ -174,22 +167,20 @@ export function Dashboard({
     });
   }, [activeAction]);
 
-  const commitMassLog = useCallback(() => {
+  const commitMassLog = useCallback((overrideNote) => {
     if (!activeAction || selectedIds.size === 0) return;
     const action = activeAction;
     const ids = Array.from(selectedIds);
+    const trimmed = (overrideNote || '').trim();
+    const fallback = topic ? `${action.type} — ${topic}` : action.type;
+    const note = trimmed || fallback;
     for (const sid of ids) {
-      const s = allStudents[sid] || {};
-      const note = topic ? `${action.type} — ${topic}` : action.type;
       addLog(sid, note, action.type, { source: 'mass_log' });
-      // Per-student toast would spam; one summary toast below.
-      // eslint-disable-next-line no-unused-vars
-      const _ = s;
     }
     showToast(`✅ ${action.label} → ${ids.length} student${ids.length === 1 ? '' : 's'}`);
     setSelectedIds(new Set());
     setActiveAction(null);
-  }, [activeAction, selectedIds, allStudents, topic, addLog, showToast]);
+  }, [activeAction, selectedIds, topic, addLog, showToast]);
 
   const cancelMassLog = useCallback(() => {
     setSelectedIds(new Set());
@@ -456,20 +447,6 @@ export function Dashboard({
             <div style={{ display: "flex", gap: 6, flexShrink: 0, alignItems: 'center' }}>
               <PrivacyToggle />
               <button
-                onClick={flashActionBar}
-                className="btn btn-secondary btn-sm"
-                title="Highlight kids and log the same action for all of them"
-                style={{
-                  whiteSpace: "nowrap",
-                  color: '#A78BFA',
-                  borderColor: 'rgba(167,139,250,.4)',
-                  background: 'rgba(167,139,250,.12)',
-                  fontWeight: 700,
-                }}
-              >
-                📋 Mass log
-              </button>
-              <button
                 onClick={async () => {
                   try {
                     const { buildTodayWorkbook, downloadWorkbook } = await import('../export/exportWorkbook');
@@ -654,111 +631,15 @@ export function Dashboard({
           )}
         </div>
 
-        {/* ── CLASS-WIDE QUICK ACTION BAR (Mass Log) ────── */}
-        <div
-          ref={actionBarRef}
-          className="panel"
-          style={{
-            padding: "var(--space-4) var(--space-5)",
-            outline: barFlash ? "3px solid #A78BFA" : "1px solid rgba(167,139,250,.35)",
-            outlineOffset: barFlash ? 4 : 0,
-            boxShadow: barFlash ? "0 0 0 6px rgba(167,139,250,.25)" : undefined,
-            transition: "outline 200ms, box-shadow 200ms",
-            background: "linear-gradient(180deg, rgba(167,139,250,.08) 0%, var(--panel-bg) 100%)",
-          }}
-        >
-          <div style={{
-            display: "flex", alignItems: "center", gap: "var(--space-2)",
-            marginBottom: "var(--space-3)",
-          }}>
-            <span style={{
-              background: "rgba(167,139,250,.18)",
-              color: "#A78BFA",
-              border: "1px solid rgba(167,139,250,.4)",
-              borderRadius: 999,
-              padding: "4px 12px",
-              fontSize: 11,
-              fontWeight: 800,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-            }}>
-              📋 Mass Log
-            </span>
-            <span style={{
-              fontSize: 12.5,
-              color: activeAction ? "var(--accent-hover)" : "var(--text-secondary)",
-            }}>
-              {activeAction ? (
-                <>
-                  <strong style={{ color: "#A78BFA" }}>Step 2:</strong> Tap student cards to highlight. {selectedIds.size > 0 ? `${selectedIds.size} selected — tap "Log for ${selectedIds.size}" when done.` : `Then tap "Log for N" to log "${activeAction.label}" for all of them.`}
-                </>
-              ) : (
-                <><strong style={{ color: "#A78BFA" }}>Step 1:</strong> Tap an action below, then tap each student you want to log it for.</>
-              )}
-            </span>
-          </div>
-          <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
-            {DASH_ACTIONS.map(action => {
-              const active = activeAction?.id === action.id;
-              return (
-                <button
-                  key={action.id}
-                  onClick={() => setActiveAction(prev => prev?.id === action.id ? null : action)}
-                  style={{
-                    minHeight: 44,
-                    padding: "var(--space-2) var(--space-4)",
-                    borderRadius: "var(--radius-md)",
-                    border: `1.5px solid ${active ? action.border : "var(--border)"}`,
-                    background: active ? action.bg : "var(--bg-dark)",
-                    color: active ? action.color : "var(--text-secondary)",
-                    cursor: "pointer",
-                    fontSize: 13, fontWeight: active ? 700 : 500,
-                    fontFamily: "inherit",
-                    transition: "all 160ms cubic-bezier(0.16,1,0.3,1)",
-                    transform: active ? "translateY(-1px)" : "translateY(0)",
-                    boxShadow: active
-                      ? `0 6px 20px ${action.bg}, inset 0 1px 0 rgba(255,255,255,0.08)`
-                      : "var(--shadow-sm)",
-                    display: "inline-flex", alignItems: "center", gap: 6,
-                  }}
-                >
-                  <span style={{ fontSize: 15 }}>{action.icon}</span> {action.label}
-                </button>
-              );
-            })}
-            {activeAction && (
-              <>
-                <button
-                  onClick={commitMassLog}
-                  disabled={selectedIds.size === 0}
-                  className="btn btn-primary"
-                  style={{
-                    minHeight: 44,
-                    background: selectedIds.size === 0 ? "var(--bg-dark)" : activeAction.bg,
-                    color: selectedIds.size === 0 ? "var(--text-muted)" : activeAction.color,
-                    border: `1.5px solid ${selectedIds.size === 0 ? "var(--border)" : activeAction.border}`,
-                    fontWeight: 700,
-                    cursor: selectedIds.size === 0 ? "not-allowed" : "pointer",
-                    opacity: selectedIds.size === 0 ? 0.5 : 1,
-                  }}
-                >
-                  ✓ Log for {selectedIds.size}
-                </button>
-                <button
-                  onClick={cancelMassLog}
-                  className="btn btn-secondary"
-                  style={{
-                    minHeight: 44,
-                    color: "var(--red)",
-                    borderColor: "rgba(248,113,113,0.3)",
-                  }}
-                >
-                  ✕ Cancel
-                </button>
-              </>
-            )}
-          </div>
-        </div>
+        {/* ── MASS LOG STRIP (subtle, sticky to top of dashboard) ── */}
+        <MassLogStrip
+          actions={DASH_ACTIONS}
+          activeAction={activeAction}
+          setActiveAction={setActiveAction}
+          selectedCount={selectedIds.size}
+          onCommit={commitMassLog}
+          onCancel={cancelMassLog}
+        />
 
         {/* ── SHOWCASE BANNER ────────────────────────────── */}
         {onLoadDemo && (
@@ -1377,15 +1258,6 @@ export function Dashboard({
         </div>
       )}
 
-      {/* ══ MASS LOG FAB — always-visible launcher ══════════ */}
-      <MassLogFab
-        actions={DASH_ACTIONS}
-        activeAction={activeAction}
-        setActiveAction={setActiveAction}
-        selectedCount={selectedIds.size}
-        onCommit={commitMassLog}
-        onCancel={cancelMassLog}
-      />
     </div>
   );
 }
