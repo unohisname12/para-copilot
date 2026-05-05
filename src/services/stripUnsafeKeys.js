@@ -1,7 +1,7 @@
 // FERPA guard. Removes keys that might carry real student names from any
 // payload destined for the cloud. Used by teamSync.js before every write.
 
-const UNSAFE_KEY_RE = /^(real_?name|student_?name|first_?name|last_?name)$/i;
+const UNSAFE_KEY_RE = /(?:real|student|first|last|full|display)[_-]?name/i;
 
 export function containsUnsafeKey(value) {
   if (value === null || typeof value !== 'object') return false;

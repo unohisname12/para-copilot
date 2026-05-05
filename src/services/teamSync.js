@@ -367,16 +367,16 @@ export async function pushStudents(teamId, students, userId) {
   // running it would delete every row the uploader owns.
   if (keyed.length > 0 && userId) {
     const keepKeys = keyed.map(r => r.external_key);
-    const inList = `(${keepKeys.map(k => String(k).replace(/[(),]/g, '')).join(',')})`;
-    await supabase
+    const { error: cleanupError } = await supabase
       .from('team_students')
       .delete()
       .eq('team_id', teamId)
       .eq('created_by', userId)
-      .not('external_key', 'in', inList)
+      .not('external_key', 'in', `(${keepKeys.map(k => `"${String(k).replace(/["\\]/g, '')}"`).join(',')})`)
       .select();
-    // Don't throw on cleanup error — the upsert already succeeded; cleanup
-    // is best-effort. Surfaced via console for debugging.
+    if (cleanupError) {
+      console.warn('pushStudents cleanup failed:', cleanupError.message);
+    }
   }
 
   return written;
@@ -532,11 +532,14 @@ export function subscribeSharedLogs(teamId, onChange, userId) {
 
 export async function pushHandoff(teamId, fromUserId, h) {
   requireClient();
+  if (!h.paraAppNumber) {
+    throw new Error('pushHandoff requires paraAppNumber or external key');
+  }
   const row = sanitize({
     team_id: teamId,
     from_user_id: fromUserId,
     student_id: h.studentDbId || null,
-    external_key: h.paraAppNumber || null,
+    external_key: h.paraAppNumber,
     audience: h.audience || null,
     urgency: h.urgency || 'normal',
     body: h.body,

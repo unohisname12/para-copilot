@@ -27,3 +27,4 @@ agent-eval/.sealed-link
 
 # Playwright signed-in storage states — contain auth JWTs.
 e2e/fixtures/*.storage.json
+repo_snapshot_*.zip

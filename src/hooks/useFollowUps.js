@@ -23,8 +23,8 @@ export function useFollowUps() {
   React.useEffect(() => {
     // Purge anything past its 2-business-day window so old entries
     // about things the para has forgotten don't pile up.
-    setFollowUps(prev => purgeExpiredFollowUps(prev));
-  }, [setFollowUps]);
+    setFollowUps(prev => purgeExpiredFollowUps(prev, nowTick));
+  }, [setFollowUps, nowTick]);
 
   const scheduleFollowUp = React.useCallback((data) => {
     const followUp = createPendingFollowUp(data);

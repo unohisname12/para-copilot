@@ -66,7 +66,7 @@ export function buildIdentityRegistry(bundleData) {
 
   byRealName.forEach((appearances, realName) => {
     const entry = pseudonymMap.get(realName);
-    if (!entry) { console.error(`buildIdentityRegistry: no pseudonym generated for "${realName}" — skipping`); return; }
+    if (!entry) { console.error(`buildIdentityRegistry: no pseudonym generated for "${appearances[0]?.paraAppNumber ?? appearances[0]?.externalKey ?? 'unknown'}" — skipping`); return; }
     const { pseudonym, color } = entry;
     const periodIds  = [...new Set(appearances.map(a => a.periodId).filter(Boolean))];
     const classLabels = {};

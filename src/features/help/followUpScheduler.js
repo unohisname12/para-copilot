@@ -147,10 +147,10 @@ export function expireOldFollowUps(followUps, now = new Date()) {
 // After 2 business days from creation, the entry is past its useful life
 // — the para has already moved on and asking now would be guessing.
 // Drop the row entirely so localStorage doesn't grow forever.
-export function purgeExpiredFollowUps(followUps, now = new Date()) {
+export function purgeExpiredFollowUps(followUps, now = Date.now()) {
   if (!Array.isArray(followUps)) return [];
   return followUps.filter(f => {
     if (['answered', 'dismissed'].includes(f.status)) return false;
-    return new Date(f.expiresAt).getTime() > now.getTime();
+    return new Date(f.expiresAt).getTime() > now;
   });
 }

@@ -35,8 +35,8 @@ export default function PrivacyFab({ on, onToggle }) {
         transition: 'all 180ms cubic-bezier(0.16,1,0.3,1)',
         background: on ? 'rgba(167,139,250,0.18)' : 'rgba(15,23,42,0.78)',
         border: on
-          ? '1px solid rgba(167,139,250,0.85)'
-          : '1px solid rgba(148,163,184,0.35)',
+          ? '2px solid rgba(167,139,250,0.85)'
+          : '2px dashed rgba(148,163,184,0.35)',
         color: on ? '#c4b5fd' : '#94a3b8',
         boxShadow: on
           ? '0 0 0 4px rgba(167,139,250,0.18), 0 8px 24px rgba(0,0,0,0.45)'
@@ -45,7 +45,7 @@ export default function PrivacyFab({ on, onToggle }) {
         WebkitBackdropFilter: 'blur(8px)',
       }}
     >
-      <span aria-hidden="true">{on ? '🛡' : '👁'}</span>
+      <span aria-hidden="true">{on ? '🔒' : '🔓'}</span>
       <span style={{
         position: 'absolute',
         inset: 0,

@@ -215,7 +215,11 @@ export function useStudents({ activePeriod, cloudStudents = null }) {
 
   const handleImport = (studentObj, periodId) => {
     setImportedStudents(prev => ({ ...prev, [studentObj.id]: studentObj }));
-    setImportedPeriodMap(prev => ({ ...prev, [periodId]: [...(prev[periodId] || []), studentObj.id] }));
+    setImportedPeriodMap(prev => {
+      const existing = prev[periodId] || [];
+      if (existing.includes(studentObj.id)) return prev;
+      return { ...prev, [periodId]: [...existing, studentObj.id] };
+    });
     setDemoMode(false);
   };
 

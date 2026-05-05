@@ -132,9 +132,10 @@ export function TeamProvider({ children }) {
     if (!activeTeamId) { setTeamStudents([]); return; }
     let cancelled = false;
     let off;
+    const wasAdmin = isAdmin;
     (async () => {
       try {
-        const initial = isAdmin
+        const initial = wasAdmin
           ? await getTeamStudents(activeTeamId)
           : await getMyAssignedStudents();
         if (cancelled) return;
@@ -146,6 +147,7 @@ export function TeamProvider({ children }) {
       }
       if (cancelled) return;
       off = subscribeTeamStudents(activeTeamId, (payload) => {
+        if (!payload?.new && !payload?.old) return;
         setTeamStudents((prev) => {
           if (payload.eventType === 'INSERT') {
             if (prev.find((s) => s.id === payload.new.id)) return prev;
@@ -185,6 +187,7 @@ export function TeamProvider({ children }) {
       }
       if (cancelled) return;
       off = subscribeSharedLogs(activeTeamId, (payload) => {
+        if (!payload?.new && !payload?.old) return;
         setSharedLogs((prev) => {
           if (prev.find((l) => l.id === payload.new.id)) return prev;
           return [payload.new, ...prev];
@@ -210,6 +213,7 @@ export function TeamProvider({ children }) {
       }
       if (cancelled) return;
       off = subscribeHandoffs(activeTeamId, (payload) => {
+        if (!payload?.new && !payload?.old) return;
         setHandoffs((prev) => {
           if (payload.eventType === 'INSERT') {
             if (prev.find((h) => h.id === payload.new.id)) return prev;
@@ -249,6 +253,7 @@ export function TeamProvider({ children }) {
       }
       if (cancelled) return;
       off = subscribeCaseMemory(activeTeamId, (kind, payload) => {
+        if (!payload?.new && !payload?.old) return;
         const pluralKey = { incident: 'incidents', intervention: 'interventions', outcome: 'outcomes' }[kind];
         if (!pluralKey) return;
         setCaseMemoryCloud((prev) => {
@@ -320,7 +325,7 @@ export function TeamProvider({ children }) {
     },
     joinTeamByCode: async (code, display, requestedRole = 'para') => {
       const t = await joinTeamByCode(code, display, requestedRole);
-      await claimPendingAssignments().catch(() => {});
+      await claimPendingAssignments().catch((err) => { console.warn('[TeamProvider] claim failed', err); });
       // We don't know the final role without a reload (server validates and
       // may coerce to 'para' if requestedRole was invalid). Reload instead
       // of guessing.
@@ -331,7 +336,7 @@ export function TeamProvider({ children }) {
     },
     joinTeamAsOwner: async (code, display) => {
       const t = await joinTeamAsOwner(code, display);
-      await claimPendingAssignments().catch(() => {});
+      await claimPendingAssignments().catch((err) => { console.warn('[TeamProvider] claim failed', err); });
       const all = await getMyTeams();
       setTeams(all);
       setActiveTeamId(t.id);

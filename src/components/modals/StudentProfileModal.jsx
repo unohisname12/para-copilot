@@ -119,6 +119,7 @@ function StudentProfileModalInner({ studentId, logs, currentDate, activePeriod, 
   // ── Guided follow-up state ──────────────────────────────────
   // Phases: "note" (normal) → "prompt" (detected help-worthy) → "guided" (user opted in) → saved
   const [helpPhase, setHelpPhase] = useState("note");
+  const [isSaving, setIsSaving] = useState(false);
   const [antecedent, setAntecedent] = useState(null);
   const [intervention, setIntervention] = useState(null);
   const [result, setResult] = useState(null);
@@ -248,7 +249,7 @@ function StudentProfileModalInner({ studentId, logs, currentDate, activePeriod, 
           </div>
           <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
             <button style={{ fontSize: "11px", padding: "5px 10px", background: "#0d2010", color: "#4ade80", border: "1px solid #166534", borderRadius: "6px", cursor: "pointer" }} onClick={() => onDraftEmail(studentId)}>✉ Draft Email</button>
-            <button className="close-btn" onClick={onClose}>×</button>
+            <button className="close-btn" onClick={onClose} aria-label="Close">×</button>
           </div>
         </div>
         {/* IEP Summary banner — clarifies scope for paras + admins alike */}

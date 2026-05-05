@@ -196,6 +196,8 @@ export default function ParaAssignmentPanel({ teamId, teamLabel = '', members = 
             className="chat-input"
             style={{ flex: '1 1 200px', minWidth: 180 }}
             type="email"
+            autoComplete="off"
+            spellCheck={false}
           />
           <button
             type="button"

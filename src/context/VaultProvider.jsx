@@ -88,7 +88,7 @@ export function VaultProvider({ identityRegistry, onPurgeIdentityRegistry, child
     if (Object.keys(fresh).length === 0) return;
     setVault((prev) => {
       const next = { ...prev, ...fresh };
-      if (persisted) updatePersistedNames(next).catch(() => {});
+      if (persisted) updatePersistedNames(next).catch((err) => { console.warn('[VaultProvider] persistNames failed', err); });
       return next;
     });
     // First-time roster load auto-enables the toggle
@@ -147,13 +147,13 @@ export function VaultProvider({ identityRegistry, onPurgeIdentityRegistry, child
     setVault(next);
     setShowRealNames(true);
     if (persisted) {
-      try { await updatePersistedNames(next); } catch {}
+      try { await updatePersistedNames(next); } catch (err) { console.warn('[VaultProvider] persistNames failed', err); }
     }
     return { added, updated };
   }, [vault, persisted]);
 
   const purgeVault = useCallback(async () => {
-    try { await dbPurge(); } catch {}
+    try { await dbPurge(); } catch (err) { console.warn('[VaultProvider] purge failed', err); }
     setVault({});
     setPersisted(false);
     setShowRealNames(false);

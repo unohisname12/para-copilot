@@ -61,7 +61,7 @@ export function useDraft(key, value, setValue, { debounceMs = 300 } = {}) {
       } catch { /* ignore */ }
     }, debounceMs);
     return () => clearTimeout(t);
-  }, [key, debounceMs]);
+  }, [key, value, debounceMs]);
 
   // Explicit clear — call after the para successfully saves the action so
   // we don't keep stale text around for the next session.

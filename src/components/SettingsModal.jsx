@@ -118,6 +118,9 @@ export default function SettingsModal({ open, onClose, onReplayOnboarding, onOpe
                 onChange={e => setGeminiKey(e.target.value)}
                 className="period-select"
                 placeholder="Paste Gemini API key"
+                autoComplete="off"
+                spellCheck={false}
+                autoCorrect="off"
                 style={{ width: '100%', marginBottom: 8 }}
               />
               <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center' }}>

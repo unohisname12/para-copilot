@@ -105,7 +105,7 @@ export function useLogs({ currentDate, periodLabel, activePeriod, onLogCreated, 
   };
 
   const updateLogText = (id, newText) =>
-    setLogs(prev => prev.map(l => l.id === id ? { ...l, note: newText, text: newText } : l));
+    setLogs(prev => prev.map(l => l.id === id ? { ...l, note: newText, text: newText, updatedAt: Date.now(), edited: true } : l));
 
   const loadDemoLogs = (demoLogs) => {
     const built = demoLogs.map(l => createLog({
