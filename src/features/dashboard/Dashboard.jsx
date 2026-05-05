@@ -15,6 +15,7 @@ import { DEMO_INCIDENTS, DEMO_INTERVENTIONS, DEMO_OUTCOMES, DEMO_LOGS } from '..
 import { getStudentPatterns } from '../analytics/getStudentPatterns';
 import PatternsCard from '../analytics/PatternsCard';
 import PrivacyToggle from '../../components/PrivacyToggle';
+import MassLogFab from '../../components/dashboard/MassLogFab';
 
 // ── Constants ────────────────────────────────────────────────
 const LAYOUT_KEY  = "dashLayoutV3";
@@ -1375,6 +1376,16 @@ export function Dashboard({
           {toast}
         </div>
       )}
+
+      {/* ══ MASS LOG FAB — always-visible launcher ══════════ */}
+      <MassLogFab
+        actions={DASH_ACTIONS}
+        activeAction={activeAction}
+        setActiveAction={setActiveAction}
+        selectedCount={selectedIds.size}
+        onCommit={commitMassLog}
+        onCancel={cancelMassLog}
+      />
     </div>
   );
 }
