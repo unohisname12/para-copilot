@@ -9,6 +9,7 @@ import {
   migrateSupports, breakAccessLabel, reinforcementLabel,
 } from '../../models/supports';
 import { resolveLabel } from '../../privacy/nameResolver';
+import PrivacyName from '../PrivacyName';
 import { matchCaseKeywords, isHelpWorthy } from '../../engine';
 import { useEscape } from '../../hooks/useEscape';
 import { useTeamOptional } from '../../context/TeamProvider';
@@ -235,7 +236,7 @@ function StudentProfileModalInner({ studentId, logs, currentDate, activePeriod, 
         <div className="modal-header" style={{ borderLeft: `5px solid ${c}`, background: `linear-gradient(135deg, ${cFaint} 0%, transparent 60%)`, gap: "12px" }}>
           <div style={{ flex: 1 }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-              <span style={{ fontWeight: "700", fontSize: "17px", color: c }}>{resolveLabel(s, "full")}</span>
+              <span style={{ fontWeight: "700", fontSize: "17px", color: c }}><PrivacyName>{resolveLabel(s, "full")}</PrivacyName></span>
               <span style={{ fontSize: "11px", background: cBorder, color: c, padding: "2px 9px", borderRadius: "20px" }}>{s.eligibility}</span>
               <span>{hdot(health)}</span>
               {s.eligibility?.includes("BIP") && <span style={{ fontSize: "11px", background: "#7f1d1d", color: "#fca5a5", padding: "2px 8px", borderRadius: "20px" }}>ACTIVE BIP</span>}

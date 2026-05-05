@@ -15,6 +15,7 @@ import { DB, SUPPORT_CARDS } from '../../data';
 import { runLocalEngine } from '../../engine';
 import { getHealth, hdot } from '../../models';
 import { resolveLabel } from '../../privacy/nameResolver';
+import PrivacyName from '../../components/PrivacyName';
 import { VisualTimer, BreathingExercise } from '../../components/tools';
 import { getStudentPatterns } from '../analytics/getStudentPatterns';
 import PatternsCard from '../analytics/PatternsCard';
@@ -614,7 +615,7 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                           lineHeight: 1.15,
                           transition: "all 200ms cubic-bezier(0.16,1,0.3,1)",
                         }}>
-                          {hdot(health)} {label}
+                          {hdot(health)} <PrivacyName>{label}</PrivacyName>
                         </div>
                         <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 1 }}>
                           {s.eligibility}
@@ -889,7 +890,7 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
               }}>
                 <div style={{ width: 14, height: 14, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
                 <div>
-                  <div style={{ fontSize: 17, fontWeight: 700, color: s.color }}>{resolveLabel(s, "compact")}</div>
+                  <div style={{ fontSize: 17, fontWeight: 700, color: s.color }}><PrivacyName>{resolveLabel(s, "compact")}</PrivacyName></div>
                   <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 1 }}>{s.eligibility}</div>
                 </div>
               </div>

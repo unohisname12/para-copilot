@@ -594,7 +594,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
     { id: "abc", label: "📊 ABC Builder", tip: "Build structured behavior records: Antecedent, Behavior, Consequence.", component: <ABCBuilder students={effectivePeriodStudents} studentsMap={allStudents} onSave={addLog} periodLabel={period.label} currentDate={currentDate} /> },
     { id: "goals", label: "🎯 Goal Tracker", tip: "Mark IEP goal progress for any student with one tap.", component: <GoalTracker students={effectivePeriodStudents} studentsMap={allStudents} logs={logs} onSave={addLog} /> },
     { id: "handoff", label: "📤 Handoff Notes", tip: "Write notes for the next para, teacher, or end-of-day.", component: <HandoffBuilder students={effectivePeriodStudents} studentsMap={allStudents} onSave={addLog} ollamaOnline={ollama.ollamaOnline} ollamaLoading={ollama.ollamaLoading} onOllamaHandoff={insights.handleOllamaHandoff} /> },
-    { id: "trainingGap", label: "🔖 Topics for Next Check-in", tip: "Generate EBP topics worth bringing up at your next sped-teacher meeting. Patterns only — no single log surfaces a topic.", component: <TrainingGapPanel students={effectivePeriodStudents} studentsMap={allStudents} logs={logs} /> },
+    { id: "trainingGap", label: "🔖 Topics for Next Check-in", tip: "Generate EBP topics worth bringing up at your next sped-teacher meeting. Patterns only — no single log surfaces a topic.", component: <TrainingGapPanel students={effectivePeriodStudents} studentsMap={allStudents} logs={vaultLogs} /> },
     { id: "checklist", label: "✅ Checklist", tip: "Before/during/after class checklist.", component: <ParaChecklist /> },
     { id: "strategies", label: "📖 Strategies", tip: "Searchable strategy library with step-by-step guides.", component: <StrategyLibrary /> },
     ...(!simpleMode ? [
@@ -950,6 +950,8 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
               <td
                 onClick={() => setProfileStu(l.studentId)}
                 title={isOrphan ? "Student not in current roster — click for details" : "Open profile"}
+                className="privacy-blur"
+                tabIndex={0}
                 style={{
                   fontWeight: isOrphan ? 400 : 600,
                   color: isOrphan ? "var(--text-muted)" : s.color,
@@ -1280,7 +1282,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
           ? <SimpleMode
               activePeriod={activePeriod}
               setActivePeriod={setActivePeriod}
-              logs={logs}
+              logs={vaultLogs}
               addLog={addLog}
               deleteLog={deleteLog}
               updateLogText={updateLogText}
