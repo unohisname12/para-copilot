@@ -77,6 +77,8 @@ describe('fromCloudRow / period_ids unpacking', () => {
     });
     expect(stu.periodIds).toEqual(['p1', 'p3']);
     expect(stu.periodId).toBe('p1');
+    expect(stu.paraAppNumber).toBe('111111');
+    expect(stu.externalKey).toBe('111111');
   });
 
   test('legacy row with only period_id falls back to a single-element array', () => {
