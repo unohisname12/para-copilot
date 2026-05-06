@@ -15,6 +15,7 @@ import { DEMO_INCIDENTS, DEMO_INTERVENTIONS, DEMO_OUTCOMES, DEMO_LOGS } from '..
 import { getStudentPatterns } from '../analytics/getStudentPatterns';
 import PatternsCard from '../analytics/PatternsCard';
 import MassLogStrip from '../../components/dashboard/MassLogStrip';
+import PrivacyName from '../../components/PrivacyName';
 
 // ── Constants ────────────────────────────────────────────────
 const LAYOUT_KEY  = "dashLayoutV3";
@@ -773,7 +774,7 @@ export function Dashboard({
                       color: s.color, lineHeight: 1.15,
                       letterSpacing: "-0.01em",
                     }}>
-                      {resolveLabel(s, "compact")}
+                      <PrivacyName>{resolveLabel(s, "compact")}</PrivacyName>
                     </div>
                     <div style={{
                       display: "flex", gap: 6, alignItems: "center",
@@ -1131,7 +1132,7 @@ export function Dashboard({
                       background: student.color || "var(--accent)",
                       flexShrink: 0,
                     }} />
-                    {studentLabel}
+                    <PrivacyName>{studentLabel}</PrivacyName>
                   </div>
                 </div>
                 <button

@@ -1,4 +1,5 @@
 import React from 'react';
+import PrivacyName from '../../components/PrivacyName';
 
 // Compact "What worked before" card. Designed to sit inline under a
 // quick-log row — one line of context so the para sees it without
@@ -16,7 +17,7 @@ export default function PatternsCard({ patterns, studentLabel, onTry }) {
       <div style={wrap}>
         <div style={title}>What worked before</div>
         <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-          Nothing saved yet for {studentLabel || 'this student'}. Your next note
+          Nothing saved yet for <PrivacyName>{studentLabel || 'this student'}</PrivacyName>. Your next note
           will start building the picture.
         </div>
       </div>
@@ -32,7 +33,7 @@ export default function PatternsCard({ patterns, studentLabel, onTry }) {
       <div style={title}>
         What worked before
         <span style={meta}>
-          · {studentLabel || ''}
+          · <PrivacyName>{studentLabel || ''}</PrivacyName>
         </span>
       </div>
 
