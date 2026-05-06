@@ -92,6 +92,16 @@ export function useStudents({ activePeriod, cloudStudents = null }) {
   const [importedStudents, setImportedStudents] = useLocalStorage('paraImportedStudentsV1', {});
   const [importedPeriodMap, setImportedPeriodMap] = useLocalStorage('paraImportedPeriodMapV1', {});
   const [demoMode, setDemoMode] = useLocalStorage('paraDemoModeV1', true);
+  // First-seen timestamp: lets us auto-disable the demo dashboard 24h after
+  // an account starts using the app. User can flip it back on from
+  // Settings → Advanced. Real kids in the roster suppress demos regardless
+  // (see effectiveDemoMode below).
+  const [firstSeenAt, setFirstSeenAt] = useLocalStorage('paraFirstSeenV1', 0);
+  React.useEffect(() => {
+    if (!firstSeenAt) { setFirstSeenAt(Date.now()); return; }
+    const age = Date.now() - firstSeenAt;
+    if (demoMode && age > 24 * 60 * 60 * 1000) setDemoMode(false);
+  }, []); // run once on mount
 
   // One-time heal: previously-imported bundles wrote students to
   // importedStudents but left importedPeriodMap empty when the source
@@ -155,14 +165,24 @@ export function useStudents({ activePeriod, cloudStudents = null }) {
     );
   }, [importedStudents, cloudStudentsById]);
 
-  // Demo students should appear whenever demoMode is on — cloud connection
-  // is orthogonal. Without this branch, joining a team silently hides every
-  // sample student and the "Load Demo" button does nothing visible.
+  // Real-roster guard: once the user has imported real kids (or is on a
+  // team with cloud students), demos should never bleed in — even if the
+  // demoMode flag stayed true through some path that forgot to flip it.
+  // This is what user reports as "test students leaking in."
+  const hasRealStudents =
+    Object.keys(importedStudents).length > 0 ||
+    (Array.isArray(cloudStudentList) && cloudStudentList.length > 0);
+  const effectiveDemoMode = demoMode && !hasRealStudents;
+
+  // Demo students should appear whenever effectiveDemoMode is on — cloud
+  // connection is orthogonal. Without this branch, joining a team silently
+  // hides every sample student and the "Load Demo" button does nothing
+  // visible.
   const allStudentsBase = cloudStudentsById
-    ? (demoMode
+    ? (effectiveDemoMode
         ? { ...DEMO_STUDENTS, ...cloudStudentsById, ...importedFiltered }
         : { ...cloudStudentsById, ...importedFiltered })
-    : demoMode
+    : effectiveDemoMode
     ? { ...DEMO_STUDENTS, ...importedStudents }
     : { ...importedStudents };
 
@@ -202,16 +222,16 @@ export function useStudents({ activePeriod, cloudStudents = null }) {
       // Master Roster upload — local imports never made it into the cloud
       // (and don't have to: paraAppNumber alone is FERPA-safe to sync, the
       // pseudonym IS the local view).
-      if (demoMode) {
+      if (effectiveDemoMode) {
         return [...new Set([...period.students, ...cloudIds, ...importedIds])];
       }
       return [...new Set([...cloudIds, ...importedIds])];
     }
-    if (demoMode) {
+    if (effectiveDemoMode) {
       return [...new Set([...period.students, ...importedIds])];
     }
     return [...new Set([...importedIds])];
-  }, [cloudStudentList, demoMode, period.students, importedPeriodMap, activePeriod]);
+  }, [cloudStudentList, effectiveDemoMode, period.students, importedPeriodMap, activePeriod]);
 
   const handleImport = (studentObj, periodId) => {
     setImportedStudents(prev => ({ ...prev, [studentObj.id]: studentObj }));
@@ -296,6 +316,7 @@ export function useStudents({ activePeriod, cloudStudents = null }) {
     allStudents, effectivePeriodStudents,
     importedStudents, importedPeriodMap,
     demoMode, setDemoMode,
+    effectiveDemoMode, hasRealStudents,
     identityOverrides, identityRegistry, setIdentityRegistry,
     supportsOverrides,
     handleImport, handleBundleImport, handleIdentityLoad, handleUpdateIdentity,

@@ -22,11 +22,13 @@ const STATUS_META = {
 export default function VerifyRoster({
   importedStudents = {}, vault = {}, cloudStudents = [],
   onRemoveOrphan, onRemoveCloudOrphan, isOwnerOrAdmin = false,
+  demoMode = false, onSetDemoMode,
 }) {
   const [csvText, setCsvText] = useState(null);
   const [csvName, setCsvName] = useState('');
   const [report, setReport] = useState(null);
   const [error, setError] = useState('');
+  const [demoCleared, setDemoCleared] = useState(false);
   const fileRef = useRef();
 
   const importedCount = Object.keys(importedStudents).length;
@@ -35,6 +37,7 @@ export default function VerifyRoster({
     const file = e.target.files?.[0];
     if (!file) return;
     setError('');
+    setDemoCleared(false);
     try {
       const text = await file.text();
       setCsvText(text);
@@ -47,6 +50,14 @@ export default function VerifyRoster({
       });
       setReport(r);
       if (r.errors?.length) setError(r.errors.join(' '));
+      // User asked for verify to always clear demo students — they
+      // expect "verifying my real roster" to mean "demos go away,
+      // regardless of report errors." Track whether we actually
+      // flipped it so the success banner can mention it.
+      if (demoMode && onSetDemoMode) {
+        onSetDemoMode(false);
+        setDemoCleared(true);
+      }
     } catch (err) {
       setError(`Could not read file: ${err.message}`);
     }
@@ -141,6 +152,24 @@ export default function VerifyRoster({
 
       {report && (
         <>
+          <div style={{
+            padding: '12px 16px',
+            background: '#0d2010',
+            border: '2px solid #166534',
+            borderRadius: 10,
+            fontSize: 13,
+            color: '#4ade80',
+            fontWeight: 600,
+            lineHeight: 1.55,
+          }}>
+            ✓ <strong>Roster verified.</strong>{' '}
+            {report.summary.linked} kid{report.summary.linked === 1 ? '' : 's'} confirmed on your roster.
+            {demoCleared && ' Demo students cleared.'}
+            {report.summary.orphan > 0 && (
+              <> {report.summary.orphan} old import{report.summary.orphan === 1 ? '' : 's'} not on this roster — use the "Remove orphans" button below to drop them.</>
+            )}
+          </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 8 }}>
             {Object.entries(STATUS_META).map(([key, meta]) => (
               <div key={key} style={{

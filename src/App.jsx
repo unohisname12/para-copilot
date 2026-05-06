@@ -530,7 +530,11 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
   const handleLoadDemo = ({ incidents, interventions, outcomes, logs: demoLogs }) => {
     caseMemory.loadDemoCaseMemory({ incidents, interventions, outcomes });
     if (demoLogs) loadDemoLogs(demoLogs);
-    students.setDemoMode(true);
+    // Only flip demoMode on if the user has no real students yet — once
+    // real kids are imported, "Load Demo" still loads demo case-memory
+    // for the showcase tour but must NOT bring DEMO_STUDENTS back into
+    // their roster.
+    if (!students.hasRealStudents) students.setDemoMode(true);
   };
   const handleClearDemo = () => {
     caseMemory.clearCaseMemory();
@@ -1331,6 +1335,8 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
                   return deleteTeamStudentByExternalKey(teamCtx?.activeTeamId, paraAppNumber);
                 }}
                 isOwnerOrAdmin={!!teamCtx?.isAdmin}
+                demoMode={students.demoMode}
+                onSetDemoMode={students.setDemoMode}
               />}
               {view === "analytics" && <AnalyticsDashboard logs={logs} groups={groups} setGroups={setGroups} onOpenProfile={setProfileStu} ollamaOnline={ollama.ollamaOnline} ollamaLoading={ollama.ollamaLoading} onOllamaPatternSummary={insights.handleOllamaPatternSummary} allStudents={allStudents} />}
               {view === "admin" && teamCtx?.isAdmin && (
@@ -1483,6 +1489,9 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
         }}
         onReplayOnboarding={() => setOnboardingOpen(true)}
         onOpenLegacyImport={() => setLegacyImportOpen(true)}
+        demoMode={students.demoMode}
+        onSetDemoMode={students.setDemoMode}
+        hasRealStudents={students.hasRealStudents}
       />
       {legacyImportOpen && (
         <LegacyImportModal
