@@ -388,3 +388,98 @@ Use only code names or Para App Numbers. Do not add facts. Keep under 200 words.
     maxOutputTokens: 650,
   });
 }
+
+// ── Lesson plan summarizer ───────────────────────────────────
+//
+// Takes raw text from a teacher's lesson doc (Google Doc fetch or
+// uploaded PDF) and returns a structured summary the para can act on:
+// today's topic, learning objectives, vocab, activities, and a
+// para-specific "what to watch for" focus line.
+//
+// Schema-enforced — Gemini guarantees valid JSON with these fields.
+const PLAN_SUMMARY_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    topic:      { type: 'STRING' },
+    objectives: { type: 'ARRAY', items: { type: 'STRING' } },
+    vocab:      { type: 'ARRAY', items: { type: 'STRING' } },
+    activities: { type: 'ARRAY', items: { type: 'STRING' } },
+    para_focus: { type: 'STRING' },
+  },
+  required: ['topic', 'objectives', 'vocab', 'activities', 'para_focus'],
+};
+
+const SYS_PLAN_SUMMARY = `You read a teacher's lesson plan or class notes and
+summarize it for a paraprofessional working with special-education students.
+
+Return JSON with:
+- topic: 1 short sentence — what is being taught today
+- objectives: 1–4 bullet learning goals, plain language
+- vocab: any key terms students must know (max 8); empty array if none
+- activities: ordered list of what students will do (worksheets, stations, group work, etc.)
+- para_focus: 1–2 sentences on what the para should specifically watch for or
+  support — e.g., students who struggle with X, transitions, regulation cues,
+  pre-teach hints. This is the most valuable field.
+
+Be concrete and short. No fluff. Do not invent details that aren't in the source.
+If the source is too thin to answer a field meaningfully, return an empty array
+or a brief honest note (e.g., "Source too brief — ask the teacher for activities.").`;
+
+export async function geminiSummarizePlan(documentText, { model } = {}) {
+  const key = getCloudApiKey();
+  if (!key) throw new CloudAIKeyMissingError();
+  const text = String(documentText || '').trim();
+  if (!text) return null;
+  const useModel = model || getCloudModel();
+  const spend = canSpendGemini(useModel, text, 800);
+  if (!spend.ok) throw new CloudAIQuotaError();
+
+  const res = await fetch(GEMINI_ENDPOINT(useModel, key), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: SYS_PLAN_SUMMARY }] },
+      contents: [{ parts: [{ text }] }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: PLAN_SUMMARY_SCHEMA,
+        temperature: 0.2,
+        maxOutputTokens: 800,
+      },
+    }),
+  });
+
+  if (res.status === 401 || res.status === 403) throw new CloudAIKeyInvalidError();
+  if (res.status === 429) throw new CloudAIQuotaError();
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new CloudAIResponseError(res.status, body.slice(0, 300));
+  }
+
+  const data = await res.json();
+  const jsonText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  recordGeminiUsage(useModel, text, jsonText || '');
+  if (!jsonText) return null;
+  try {
+    return JSON.parse(jsonText);
+  } catch {
+    return null;
+  }
+}
+
+// Lighter call — used when the para has only typed a short topic and
+// wants the "what to watch for" tip without parsing a full doc. Uses
+// Flash-Lite for cost.
+export async function geminiQuickFocusTips(topicText) {
+  const text = String(topicText || '').trim();
+  if (!text) return null;
+  const out = await geminiTextCall({
+    system: `You are advising a paraprofessional supporting special-education students.
+Given a brief lesson topic line, give 2–3 short, concrete things the para should
+watch for or pre-teach today. Plain language. No filler. No bullets in output.`,
+    prompt: `Today's topic: ${text}`,
+    maxOutputTokens: 220,
+    model: GEMINI_FLASH_LITE_MODEL,
+  });
+  return out;
+}
