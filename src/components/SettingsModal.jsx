@@ -38,7 +38,7 @@ export function setFindStudentsBannerHidden(hidden) {
   } catch {}
 }
 
-export default function SettingsModal({ open, onClose, onReplayOnboarding, onOpenLegacyImport }) {
+export default function SettingsModal({ open, onClose, onReplayOnboarding, onOpenLegacyImport, demoMode, onSetDemoMode, hasRealStudents }) {
   const vault = useVault();
   const team  = useTeamOptional();
 
@@ -212,6 +212,17 @@ export default function SettingsModal({ open, onClose, onReplayOnboarding, onOpe
 
           {/* ADVANCED */}
           <Section label="Advanced">
+            {onSetDemoMode && (
+              <Toggle
+                icon="🧪"
+                title="Show demo students on the dashboard"
+                body={hasRealStudents
+                  ? 'You have real students imported, so demos stay hidden even if this is on. Turn off your imports to see demos again.'
+                  : 'New accounts see demo students for the first day so the app isn\'t empty. Toggle this back on if you want to keep using the demo data.'}
+                on={!!demoMode}
+                onChange={() => onSetDemoMode(!demoMode)}
+              />
+            )}
             <button
               type="button"
               className="btn btn-secondary"
