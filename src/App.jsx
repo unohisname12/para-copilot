@@ -199,7 +199,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
   // view + simpleMode persist across reload so you don't lose your spot when
   // a school computer reloads the tab unexpectedly.
   const [view, setView] = useLocalStorage("paraLastViewV1", "dashboard");
-  const [simpleMode, setSimpleMode] = useLocalStorage("paraSimpleModeV1", false);
+  const [simpleMode, setSimpleMode] = useLocalStorage("paraSimpleModeV2", true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [findStudentsOpen, setFindStudentsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
