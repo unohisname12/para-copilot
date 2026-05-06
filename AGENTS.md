@@ -19,6 +19,9 @@ prefers artifacts to discussion.
 - Don't refuse on edge of caution; he has real lived expertise (military,
   ministry, special-ed).
 - Don't recommend SaaS unless asked; he prefers self-hosted.
+- War Room tasks must follow `docs/war-room/operating-rules.md`: newest
+  mid-conversation correction wins, local visible prompt first, email only as
+  fallback, and latest-main disposable-copy testing by default.
 
 **Retrieval — use his second-brain vault before answering history-dependent
 questions:**

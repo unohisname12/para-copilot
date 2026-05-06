@@ -43,6 +43,7 @@ import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { SimpleMode } from './components/SimpleMode';
 import { IEPImport } from './components/IEPImport';
 import { OllamaStatusBadge } from './components/OllamaStatusBadge';
+import { CloudAIStatusBadge } from './components/CloudAIStatusBadge';
 import { Dashboard } from './components/Dashboard';
 import { BrandHeader } from './components/BrandHeader';
 import TeamSwitcher from './components/TeamSwitcher';
@@ -1048,8 +1049,9 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
       <BrandHeader right={
         <>
-          {supabaseConfigured && <TeamSwitcher />}
           <OllamaStatusBadge online={ollama.ollamaOnline} modelName={ollama.ollamaModel} />
+          <CloudAIStatusBadge />
+          {supabaseConfigured && <TeamSwitcher />}
         </>
       } />
 

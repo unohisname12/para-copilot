@@ -27,6 +27,8 @@
     "build": "react-scripts build",
     "test": "react-scripts test --env=jsdom",
     "test:e2e": "playwright test e2e/",
+    "warroom:test:latest": "node scripts/war-room-test-latest-main.mjs",
+    "warroom:test:handoff": "node scripts/war-room-test-latest-main.mjs --suite=handoff --test=e2e/team-realtime.spec.ts",
     "eject": "react-scripts eject",
     "postinstall": "rm -rf node_modules/canvas"
   },

@@ -23,7 +23,7 @@ export function HelpButton({
         onClick={() => setOpen(true)}
         title="Help — What worked before?"
         style={{
-          position: 'fixed', bottom: '24px', right: '24px', zIndex: 1250,
+          position: 'fixed', top: '24px', right: '24px', zIndex: 1250,
           width: '56px', height: '56px', borderRadius: '50%',
           background: 'linear-gradient(135deg, #1d4ed8, #3b82f6)',
           color: '#fff', border: 'none', cursor: 'pointer',
