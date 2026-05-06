@@ -1482,6 +1482,15 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
         open={findStudentsOpen}
         onClose={() => setFindStudentsOpen(false)}
         onIdentityLoad={students.handleIdentityLoad}
+        allStudents={students.allStudents}
+        logs={logs}
+        hiddenStudentIds={students.hiddenStudentIds}
+        onHideStudents={students.hideStudentIds}
+        onUnhideStudents={students.unhideStudentIds}
+        onClearHidden={students.clearHiddenStudents}
+        allowedKeys={students.allowedKeys}
+        onSetAllowlist={students.setRosterAllowlist}
+        onClearAllowlist={students.clearRosterAllowlist}
       />
       <SettingsModal
         open={settingsOpen}

@@ -116,6 +116,16 @@ export function useStudents({ activePeriod, cloudStudents = null }) {
   // to the persisted students via paraAppNumber on hydration.
   const [importedStudents, setImportedStudents] = useLocalStorage('paraImportedStudentsV1', {});
   const [importedPeriodMap, setImportedPeriodMap] = useLocalStorage('paraImportedPeriodMapV1', {});
+  // Per-user hide list — set by Find My Students dup-scan when the user
+  // chooses which copy of a duplicate to keep. Only filters the local view;
+  // database rows stay intact so admin can clean up server-side later.
+  const [hiddenStudentIds, setHiddenStudentIds] = useLocalStorage('paraHiddenStudentIdsV1', []);
+  // Allowlist of paraAppNumbers — the para uploaded a list via Find My
+  // Students saying "these are MY students". When populated, the visible
+  // roster is restricted to ONLY those keys. Cloud rows that don't match a
+  // key are hidden until the para clears the lock from the FMS modal.
+  // Empty array = no lock = legacy behavior (show every assigned row).
+  const [allowedKeys, setAllowedKeys] = useLocalStorage('paraRosterAllowlistV1', []);
   const [demoMode, setDemoMode] = useLocalStorage('paraDemoModeV1', true);
   // First-seen timestamp: lets us auto-disable the demo dashboard 24h after
   // an account starts using the app. User can flip it back on from
@@ -227,6 +237,14 @@ export function useStudents({ activePeriod, cloudStudents = null }) {
     );
   }, [allStudentsBase, identityOverrides, supportsOverrides]);
 
+  const hiddenSet = useMemo(
+    () => new Set(Array.isArray(hiddenStudentIds) ? hiddenStudentIds : []),
+    [hiddenStudentIds]
+  );
+  const allowedSet = useMemo(() => {
+    const arr = Array.isArray(allowedKeys) ? allowedKeys : [];
+    return new Set(arr.map((k) => String(k).trim()).filter(Boolean));
+  }, [allowedKeys]);
   const effectivePeriodStudents = useMemo(() => {
     const importedIds = importedPeriodMap[activePeriod] || [];
     if (cloudStudentList) {
@@ -239,6 +257,14 @@ export function useStudents({ activePeriod, cloudStudents = null }) {
           : (s.periodId ? [s.periodId] : []);
         return ids.includes(activePeriod);
       };
+      // Allowlist gate — when the para has uploaded their roster via Find
+      // My Students, only cloud rows whose paraAppNumber appears in the
+      // allowlist survive. Empty allowlist = no lock = show all assigned.
+      const passesAllowlist = (s) => {
+        if (allowedSet.size === 0) return true;
+        const key = s?.paraAppNumber ? String(s.paraAppNumber).trim() : '';
+        return key && allowedSet.has(key);
+      };
       // Dedupe cloud rows by paraAppNumber inside this period and drop
       // locally-imported ids that the cloud already covers. Admin
       // re-uploads or repeated Smart Imports can leave two team_students
@@ -246,7 +272,7 @@ export function useStudents({ activePeriod, cloudStudents = null }) {
       // both passed `inPeriod` and both rendered as separate students.
       // Both ids stay in cloudStudentsById so existing logs continue to
       // resolve — only one id surfaces in the roster. See pure helper.
-      const cloudInPeriod = cloudStudentList.filter(inPeriod);
+      const cloudInPeriod = cloudStudentList.filter(inPeriod).filter(passesAllowlist);
       const { cloudIds, localIds } = dedupeStudentsByParaAppNumber({
         cloudStudents: cloudInPeriod,
         importedIds,
@@ -255,16 +281,16 @@ export function useStudents({ activePeriod, cloudStudents = null }) {
       // Locally-imported students with no cloud match still appear so the
       // dashboard isn't blank after a Smart Import / Master Roster upload
       // before sync completes.
-      if (effectiveDemoMode) {
-        return [...new Set([...period.students, ...cloudIds, ...localIds])];
-      }
-      return [...new Set([...cloudIds, ...localIds])];
+      const merged = effectiveDemoMode
+        ? [...new Set([...period.students, ...cloudIds, ...localIds])]
+        : [...new Set([...cloudIds, ...localIds])];
+      return merged.filter((id) => !hiddenSet.has(id));
     }
-    if (effectiveDemoMode) {
-      return [...new Set([...period.students, ...importedIds])];
-    }
-    return [...new Set([...importedIds])];
-  }, [cloudStudentList, effectiveDemoMode, period.students, importedPeriodMap, importedStudents, activePeriod]);
+    const merged = effectiveDemoMode
+      ? [...new Set([...period.students, ...importedIds])]
+      : [...new Set([...importedIds])];
+    return merged.filter((id) => !hiddenSet.has(id));
+  }, [cloudStudentList, effectiveDemoMode, period.students, importedPeriodMap, importedStudents, activePeriod, hiddenSet, allowedSet]);
 
   const handleImport = (studentObj, periodId) => {
     setImportedStudents(prev => ({ ...prev, [studentObj.id]: studentObj }));
@@ -345,6 +371,30 @@ export function useStudents({ activePeriod, cloudStudents = null }) {
     setDemoMode(true); // back to showing demo students
   };
 
+  const setRosterAllowlist = (keys = []) => {
+    const cleaned = Array.from(new Set(
+      (Array.isArray(keys) ? keys : [])
+        .map((k) => (k == null ? '' : String(k).trim()))
+        .filter(Boolean)
+    ));
+    setAllowedKeys(cleaned);
+    return cleaned.length;
+  };
+  const clearRosterAllowlist = () => setAllowedKeys([]);
+
+  const hideStudentIds = (ids = []) => {
+    const next = Array.from(new Set([...(hiddenStudentIds || []), ...ids.filter(Boolean)]));
+    setHiddenStudentIds(next);
+    return next.length;
+  };
+  const unhideStudentIds = (ids = []) => {
+    const drop = new Set(ids);
+    const next = (hiddenStudentIds || []).filter((id) => !drop.has(id));
+    setHiddenStudentIds(next);
+    return next.length;
+  };
+  const clearHiddenStudents = () => setHiddenStudentIds([]);
+
   return {
     allStudents, effectivePeriodStudents,
     importedStudents, importedPeriodMap,
@@ -358,5 +408,7 @@ export function useStudents({ activePeriod, cloudStudents = null }) {
     removeImportedStudent,
     clearImports,
     resetImports,
+    hiddenStudentIds, hideStudentIds, unhideStudentIds, clearHiddenStudents,
+    allowedKeys, setRosterAllowlist, clearRosterAllowlist,
   };
 }
