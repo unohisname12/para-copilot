@@ -49,6 +49,31 @@ export function applyStudentRemoval(state, studentId, options = {}) {
 // inside this module use `fromCloudRow` directly.
 export function fromCloudRowForTests(row) { return fromCloudRow(row); }
 
+// Pure helper: collapse duplicate students that share a paraAppNumber. Used
+// by effectivePeriodStudents and exported so tests can pin the contract.
+// Inputs: list of {id, paraAppNumber} and list of importedStudents (map
+// id->{paraAppNumber}). Returns { cloudIds, localIds } with first-seen
+// cloud retained per paraAppNumber and local entries dropped if their
+// paraAppNumber is already in the cloud set.
+export function dedupeStudentsByParaAppNumber({ cloudStudents = [], importedIds = [], importedStudents = {} }) {
+  const seenKey = new Map();
+  const cloudIds = [];
+  for (const s of cloudStudents) {
+    const key = s?.paraAppNumber ? String(s.paraAppNumber).trim() : null;
+    if (!key) { if (s?.id != null) cloudIds.push(s.id); continue; }
+    if (!seenKey.has(key)) {
+      seenKey.set(key, s.id);
+      cloudIds.push(s.id);
+    }
+  }
+  const localIds = importedIds.filter((id) => {
+    const s = importedStudents[id];
+    const key = s?.paraAppNumber ? String(s.paraAppNumber).trim() : null;
+    return !key || !seenKey.has(key);
+  });
+  return { cloudIds, localIds, seenKey };
+}
+
 function fromCloudRow(row) {
   // Prefer the new period_ids[] column. Fall back to scalar period_id for
   // legacy rows written before the multi-period migration. Both are kept in
@@ -214,24 +239,32 @@ export function useStudents({ activePeriod, cloudStudents = null }) {
           : (s.periodId ? [s.periodId] : []);
         return ids.includes(activePeriod);
       };
-      const cloudIds = cloudStudentList
-        .filter(inPeriod)
-        .map((s) => s.id);
-      // Always include locally-imported students. Excluding them in cloud
-      // mode is what made every dashboard go blank after a Smart Import or
-      // Master Roster upload — local imports never made it into the cloud
-      // (and don't have to: paraAppNumber alone is FERPA-safe to sync, the
-      // pseudonym IS the local view).
+      // Dedupe cloud rows by paraAppNumber inside this period and drop
+      // locally-imported ids that the cloud already covers. Admin
+      // re-uploads or repeated Smart Imports can leave two team_students
+      // rows for the same kid (different cloud ids, same external_key);
+      // both passed `inPeriod` and both rendered as separate students.
+      // Both ids stay in cloudStudentsById so existing logs continue to
+      // resolve — only one id surfaces in the roster. See pure helper.
+      const cloudInPeriod = cloudStudentList.filter(inPeriod);
+      const { cloudIds, localIds } = dedupeStudentsByParaAppNumber({
+        cloudStudents: cloudInPeriod,
+        importedIds,
+        importedStudents,
+      });
+      // Locally-imported students with no cloud match still appear so the
+      // dashboard isn't blank after a Smart Import / Master Roster upload
+      // before sync completes.
       if (effectiveDemoMode) {
-        return [...new Set([...period.students, ...cloudIds, ...importedIds])];
+        return [...new Set([...period.students, ...cloudIds, ...localIds])];
       }
-      return [...new Set([...cloudIds, ...importedIds])];
+      return [...new Set([...cloudIds, ...localIds])];
     }
     if (effectiveDemoMode) {
       return [...new Set([...period.students, ...importedIds])];
     }
     return [...new Set([...importedIds])];
-  }, [cloudStudentList, effectiveDemoMode, period.students, importedPeriodMap, activePeriod]);
+  }, [cloudStudentList, effectiveDemoMode, period.students, importedPeriodMap, importedStudents, activePeriod]);
 
   const handleImport = (studentObj, periodId) => {
     setImportedStudents(prev => ({ ...prev, [studentObj.id]: studentObj }));
