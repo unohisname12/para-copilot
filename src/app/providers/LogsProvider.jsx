@@ -1,7 +1,7 @@
-import React, { createContext, useContext, useCallback } from 'react';
+import React, { createContext, useContext, useCallback, useState } from 'react';
 import { useLogs } from '../../hooks/useLogs';
 import { useTeamOptional } from '../../context/TeamProvider';
-import { pushLog } from '../../services/teamSync';
+import { pushLog, deleteLogCloud } from '../../services/teamSync';
 import { useStudentsContext } from './StudentsProvider';
 
 const LogsContext = createContext(null);
@@ -9,6 +9,12 @@ const LogsContext = createContext(null);
 export function LogsProvider({ currentDate, periodLabel, activePeriod, children }) {
   const team = useTeamOptional();
   const { allStudents } = useStudentsContext();
+  // Tombstones cover the gap between local delete and the cloud realtime
+  // DELETE event (which TeamProvider also handles, but the round-trip can
+  // take a beat). Without this, vaultLogs re-merges the cloud copy of a
+  // log the user just deleted — producing the "stubborn logs that won't
+  // delete" UX. Kept in memory only; on reload the cloud is the truth.
+  const [tombstoneIds, setTombstoneIds] = useState(() => new Set());
 
   const onLogCreated = useCallback((log, extras) => {
     if (!team?.activeTeamId || !team?.user?.id) return;
@@ -43,8 +49,30 @@ export function LogsProvider({ currentDate, periodLabel, activePeriod, children 
     });
   }, [team]);
 
-  const logsBag = useLogs({ currentDate, periodLabel, activePeriod, onLogCreated, allStudents });
-  return <LogsContext.Provider value={logsBag}>{children}</LogsContext.Provider>;
+  const onLogDeleted = useCallback((removed) => {
+    if (!removed || !removed.length) return;
+    setTombstoneIds(prev => {
+      const next = new Set(prev);
+      removed.forEach(l => { if (l?.id) next.add(l.id); });
+      return next;
+    });
+    if (!team?.activeTeamId || !team?.user?.id) return;
+    removed.forEach(log => {
+      if (!log?.id) return;
+      deleteLogCloud(log.id).catch((err) => {
+        team.reportCloudError?.(`Log deleted locally but cloud delete failed: ${err.message || err}`);
+        // eslint-disable-next-line no-console
+        console.error('[cloud] deleteLogCloud failed', err);
+      });
+    });
+  }, [team]);
+
+  const logsBag = useLogs({ currentDate, periodLabel, activePeriod, onLogCreated, onLogDeleted, allStudents });
+  return (
+    <LogsContext.Provider value={{ ...logsBag, tombstoneIds }}>
+      {children}
+    </LogsContext.Provider>
+  );
 }
 
 export function useLogsContext() {

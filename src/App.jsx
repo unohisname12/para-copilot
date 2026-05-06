@@ -284,8 +284,9 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
     const localFingerprints = new Set(
       (logs || []).map(l => `${l.studentId}__${l.timestamp}`)
     );
+    const tombstones = logsBag.tombstoneIds || new Set();
     const sharedAdapted = (teamCtx?.sharedLogs || [])
-      .filter(l => l && !localFingerprints.has(`${l.student_id}__${l.timestamp}`))
+      .filter(l => l && !tombstones.has(l.id) && !localFingerprints.has(`${l.student_id}__${l.timestamp}`))
       .map(l => {
         const cloudStudentId = l.student_id;
         const paraAppNumber = l.external_key || null;
@@ -319,7 +320,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
         };
       });
     return sharedAdapted.length ? [...(logs || []), ...sharedAdapted] : (logs || []);
-  }, [logs, teamCtx?.sharedLogs, teamCtx?.user?.id, allStudents]);
+  }, [logs, teamCtx?.sharedLogs, teamCtx?.user?.id, allStudents, logsBag.tombstoneIds]);
 
   // Auto-clear sample data when real students come in. demoMode flips to
   // false inside useStudents on any handleImport / handleBundleImport call.

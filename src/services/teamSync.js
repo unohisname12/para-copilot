@@ -482,6 +482,18 @@ export async function pushLog(teamId, userId, log) {
   return data;
 }
 
+// Hard-delete a log row by id. RLS gates this — paras can only delete their
+// own logs; the row id alone is enough. Without this, "delete a log" only
+// flipped the local copy and the cloud row resurrected the entry on the
+// next subscribeSharedLogs tick or after a reload. That's the "stubborn
+// logs that won't delete" bug.
+export async function deleteLogCloud(logId) {
+  requireClient();
+  if (!logId) return;
+  const { error } = await supabase.from('logs').delete().eq('id', logId);
+  if (error) throw new Error(error.message);
+}
+
 export async function pullMyLogs(teamId, userId) {
   requireClient();
   const { data, error } = await supabase
@@ -510,6 +522,12 @@ export async function pullSharedTeamLogs(teamId, userId) {
   return data || [];
 }
 
+// onChange receives a tagged event:
+//   { kind: 'insert', row }  — a new log row visible to this user
+//   { kind: 'delete', id  }  — a log row was hard-deleted (id only; Postgres
+//                              REPLICA IDENTITY DEFAULT only ships the PK)
+// The previous signature only carried INSERTs, which is why local deletes
+// didn't propagate across devices and rows resurrected on reload.
 export function subscribeSharedLogs(teamId, onChange, userId) {
   requireClient();
   const channel = supabase
@@ -520,8 +538,16 @@ export function subscribeSharedLogs(teamId, onChange, userId) {
       (payload) => {
         if (!payload.new) return;
         if (payload.new.shared || (userId && payload.new.user_id === userId)) {
-          onChange(payload);
+          onChange({ kind: 'insert', row: payload.new });
         }
+      }
+    )
+    .on(
+      'postgres_changes',
+      { event: 'DELETE', schema: 'public', table: 'logs', filter: `team_id=eq.${teamId}` },
+      (payload) => {
+        const id = payload.old?.id;
+        if (id) onChange({ kind: 'delete', id });
       }
     )
     .subscribe();
