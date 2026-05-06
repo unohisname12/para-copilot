@@ -3,6 +3,7 @@ import { useEscape } from '../hooks/useEscape';
 import { useVault } from '../context/VaultProvider';
 import { useTeamOptional } from '../context/TeamProvider';
 import { useGrammarFixSetting } from '../hooks/useAutoGrammarFix';
+import { useCompactView } from '../hooks/useCompactView';
 import {
   getCloudApiKey,
   setCloudApiKey,
@@ -50,6 +51,7 @@ export default function SettingsModal({ open, onClose, onReplayOnboarding, onOpe
   const [dailyCap, setDailyCap] = React.useState(() => getDailyCapDollars());
   const [aiSaved, setAiSaved] = React.useState(false);
   const aiUsage = getDailyUsage();
+  const { mode: compactMode, setMode: setCompactMode } = useCompactView();
 
   useEscape(open ? onClose : () => {});
   if (!open) return null;
@@ -223,6 +225,7 @@ export default function SettingsModal({ open, onClose, onReplayOnboarding, onOpe
                 onChange={() => onSetDemoMode(!demoMode)}
               />
             )}
+            <CompactViewControl mode={compactMode} onChange={setCompactMode} />
             <button
               type="button"
               className="btn btn-secondary"
@@ -348,6 +351,48 @@ function Section({ label, children }) {
         overflow: 'hidden',
       }}>
         {children}
+      </div>
+    </div>
+  );
+}
+
+function CompactViewControl({ mode, onChange }) {
+  const opts = [
+    { id: 'auto',    label: 'Auto',    hint: 'Compact under 1366px (Chromebook), roomy on bigger screens.' },
+    { id: 'compact', label: 'Compact', hint: 'Always dense — fits more rows on screen.' },
+    { id: 'roomy',   label: 'Roomy',   hint: 'Always spacious — easier on tired eyes.' },
+  ];
+  return (
+    <div style={rowStyle}>
+      <div style={iconBox}>📐</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={rowTitle}>Layout density</div>
+        <div style={rowBody}>{opts.find(o => o.id === mode)?.hint || opts[0].hint}</div>
+        <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+          {opts.map(o => {
+            const active = mode === o.id;
+            return (
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => onChange(o.id)}
+                aria-pressed={active}
+                style={{
+                  minHeight: 36, padding: '6px 12px',
+                  borderRadius: 'var(--radius-pill)',
+                  border: active ? '2px solid var(--accent)' : '1px solid var(--border)',
+                  background: active ? 'var(--accent-glow)' : 'var(--bg-surface)',
+                  color: active ? 'var(--accent-hover)' : 'var(--text-secondary)',
+                  fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                  cursor: 'pointer',
+                  transition: 'background-color 160ms ease, border-color 160ms ease, color 160ms ease',
+                }}
+              >
+                {o.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
