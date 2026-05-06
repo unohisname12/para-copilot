@@ -184,10 +184,16 @@ export function TeamProvider({ children }) {
         console.error('[sharedLogs] initial load failed', e);
       }
       if (cancelled) return;
-      off = subscribeSharedLogs(activeTeamId, (payload) => {
+      off = subscribeSharedLogs(activeTeamId, (event) => {
+        if (event?.kind === 'delete') {
+          setSharedLogs((prev) => prev.filter((l) => l.id !== event.id));
+          return;
+        }
+        const row = event?.row;
+        if (!row) return;
         setSharedLogs((prev) => {
-          if (prev.find((l) => l.id === payload.new.id)) return prev;
-          return [payload.new, ...prev];
+          if (prev.find((l) => l.id === row.id)) return prev;
+          return [row, ...prev];
         });
       }, ownUserId);
     })();

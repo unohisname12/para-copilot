@@ -5,7 +5,7 @@ import { polishText } from '../utils/spellPolish';
 import { relinkLogsByParaAppNumber } from '../utils/relinkLogs';
 import { removeLogsByIds, restoreLogsAtTop } from '../utils/bulkLogOps';
 
-export function useLogs({ currentDate, periodLabel, activePeriod, onLogCreated, allStudents = {} }) {
+export function useLogs({ currentDate, periodLabel, activePeriod, onLogCreated, onLogDeleted, allStudents = {} }) {
   const [logs, setLogs] = useLocalStorage('paraLogsV1', []);
   // Auto-polish toggle. Default ON — paras want quick messy notes cleaned
   // up automatically. They can flip it off in Settings → Editor if they
@@ -81,11 +81,21 @@ export function useLogs({ currentDate, periodLabel, activePeriod, onLogCreated, 
   const toggleFlag = id =>
     setLogs(prev => prev.map(l => l.id === id ? { ...l, flagged: !l.flagged } : l));
 
+  const fireDeleted = (removed) => {
+    if (!removed || !removed.length || !onLogDeleted) return;
+    try { onLogDeleted(removed); } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('[onLogDeleted] handler threw', e);
+    }
+  };
+
   const deleteLog = (id, opts = {}) => {
     // { silent: true } skips the confirm — used by Undo flows where the user
     // has already indicated they want the entry gone.
     if (opts.silent || window.confirm("Delete this log entry?")) {
+      const removed = logs.filter(l => l.id === id);
       setLogs(prev => prev.filter(l => l.id !== id));
+      fireDeleted(removed);
     }
   };
 
@@ -96,6 +106,7 @@ export function useLogs({ currentDate, periodLabel, activePeriod, onLogCreated, 
     if (set.size === 0) return [];
     const removed = logs.filter(l => set.has(l.id));
     setLogs(prev => removeLogsByIds(prev, set));
+    fireDeleted(removed);
     return removed;
   };
 
