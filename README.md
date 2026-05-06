@@ -78,6 +78,14 @@ Integration (Playwright, requires deployed app + two test Google accounts):
 npx playwright test e2e/
 ```
 
+War Room latest-main browser reports:
+
+```bash
+npm run warroom:test:latest
+```
+
+See `docs/war-room/testing-pipeline.md`.
+
 ## Documentation
 
 - `APP_KNOWLEDGE.md` — full system reference
