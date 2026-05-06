@@ -11,6 +11,7 @@ import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { useAutoGrammarFix, useGrammarFixSetting } from '../../hooks/useAutoGrammarFix';
 import { useDraft } from '../../hooks/useDraft';
+import { useCompactView } from '../../hooks/useCompactView';
 import { DB, SUPPORT_CARDS } from '../../data';
 import { runLocalEngine } from '../../engine';
 import { getHealth, hdot } from '../../models';
@@ -121,6 +122,29 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
   // missing a real-name match while real-names mode is active.
   const { showRealNames } = useVault();
 
+  // Density layer — Chromebook-friendly compact mode. Auto-on under 1366px,
+  // settings override available. Metrics flow into inline styles below so the
+  // existing DOM doesn't need a CSS rewrite.
+  const { compact } = useCompactView();
+  const M = useMemo(() => ({
+    rowGap:      compact ? 6   : 10,
+    rowPadV:     compact ? 8   : 12,
+    rowPadH:     compact ? 12  : 14,
+    qaSize:      compact ? 40  : 48,
+    qaIcon:      compact ? 18  : 22,
+    nameSize:    compact ? 15  : 17,
+    nameSizeFocus: compact ? 19 : 22,
+    subSize:     compact ? 11  : 12,
+    periodPillH: compact ? 40  : 44,
+    noteMin:     compact ? 160 : 220,
+    noteFont:    compact ? 14  : 15,
+    gridMin:     compact ? 360 : 520,
+    accLimit:    compact ? 2   : 3,
+    accFocusLimit: compact ? 3 : 4,
+    summaryStripVPad: compact ? 6 : 12,
+    showSummaryHero: !compact,
+  }), [compact]);
+
   const [step, setStep] = useState("students"); // "students" | "note" | "tool"
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [noteText, setNoteText] = useState("");
@@ -159,6 +183,20 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
   const [autoFix] = useGrammarFixSetting();
   useAutoGrammarFix({ value: focusedDraft, setValue: setFocusedDraft, ref: focusedRef, enabled: autoFix && !!focusedStudentId });
   useAutoGrammarFix({ value: noteText,     setValue: setNoteText,     ref: noteTextRef, enabled: autoFix });
+
+  // When a student row is focused, scroll its expansion into view smoothly so
+  // the textarea is visible without a manual scroll. block:'nearest' avoids
+  // ripping the page when the row is already on-screen.
+  useEffect(() => {
+    if (!focusedStudentId) return;
+    const t = setTimeout(() => {
+      const row = document.querySelector(`[data-row-index][data-student-id="${focusedStudentId}"]`);
+      if (row && typeof row.scrollIntoView === 'function') {
+        row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }, 60);
+    return () => clearTimeout(t);
+  }, [focusedStudentId]);
 
   // Draft persistence — keyed per-student so each kid's in-flight note is
   // remembered separately. Survives focus swap, navigation away, reload.
@@ -422,15 +460,16 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
           {Object.entries(DB.periods).map(([id, p]) => (
             <button key={id} onClick={() => { setActivePeriod(id); reset(); }}
+              className="sm-qa-btn"
               style={{
-                minHeight: 44, padding: "10px 16px",
+                minHeight: M.periodPillH, padding: compact ? "8px 12px" : "10px 16px",
                 borderRadius: "var(--radius-pill)",
                 border: `2px solid ${activePeriod === id ? "var(--accent)" : "var(--border)"}`,
                 background: activePeriod === id ? "var(--accent-glow)" : "var(--bg-surface)",
                 color: activePeriod === id ? "var(--accent-hover)" : "var(--text-muted)",
-                fontSize: 13, fontWeight: 600, cursor: "pointer",
+                fontSize: compact ? 12 : 13, fontWeight: 600, cursor: "pointer",
                 fontFamily: "inherit",
-                transition: "all 120ms cubic-bezier(0.16,1,0.3,1)",
+                transition: "background-color 180ms ease, color 180ms ease, border-color 180ms ease",
               }}>
               {p.label.split("—")[0].trim()}
             </button>
@@ -478,27 +517,38 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
           padding: "var(--space-4) var(--space-5) 120px",
         }}>
 
-          {/* Today's summary strip — totals + click-to-filter per category */}
+          {/* Today's summary strip — totals + click-to-filter per category.
+              In compact mode the big total number is dropped to save vertical
+              space; the count for each category still rides on its pill. */}
           <div style={{
-            marginBottom: 12,
-            padding: "var(--space-3) var(--space-4)",
+            marginBottom: compact ? 8 : 12,
+            padding: compact ? "6px 10px" : "var(--space-3) var(--space-4)",
             background: "linear-gradient(90deg, var(--panel-raised), var(--panel-bg))",
             border: "1px solid var(--border)",
             borderRadius: "var(--radius-lg)",
-            display: "flex", alignItems: "center", gap: "var(--space-3)", flexWrap: "wrap",
+            display: "flex", alignItems: "center", gap: compact ? 8 : "var(--space-3)", flexWrap: "wrap",
           }}>
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".1em", color: "var(--text-muted)" }}>
-                Today
-              </div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: "var(--text-primary)", lineHeight: 1 }}>
-                {todayTotals.all}
-              </div>
-              <div style={{ fontSize: 10, color: "var(--text-muted)" }}>
-                total log{todayTotals.all !== 1 ? 's' : ''}
-              </div>
-            </div>
-            <div style={{ width: 1, alignSelf: "stretch", background: "var(--border)" }} />
+            {M.showSummaryHero && (
+              <>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".1em", color: "var(--text-muted)" }}>
+                    Today
+                  </div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: "var(--text-primary)", lineHeight: 1 }}>
+                    {todayTotals.all}
+                  </div>
+                  <div style={{ fontSize: 10, color: "var(--text-muted)" }}>
+                    total log{todayTotals.all !== 1 ? 's' : ''}
+                  </div>
+                </div>
+                <div style={{ width: 1, alignSelf: "stretch", background: "var(--border)" }} />
+              </>
+            )}
+            {compact && (
+              <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--text-muted)" }}>
+                Today {todayTotals.all}
+              </span>
+            )}
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", flex: 1 }}>
               {QUICK_CATEGORIES.map(c => {
                 const count = todayTotals[c.id] || 0;
@@ -557,10 +607,10 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
 
           <div style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(min(520px, 100%), 1fr))",
-            gap: 10,
+            gridTemplateColumns: `repeat(auto-fit, minmax(min(${M.gridMin}px, 100%), 1fr))`,
+            gap: M.rowGap,
           }}>
-            {rows.map(({ id, student: s, health, todayCount, byCat, hasAlert, alertText }) => {
+            {rows.map(({ id, student: s, health, todayCount, byCat, hasAlert, alertText }, rowIndex) => {
               const isFlashing = flashState?.id === id;
               const label = resolveLabel(s, "compact");
               const flashCat = isFlashing ? CATEGORIES.find(c => c.id === flashState.category) : null;
@@ -569,6 +619,9 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
               const isDimmed = focusedStudentId !== null && !isFocused;
               return (
                 <div key={id}
+                  data-row-index={rowIndex}
+                  data-student-id={id}
+                  className={isFlashing ? "sm-row sm-row--flash" : "sm-row"}
                   style={{
                     borderRadius: "var(--radius-lg)",
                     border: `${isFocused ? 3 : 2}px solid ${isFlashing && flashCat ? flashCat.color : (isFocused ? s.color : (health === 'red' ? '#7f1d1d' : s.color + '30'))}`,
@@ -578,16 +631,18 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                       ? `linear-gradient(180deg, ${s.color}10, var(--bg-surface))`
                       : "var(--bg-surface)",
                     overflow: "hidden",
-                    transition: "all 200ms cubic-bezier(0.16,1,0.3,1)",
+                    transition: "border-color 200ms cubic-bezier(0.16,1,0.3,1), box-shadow 200ms cubic-bezier(0.16,1,0.3,1), opacity 180ms ease, transform 240ms cubic-bezier(.34,1.56,.64,1), background 200ms ease",
                     boxShadow: isFlashing
-                      ? `0 0 24px ${flashCat.color}40`
+                      ? `0 0 28px ${flashCat.color}55, 0 0 0 4px ${flashCat.color}30`
                       : isFocused
                       ? `0 0 32px ${s.color}55, 0 6px 20px rgba(0,0,0,0.35)`
                       : "none",
-                    opacity: isDimmed ? 0.55 : 1,
+                    opacity: isDimmed ? 0.5 : 1,
                     transform: isFocused ? "scale(1.01)" : "scale(1)",
                     transformOrigin: "center top",
                     gridColumn: isFocused ? "1 / -1" : "auto",
+                    animation: `sm-row-fade-in 220ms ease both`,
+                    animationDelay: `${Math.min(rowIndex, 8) * 30}ms`,
                   }}
                 >
                   {/* Alert banner (BIP / active alert) */}
@@ -603,18 +658,18 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                   )}
 
                   {/* Main row */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: compact ? 8 : 12, padding: `${M.rowPadV}px ${M.rowPadH}px`, flexWrap: "wrap" }}>
                     {/* Name + eligibility + health */}
                     <div
                       role="button"
                       tabIndex={0}
                       onClick={() => swapFocus(id)}
                       onKeyDown={e => { if (e.key === "Enter" || e.key === " ") swapFocus(id); }}
-                      style={{ flex: "1 1 220px", minWidth: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}
+                      style={{ flex: "1 1 200px", minWidth: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: compact ? 8 : 12 }}
                     >
                       <div style={{
-                        width: isFocused ? 24 : 18,
-                        height: isFocused ? 24 : 18,
+                        width: isFocused ? (compact ? 20 : 24) : (compact ? 14 : 18),
+                        height: isFocused ? (compact ? 20 : 24) : (compact ? 14 : 18),
                         borderRadius: "50%",
                         background: s.color,
                         boxShadow: `0 0 ${isFocused ? 16 : 10}px ${s.color}${isFocused ? '90' : '70'}`,
@@ -623,7 +678,7 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                       }} />
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{
-                          fontSize: isFocused ? 22 : 17,
+                          fontSize: isFocused ? M.nameSizeFocus : M.nameSize,
                           fontWeight: isFocused ? 800 : 700,
                           color: s.color,
                           lineHeight: 1.15,
@@ -648,7 +703,7 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                             </span>
                           )}
                         </div>
-                        <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 1 }}>
+                        <div style={{ fontSize: M.subSize, color: "var(--text-muted)", marginTop: 1 }}>
                           {s.eligibility}
                           {todayCount > 0 && (
                             <span style={{ color: "var(--green)", fontWeight: 600, marginLeft: 8 }}>
@@ -656,15 +711,20 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                             </span>
                           )}
                         </div>
-                        {/* Accommodation pills (first 2) */}
-                        {Array.isArray(s.accs) && s.accs.length > 0 && (
+                        {/* Accommodation pills — fewer in compact mode to save vertical space */}
+                        {Array.isArray(s.accs) && s.accs.length > 0 && !compact && (
                           <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
-                            {s.accs.slice(0, 3).map(a => (
+                            {s.accs.slice(0, M.accLimit).map(a => (
                               <span key={a} className="pill pill-accent" style={{ fontSize: 10 }}>{a}</span>
                             ))}
-                            {s.accs.length > 3 && (
-                              <span style={{ fontSize: 10, color: "var(--text-muted)" }}>+{s.accs.length - 3}</span>
+                            {s.accs.length > M.accLimit && (
+                              <span style={{ fontSize: 10, color: "var(--text-muted)" }}>+{s.accs.length - M.accLimit}</span>
                             )}
+                          </div>
+                        )}
+                        {Array.isArray(s.accs) && s.accs.length > 0 && compact && (
+                          <div style={{ marginTop: 4, fontSize: 10, color: "var(--text-muted)" }}>
+                            <span className="pill pill-accent" style={{ fontSize: 10 }}>{s.accs.length} acc</span>
                           </div>
                         )}
                       </div>
@@ -683,16 +743,17 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                             onClick={e => handleQuickLog(e, id, cat.id)}
                             onDoubleClick={e => handleCategoryDoubleClick(e, id, cat.id)}
                             title={`Tap: log ${cat.label}. Double-tap: add detail.${count > 0 ? ` (${count} today)` : ''}`}
+                            className="sm-qa-btn"
                             style={{
                               position: "relative",
-                              width: 48, height: 48,
-                              minWidth: 48, minHeight: 48,
+                              width: M.qaSize, height: M.qaSize,
+                              minWidth: M.qaSize, minHeight: M.qaSize,
                               borderRadius: "var(--radius-md)",
                               border: `1px solid ${cat.color}40`,
                               background: count > 0 ? cat.color + "20" : "var(--bg-dark)",
                               color: cat.color,
                               cursor: "pointer",
-                              fontSize: 22, lineHeight: 1,
+                              fontSize: M.qaIcon, lineHeight: 1,
                               fontFamily: "inherit",
                               display: "flex", alignItems: "center", justifyContent: "center",
                               transition: "all 120ms cubic-bezier(0.16,1,0.3,1)",
@@ -722,19 +783,20 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                       <button
                         onClick={() => swapFocus(id)}
                         title="Expand this row to write a longer note"
+                        className="sm-qa-btn"
                         style={{
-                          height: 48, minHeight: 48,
-                          padding: "0 14px",
+                          height: M.qaSize, minHeight: M.qaSize,
+                          padding: compact ? "0 10px" : "0 14px",
                           borderRadius: "var(--radius-md)",
                           border: focusedStudentId === id ? `1px solid ${s.color}` : "1px solid var(--border-light)",
                           background: focusedStudentId === id ? `${s.color}20` : "var(--bg-dark)",
                           color: focusedStudentId === id ? s.color : "var(--text-secondary)",
-                          cursor: "pointer", fontSize: 13, fontWeight: 600,
+                          cursor: "pointer", fontSize: compact ? 12 : 13, fontWeight: 600,
                           fontFamily: "inherit",
                           display: "flex", alignItems: "center", gap: 6,
                         }}
                       >
-                        📝 Note
+                        📝 {compact ? "" : "Note"}
                       </button>
                     </div>
                   </div>
@@ -893,13 +955,13 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                         placeholder={`What happened with ${label}? Type freely — saves automatically when you switch students.`}
                         style={{
                           width: "100%",
-                          minHeight: 220,
-                          padding: "14px 16px",
+                          minHeight: M.noteMin,
+                          padding: compact ? "10px 12px" : "14px 16px",
                           background: "var(--bg-dark)",
                           border: `1px solid ${s.color}40`,
                           borderRadius: "var(--radius-md)",
                           color: "var(--text-primary)",
-                          fontSize: 15, lineHeight: 1.55, fontFamily: "inherit",
+                          fontSize: M.noteFont, lineHeight: 1.55, fontFamily: "inherit",
                           resize: "vertical",
                         }}
                       />
