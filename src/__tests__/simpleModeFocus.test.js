@@ -1,4 +1,53 @@
 import { commitFocusedDraft } from '../features/simple-mode/SimpleMode';
+import { insertTemplate } from '../features/simple-mode/noteTemplates';
+
+describe('Focus mode + note templates — end-to-end draft flow', () => {
+  test('inserting a template then committing saves the templated text', () => {
+    const addLog = jest.fn();
+    const allStudents = { stu_a: { id: 'stu_a', pseudonym: 'Red Student 1' } };
+
+    // Para taps the "Needed redirection" chip on an empty draft, then types a
+    // few words and saves. The committed log should contain both pieces.
+    let draft = '';
+    draft = insertTemplate(draft, 'redirect');
+    draft += 'math when we hit fractions';
+
+    const ok = commitFocusedDraft({
+      draft,
+      studentId: 'stu_a',
+      allStudents,
+      addLog,
+    });
+
+    expect(ok).toBe(true);
+    expect(addLog).toHaveBeenCalledWith(
+      'stu_a',
+      'Needed redirection during math when we hit fractions',
+      'General Observation',
+      expect.objectContaining({ source: 'simple_mode_focus' })
+    );
+  });
+
+  test('switching students mid-draft does NOT lose the templated text', () => {
+    const addLog = jest.fn();
+    const allStudents = {
+      stu_a: { id: 'stu_a', pseudonym: 'Red Student 1' },
+      stu_b: { id: 'stu_b', pseudonym: 'Blue Student 1' },
+    };
+
+    let focused = 'stu_a';
+    let draft = insertTemplate('', 'positive') + 'verbal praise';
+
+    // SimpleMode's swapFocus() commits the prior draft before changing focus.
+    if (focused && draft.trim()) {
+      commitFocusedDraft({ draft, studentId: focused, allStudents, addLog });
+    }
+    focused = 'stu_b';
+
+    expect(addLog).toHaveBeenCalledTimes(1);
+    expect(addLog.mock.calls[0][1]).toBe('Responded well to verbal praise');
+  });
+});
 
 describe('commitFocusedDraft', () => {
   test('saves a non-empty draft as a General Observation log', () => {

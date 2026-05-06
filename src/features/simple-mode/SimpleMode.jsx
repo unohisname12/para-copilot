@@ -15,20 +15,30 @@ import { DB, SUPPORT_CARDS } from '../../data';
 import { runLocalEngine } from '../../engine';
 import { getHealth, hdot } from '../../models';
 import { resolveLabel } from '../../privacy/nameResolver';
+import { useVault } from '../../context/VaultProvider';
 import { VisualTimer, BreathingExercise } from '../../components/tools';
 import { getStudentPatterns } from '../analytics/getStudentPatterns';
 import PatternsCard from '../analytics/PatternsCard';
 import { SimpleModeQuickViews } from './SimpleModeQuickViews';
+import { NOTE_TEMPLATES, insertTemplate } from './noteTemplates';
 
 // Category order matters: arranged left-to-right from most-positive to most-critical.
+// UX prototype reorder: per Dre's para field-test feedback, the five quick
+// actions are ordered Redirect → Break → Accommodation → Behavior → Success
+// so the most-frequent in-the-moment supports are leftmost.
+// IDs are PERSISTED in logs — do NOT rename them. `transition` stays in the
+// array so legacy logs and the hint engine still resolve, but it is no longer
+// surfaced as a quick-action button (use the +Note flow instead).
 const CATEGORIES = [
-  { id: "positive",  label: "Positive!",      icon: "⭐", color: "#34d399", logType: "Positive Note",       tag: "positive"  },
-  { id: "academic",  label: "Academic Help",  icon: "📚", color: "#a78bfa", logType: "Academic Support",    tag: "academic"  },
-  { id: "break",     label: "Needed Break",   icon: "☕", color: "#60a5fa", logType: "Accommodation Used",  tag: "break"     },
-  { id: "transition",label: "Transition",     icon: "🔔", color: "#fbbf24", logType: "Accommodation Used",  tag: "transition"},
-  { id: "refusal",   label: "Work Refusal",   icon: "✋", color: "#fb923c", logType: "Behavior Note",       tag: "refusal"   },
-  { id: "behavior",  label: "Behavior",       icon: "🔴", color: "#f87171", logType: "Behavior Note",       tag: "behavior"  },
+  { id: "refusal",    label: "Redirect",      icon: "↩️", color: "#fb923c", logType: "Behavior Note",       tag: "refusal",     quick: true  },
+  { id: "break",      label: "Break",         icon: "☕", color: "#60a5fa", logType: "Accommodation Used",  tag: "break",       quick: true  },
+  { id: "academic",   label: "Accommodation", icon: "📚", color: "#a78bfa", logType: "Accommodation Used",  tag: "academic",    quick: true  },
+  { id: "behavior",   label: "Behavior",      icon: "🔴", color: "#f87171", logType: "Behavior Note",       tag: "behavior",    quick: true  },
+  { id: "positive",   label: "Success",       icon: "⭐", color: "#34d399", logType: "Positive Note",       tag: "positive",    quick: true  },
+  { id: "transition", label: "Transition",    icon: "🔔", color: "#fbbf24", logType: "Accommodation Used",  tag: "transition",  quick: false },
 ];
+
+const QUICK_CATEGORIES = CATEGORIES.filter(c => c.quick);
 
 const CATEGORY_CARD_MAP = {
   behavior:   "sc_escal",
@@ -107,6 +117,10 @@ function sortRows(rows, mode) {
 }
 
 export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, deleteLog, updateLogText, currentDate, allStudents, effectivePeriodStudents }) {
+  // Real-names visibility — used to surface a warning chip when a student is
+  // missing a real-name match while real-names mode is active.
+  const { showRealNames } = useVault();
+
   const [step, setStep] = useState("students"); // "students" | "note" | "tool"
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [noteText, setNoteText] = useState("");
@@ -409,11 +423,12 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
           {Object.entries(DB.periods).map(([id, p]) => (
             <button key={id} onClick={() => { setActivePeriod(id); reset(); }}
               style={{
-                padding: "7px 13px", borderRadius: "var(--radius-pill)",
+                minHeight: 44, padding: "10px 16px",
+                borderRadius: "var(--radius-pill)",
                 border: `2px solid ${activePeriod === id ? "var(--accent)" : "var(--border)"}`,
                 background: activePeriod === id ? "var(--accent-glow)" : "var(--bg-surface)",
                 color: activePeriod === id ? "var(--accent-hover)" : "var(--text-muted)",
-                fontSize: 12, fontWeight: 600, cursor: "pointer",
+                fontSize: 13, fontWeight: 600, cursor: "pointer",
                 fontFamily: "inherit",
                 transition: "all 120ms cubic-bezier(0.16,1,0.3,1)",
               }}>
@@ -485,7 +500,7 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
             </div>
             <div style={{ width: 1, alignSelf: "stretch", background: "var(--border)" }} />
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", flex: 1 }}>
-              {CATEGORIES.map(c => {
+              {QUICK_CATEGORIES.map(c => {
                 const count = todayTotals[c.id] || 0;
                 const active = summaryFilter === c.id;
                 return (
@@ -542,7 +557,7 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
 
           <div style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(520px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(520px, 100%), 1fr))",
             gap: 10,
           }}>
             {rows.map(({ id, student: s, health, todayCount, byCat, hasAlert, alertText }) => {
@@ -613,8 +628,25 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                           color: s.color,
                           lineHeight: 1.15,
                           transition: "all 200ms cubic-bezier(0.16,1,0.3,1)",
+                          display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
                         }}>
-                          {hdot(health)} {label}
+                          <span>{hdot(health)} {label}</span>
+                          {showRealNames && !s.realName && (
+                            <span
+                              title="Real-names mode is on but this student is missing a vault match. Showing the codename instead."
+                              style={{
+                                fontSize: 10, fontWeight: 700,
+                                padding: "2px 8px",
+                                borderRadius: "var(--radius-pill)",
+                                background: "rgba(251,191,36,0.18)",
+                                border: "1px solid rgba(251,191,36,0.55)",
+                                color: "#fbbf24",
+                                textTransform: "uppercase", letterSpacing: ".06em",
+                              }}
+                            >
+                              ⚠ name missing
+                            </span>
+                          )}
                         </div>
                         <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 1 }}>
                           {s.eligibility}
@@ -643,7 +675,7 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                       style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}
                       onClick={e => e.stopPropagation()}
                     >
-                      {CATEGORIES.map(cat => {
+                      {QUICK_CATEGORIES.map(cat => {
                         const count = byCat[cat.id] || 0;
                         return (
                           <button
@@ -708,39 +740,148 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                   </div>
 
                   {/* Focus-row expansion — opens when a student's name or 📝 Note
-                      is tapped. Larger textarea + accommodation/goal reminders +
-                      Save/Done. Switching students auto-saves the current draft. */}
+                      is tapped. Sticky back-bar, larger textarea, accommodation
+                      pills, goal-chip block, and quick note templates.
+                      Switching students auto-saves the current draft. */}
                   {focusedStudentId === id && (
                     <div
                       style={{
                         padding: "12px 14px",
                         borderTop: `2px solid ${s.color}40`,
                         background: `${s.color}08`,
-                        display: "flex", flexDirection: "column", gap: 10,
+                        display: "flex", flexDirection: "column", gap: 12,
                       }}
                       onKeyDown={e => {
                         if (e.key === "Escape") { e.preventDefault(); closeFocus(); }
                       }}
                     >
-                      {/* Reminders strip */}
-                      {(Array.isArray(s.accs) && s.accs.length > 0) || (Array.isArray(s.goals) && s.goals.length > 0) ? (
+                      {/* Sticky back-to-class-view bar — gives the para a single,
+                          unmissable exit. Sits above everything else in the panel. */}
+                      <div style={{
+                        position: "sticky", top: 0, zIndex: 5,
+                        marginTop: -12, marginLeft: -14, marginRight: -14, marginBottom: 0,
+                        padding: "10px 14px",
+                        background: `linear-gradient(180deg, ${s.color}25, ${s.color}08)`,
+                        borderBottom: `1px solid ${s.color}40`,
+                        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
+                        flexWrap: "wrap",
+                      }}>
+                        <button
+                          type="button"
+                          onClick={closeFocus}
+                          aria-label="Back to class view"
+                          style={{
+                            minHeight: 44, padding: "10px 14px",
+                            borderRadius: "var(--radius-md)",
+                            background: "var(--bg-dark)", color: s.color,
+                            border: `1px solid ${s.color}60`,
+                            fontSize: 13, fontWeight: 700, fontFamily: "inherit",
+                            cursor: "pointer",
+                            display: "inline-flex", alignItems: "center", gap: 6,
+                          }}
+                        >
+                          ← Back to class view
+                        </button>
+                        <span style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>
+                          Focused on {label}
+                        </span>
+                      </div>
+
+                      {/* Accommodation pills */}
+                      {Array.isArray(s.accs) && s.accs.length > 0 && (
                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                          {Array.isArray(s.accs) && s.accs.slice(0, 2).map(a => (
-                            <span key={`acc-${a}`} className="pill pill-accent" style={{ fontSize: 10 }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--text-muted)", marginRight: 4 }}>
+                            Accommodations
+                          </span>
+                          {s.accs.slice(0, 4).map(a => (
+                            <span key={`acc-${a}`} className="pill pill-accent" style={{ fontSize: 11 }}>
                               {a}
                             </span>
                           ))}
-                          {Array.isArray(s.goals) && s.goals[0] && (
-                            <span style={{
-                              fontSize: 11, color: "var(--text-muted)", fontStyle: "italic",
-                              marginLeft: 4,
-                            }}>
-                              Goal: {(typeof s.goals[0] === 'string' ? s.goals[0] : s.goals[0].text || '').slice(0, 90)}
-                              {((typeof s.goals[0] === 'string' ? s.goals[0] : s.goals[0].text) || '').length > 90 ? '…' : ''}
+                          {s.accs.length > 4 && (
+                            <span style={{ fontSize: 10, color: "var(--text-muted)" }}>
+                              +{s.accs.length - 4} more
                             </span>
                           )}
                         </div>
-                      ) : null}
+                      )}
+
+                      {/* Goal chip block — replaces the old italic line.
+                          Shows up to 2 goals as cards with a status dot and
+                          a "next step" cue derived from the goal text. */}
+                      {Array.isArray(s.goals) && s.goals.length > 0 && (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--text-muted)" }}>
+                            Active goals
+                          </span>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(0, 1fr))", gap: 8 }}>
+                            {s.goals.slice(0, 2).map((g, gi) => {
+                              const text = (typeof g === 'string' ? g : (g?.text || '')).trim();
+                              if (!text) return null;
+                              const status = (typeof g === 'object' && g?.status) || 'active';
+                              const statusColor = status === 'met' ? '#34d399'
+                                : status === 'at_risk' ? '#fbbf24'
+                                : '#60a5fa';
+                              const nextStep = (typeof g === 'object' && g?.nextStep) || 'Support today';
+                              return (
+                                <div key={`goal-${gi}`} style={{
+                                  padding: "8px 10px",
+                                  background: "var(--bg-dark)",
+                                  border: `1px solid ${statusColor}40`,
+                                  borderLeft: `3px solid ${statusColor}`,
+                                  borderRadius: "var(--radius-sm)",
+                                  display: "flex", flexDirection: "column", gap: 4,
+                                  minWidth: 0,
+                                }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: statusColor, flexShrink: 0 }} />
+                                    <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                      {text.length > 80 ? text.slice(0, 80) + '…' : text}
+                                    </span>
+                                  </div>
+                                  <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                                    Next: {nextStep}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Note-template chips — pre-fill common sentence starters */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--text-muted)" }}>
+                          Quick starters
+                        </span>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          {NOTE_TEMPLATES.map(tpl => (
+                            <button
+                              key={tpl.id}
+                              type="button"
+                              onClick={() => {
+                                setFocusedDraft(prev => insertTemplate(prev, tpl.id));
+                                setTimeout(() => focusedRef.current?.focus(), 0);
+                              }}
+                              title={`Insert: "${tpl.text.trim()}"`}
+                              style={{
+                                minHeight: 36, padding: "6px 12px",
+                                borderRadius: "var(--radius-pill)",
+                                border: `1px solid ${s.color}40`,
+                                background: "var(--bg-dark)",
+                                color: s.color,
+                                fontSize: 12, fontWeight: 600, fontFamily: "inherit",
+                                cursor: "pointer",
+                                transition: "all 120ms cubic-bezier(0.16,1,0.3,1)",
+                              }}
+                              onMouseEnter={e => { e.currentTarget.style.background = `${s.color}20`; }}
+                              onMouseLeave={e => { e.currentTarget.style.background = "var(--bg-dark)"; }}
+                            >
+                              {tpl.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
 
                       <textarea
                         ref={focusedRef}
@@ -752,13 +893,13 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                         placeholder={`What happened with ${label}? Type freely — saves automatically when you switch students.`}
                         style={{
                           width: "100%",
-                          minHeight: 140,
-                          padding: "12px 14px",
+                          minHeight: 220,
+                          padding: "14px 16px",
                           background: "var(--bg-dark)",
                           border: `1px solid ${s.color}40`,
                           borderRadius: "var(--radius-md)",
                           color: "var(--text-primary)",
-                          fontSize: 14, lineHeight: 1.5, fontFamily: "inherit",
+                          fontSize: 15, lineHeight: 1.55, fontFamily: "inherit",
                           resize: "vertical",
                         }}
                       />
@@ -767,8 +908,8 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                         <button
                           type="button"
                           onClick={closeFocus}
-                          className="btn btn-primary btn-sm"
-                          style={{ minHeight: 36 }}
+                          className="btn btn-primary"
+                          style={{ minHeight: 48, padding: "0 18px", fontSize: 14, fontWeight: 700 }}
                           title="Save this note and close the focus area (Esc also works)"
                         >
                           Save & Done
@@ -776,15 +917,15 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                         <button
                           type="button"
                           onClick={() => { setFocusedDraft(''); setFocusedStudentId(null); }}
-                          className="btn btn-ghost btn-sm"
-                          style={{ minHeight: 36, color: "var(--text-muted)" }}
+                          className="btn btn-ghost"
+                          style={{ minHeight: 48, padding: "0 14px", color: "var(--text-muted)" }}
                           title="Discard the draft and close"
                         >
                           Cancel (no save)
                         </button>
                         {focusedDraft.trim() && (
                           <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 4 }}>
-                            Saves as a General Observation log when you tap Save or switch students.
+                            Auto-saves as a General Observation log when you tap Save or switch students.
                           </span>
                         )}
                       </div>
@@ -900,7 +1041,7 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                 What's happening? <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(tap one or skip)</span>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                {CATEGORIES.map(cat => (
+                {QUICK_CATEGORIES.map(cat => (
                   <button key={cat.id} onClick={() => setSelectedCat(selectedCat === cat.id ? null : cat.id)}
                     style={{
                       minHeight: 56,
