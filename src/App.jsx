@@ -50,6 +50,7 @@ import TeamSwitcher from './components/TeamSwitcher';
 import HandoffInbox from './components/HandoffInbox';
 import OnboardingModal, { hasSeenOnboarding } from './components/OnboardingModal';
 import { usePrivacyMode } from './hooks/usePrivacyMode';
+import PrivacyFab from './components/PrivacyFab';
 import AdminDashboard from './components/AdminDashboard';
 import BugReportButton from './components/BugReportButton';
 import FindMyStudentsModal from './components/FindMyStudentsModal';
@@ -1068,6 +1069,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
       )}
 
     <div className="app-layout" data-privacy={privacyOn ? "on" : "off"} style={{ flex: 1, minWidth: 0 }}>
+      <PrivacyFab on={privacyOn} onToggle={togglePrivacy} />
       <aside className={`sidebar${sidebarCollapsed ? ' collapsed' : ''}`} style={{ position: 'relative' }}>
         <button
           type="button"

@@ -17,6 +17,7 @@ import { runLocalEngine } from '../../engine';
 import { getHealth, hdot } from '../../models';
 import { resolveLabel } from '../../privacy/nameResolver';
 import { useVault } from '../../context/VaultProvider';
+import PrivacyName from '../../components/PrivacyName';
 import { VisualTimer, BreathingExercise } from '../../components/tools';
 import { getStudentPatterns } from '../analytics/getStudentPatterns';
 import PatternsCard from '../analytics/PatternsCard';
@@ -624,12 +625,17 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                   className={isFlashing ? "sm-row sm-row--flash" : "sm-row"}
                   style={{
                     borderRadius: "var(--radius-lg)",
-                    border: `${isFocused ? 3 : 2}px solid ${isFlashing && flashCat ? flashCat.color : (isFocused ? s.color : (health === 'red' ? '#7f1d1d' : s.color + '30'))}`,
+                    // Focused row: thick s.color border on all sides PLUS an
+                    // extra-bold left edge so the per-kid color is unmissable
+                    // even on washed-out Chromebook screens.
+                    border: `${isFocused ? 3 : 2}px solid ${isFlashing && flashCat ? flashCat.color : (isFocused ? s.color : (health === 'red' ? '#7f1d1d' : s.color + '50'))}`,
+                    borderLeftWidth: isFocused ? 8 : 4,
+                    borderLeftColor: isFlashing && flashCat ? flashCat.color : s.color,
                     background: isFlashing && flashCat
-                      ? `linear-gradient(90deg, ${flashCat.color}20, var(--bg-surface) 40%)`
+                      ? `linear-gradient(90deg, ${flashCat.color}25, var(--bg-surface) 40%)`
                       : isFocused
-                      ? `linear-gradient(180deg, ${s.color}10, var(--bg-surface))`
-                      : "var(--bg-surface)",
+                      ? `linear-gradient(135deg, ${s.color}28, ${s.color}08 40%, var(--bg-surface))`
+                      : `linear-gradient(90deg, ${s.color}12, var(--bg-surface) 18%)`,
                     overflow: "hidden",
                     transition: "border-color 200ms cubic-bezier(0.16,1,0.3,1), box-shadow 200ms cubic-bezier(0.16,1,0.3,1), opacity 180ms ease, transform 240ms cubic-bezier(.34,1.56,.64,1), background 200ms ease",
                     boxShadow: isFlashing
@@ -685,7 +691,7 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                           transition: "all 200ms cubic-bezier(0.16,1,0.3,1)",
                           display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
                         }}>
-                          <span>{hdot(health)} {label}</span>
+                          <span>{hdot(health)} <PrivacyName>{label}</PrivacyName></span>
                           {showRealNames && !s.realName && (
                             <span
                               title="Real-names mode is on but this student is missing a vault match. Showing the codename instead."
@@ -845,7 +851,7 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                           ← Back to class view
                         </button>
                         <span style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>
-                          Focused on {label}
+                          Focused on <PrivacyName>{label}</PrivacyName>
                         </span>
                       </div>
 
@@ -1092,7 +1098,7 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
               }}>
                 <div style={{ width: 14, height: 14, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
                 <div>
-                  <div style={{ fontSize: 17, fontWeight: 700, color: s.color }}>{resolveLabel(s, "compact")}</div>
+                  <div style={{ fontSize: 17, fontWeight: 700, color: s.color }}><PrivacyName>{resolveLabel(s, "compact")}</PrivacyName></div>
                   <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 1 }}>{s.eligibility}</div>
                 </div>
               </div>
