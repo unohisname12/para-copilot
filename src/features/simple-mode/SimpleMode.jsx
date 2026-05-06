@@ -673,15 +673,28 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                       onKeyDown={e => { if (e.key === "Enter" || e.key === " ") swapFocus(id); }}
                       style={{ flex: "1 1 200px", minWidth: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: compact ? 8 : 12 }}
                     >
+                      {/* Identity disc — colored circle that holds the kid's
+                          emoji when their identity is set. Swaps for a plain
+                          dot on legacy students with no identity. The big
+                          emoji is the strongest "this is THIS kid" cue we
+                          have when palette colors collide. */}
                       <div style={{
-                        width: isFocused ? (compact ? 20 : 24) : (compact ? 14 : 18),
-                        height: isFocused ? (compact ? 20 : 24) : (compact ? 14 : 18),
+                        width:  isFocused ? (compact ? 30 : 36) : (compact ? 26 : 30),
+                        height: isFocused ? (compact ? 30 : 36) : (compact ? 26 : 30),
                         borderRadius: "50%",
-                        background: s.color,
+                        background: s.identity?.emoji ? `${s.color}28` : s.color,
+                        border: s.identity?.emoji ? `2px solid ${s.color}` : 'none',
                         boxShadow: `0 0 ${isFocused ? 16 : 10}px ${s.color}${isFocused ? '90' : '70'}`,
                         flexShrink: 0,
                         transition: "all 200ms cubic-bezier(0.16,1,0.3,1)",
-                      }} />
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: isFocused ? (compact ? 16 : 20) : (compact ? 14 : 16),
+                        lineHeight: 1,
+                      }}>
+                        {s.identity?.emoji && (
+                          <span aria-hidden="true">{s.identity.emoji}</span>
+                        )}
+                      </div>
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{
                           fontSize: isFocused ? M.nameSizeFocus : M.nameSize,
@@ -691,7 +704,41 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                           transition: "all 200ms cubic-bezier(0.16,1,0.3,1)",
                           display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
                         }}>
-                          <span>{hdot(health)} <PrivacyName>{label}</PrivacyName></span>
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            {hdot(health)}
+                            {/* Identity badge — emoji + codename chip in the
+                                student's color. Always shows when real-names
+                                mode is on (so two kids with close palette
+                                colors stay distinguishable behind the real
+                                name). When real-names is off, the label
+                                already contains emoji+codename, so the badge
+                                would be redundant. */}
+                            {s.realName && s.identity?.emoji && (
+                              <span
+                                aria-hidden="true"
+                                title={s.identity?.codename ? `${s.identity.emoji} ${s.identity.codename} ${s.identity.sequenceNumber}` : ''}
+                                style={{
+                                  display: "inline-flex", alignItems: "center", gap: 4,
+                                  padding: compact ? "1px 7px" : "2px 9px",
+                                  borderRadius: "var(--radius-pill)",
+                                  background: `${s.color}25`,
+                                  border: `1px solid ${s.color}55`,
+                                  color: s.color,
+                                  fontSize: compact ? 11 : 12,
+                                  fontWeight: 700,
+                                  lineHeight: 1.2,
+                                  flexShrink: 0,
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                <span style={{ fontSize: compact ? 13 : 15, lineHeight: 1 }}>{s.identity.emoji}</span>
+                                {!compact && s.identity?.codename && (
+                                  <span>{s.identity.codename} {s.identity.sequenceNumber ?? ''}</span>
+                                )}
+                              </span>
+                            )}
+                            <PrivacyName>{label}</PrivacyName>
+                          </span>
                           {showRealNames && !s.realName && (
                             <span
                               title="Real-names mode is on but this student is missing a vault match. Showing the codename instead."
