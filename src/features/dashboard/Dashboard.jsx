@@ -16,6 +16,11 @@ import { getStudentPatterns } from '../analytics/getStudentPatterns';
 import PatternsCard from '../analytics/PatternsCard';
 import MassLogStrip from '../../components/dashboard/MassLogStrip';
 import PrivacyName from '../../components/PrivacyName';
+import PlanRendered from '../plan/PlanRendered';
+import { usePlanSummary } from '../plan/usePlanSummary';
+import { extractPdfText } from '../plan/extractPdfText';
+import { geminiQuickFocusTips } from '../../engine/cloudAI';
+import { useVault } from '../../context/VaultProvider';
 
 // ── Constants ────────────────────────────────────────────────
 const LAYOUT_KEY  = "dashLayoutV3";
@@ -81,8 +86,17 @@ export function Dashboard({
   const [layout, setLayout] = useLS(LAYOUT_KEY, { cols: 2, chatOpen: false, chatH: 320 });
   const [topic, setTopic]   = useLS(topicKey(activePeriod, currentDate), "");
   // 'write' = type the topic in the app; 'fetch' = pull from Google Doc URL;
-  // 'none' = skip (no plan today). Persisted per-period-per-day.
+  // 'pdf'   = upload a PDF lesson plan from the teacher;
+  // 'none'  = skip (no plan today). Persisted per-period-per-day.
   const [planMode, setPlanMode] = useLS(`planMode_${activePeriod}_${currentDate}`, 'write');
+  // AI-summarized plan (from doc fetch or PDF upload). Per-period-per-day,
+  // cached by content hash so re-renders don't re-spend Gemini quota.
+  const planSummary = usePlanSummary(activePeriod, currentDate);
+  const [pdfFileName, setPdfFileName] = useLS(`planPdfName_${activePeriod}_${currentDate}`, '');
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfError, setPdfError] = useState(null);
+  const [focusTip, setFocusTip] = useState(null);
+  const [focusTipLoading, setFocusTipLoading] = useState(false);
   // Auto-Grammar-Fix toggle — toggle now lives in Settings; this hook just
   // reads the persisted setting so multiple components stay in sync.
   const [autoFix] = useGrammarFixSetting();
@@ -206,6 +220,53 @@ export function Dashboard({
   }, [topic, effectivePeriodStudents, addLog, period, showToast]);
 
   const docSnippet = docContent ? parseDocForPeriod(docContent, period.label || "") : null;
+
+  // When the para fetches a Google Doc, auto-pipe the period-relevant
+  // section through Gemini for the structured plan summary. Cached by
+  // content hash inside usePlanSummary so it won't re-spend on rerender.
+  useEffect(() => {
+    if (planMode !== 'fetch') return;
+    const text = docSnippet || docContent;
+    if (!text || !String(text).trim()) return;
+    planSummary.summarize(text, 'doc').catch(() => {});
+  }, [docContent, docSnippet, planMode]);
+
+  const handlePdfFile = useCallback(async (file) => {
+    if (!file) return;
+    setPdfError(null);
+    setPdfLoading(true);
+    try {
+      const text = await extractPdfText(file);
+      if (!text.trim()) {
+        setPdfError('PDF contained no extractable text — was it scanned without OCR?');
+        return;
+      }
+      setPdfFileName(file.name || 'lesson.pdf');
+      const plan = await planSummary.summarize(text, 'pdf');
+      if (!plan) {
+        setPdfError('Gemini returned no plan. Check your API key in Settings or try again.');
+      }
+    } catch (e) {
+      setPdfError(e?.message || String(e));
+    } finally {
+      setPdfLoading(false);
+    }
+  }, [planSummary, setPdfFileName]);
+
+  const handleQuickFocusTips = useCallback(async () => {
+    if (!topic.trim()) return;
+    setFocusTip(null);
+    setFocusTipLoading(true);
+    try {
+      const tip = await geminiQuickFocusTips(topic);
+      if (tip) setFocusTip(tip);
+      else setFocusTip('No tips returned. Check your API key in Settings.');
+    } catch (e) {
+      setFocusTip(`Error: ${e?.message || e}`);
+    } finally {
+      setFocusTipLoading(false);
+    }
+  }, [topic]);
 
   // ── Inline case memory suggestions ───────────────────────
   const caseSuggestions = useMemo(() => {
@@ -381,31 +442,17 @@ export function Dashboard({
           </div>
         )}
 
-        {/* ── TODAY'S PLAN CARD (merged Topic + Class Notes Doc) ─ */}
-        {!planOpen && (
-          <button
-            onClick={() => setPlanOpen(true)}
-            style={{
-              width: '100%',
-              padding: '8px 14px',
-              background: 'rgba(167,139,250,.05)',
-              border: '1px dashed rgba(167,139,250,.3)',
-              borderRadius: 'var(--radius-md)',
-              color: 'var(--text-muted)',
-              cursor: 'pointer',
-              fontSize: 12,
-              fontFamily: 'inherit',
-              textAlign: 'left',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
-            <span style={{ fontSize: 14 }}>📚</span>
-            <span style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>Today's Plan</span>
-            <span style={{ marginLeft: 'auto' }}>Click to open ▾</span>
-          </button>
-        )}
+        {/* ── MASS LOG STRIP (sticky to top of dashboard) ── */}
+        <MassLogStrip
+          actions={DASH_ACTIONS}
+          activeAction={activeAction}
+          setActiveAction={setActiveAction}
+          selectedCount={selectedIds.size}
+          onCommit={commitMassLog}
+          onCancel={cancelMassLog}
+        />
+
+        {/* ── TODAY'S PLAN CARD — full UI between Mass Log and student grid ─ */}
         {planOpen && (
         <div style={{
           background: "var(--panel-bg)",
@@ -415,6 +462,7 @@ export function Dashboard({
           transition: "all 200ms cubic-bezier(0.16,1,0.3,1)",
           boxShadow: "var(--shadow-sm)",
           position: "relative",
+          flexShrink: 0,
         }}>
           <button
             onClick={() => setPlanOpen(false)}
@@ -472,7 +520,8 @@ export function Dashboard({
             }}>
               {[
                 ["write", "✏️ Write it"],
-                ["fetch", "📄 Get from link"],
+                ["fetch", "📄 Doc link"],
+                ["pdf",   "📎 PDF"],
                 ["none",  "— Skip"],
               ].map(([id, label]) => (
                 <button
@@ -568,6 +617,17 @@ export function Dashboard({
                   <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                     {topic && (
                       <button
+                        onClick={e => { e.stopPropagation(); handleQuickFocusTips(); }}
+                        title="Ask Gemini for 2–3 things to watch for today"
+                        disabled={focusTipLoading}
+                        className="btn btn-secondary btn-sm"
+                        style={{ color: "var(--accent-hover)", borderColor: "var(--accent-border)" }}
+                      >
+                        {focusTipLoading ? '✨ …' : '✨ Para focus tips'}
+                      </button>
+                    )}
+                    {topic && (
+                      <button
                         onClick={e => { e.stopPropagation(); logTopic(); }}
                         title="Log this topic as a Class Note"
                         className="btn btn-secondary btn-sm"
@@ -615,6 +675,35 @@ export function Dashboard({
                   </div>
                 </>
               )}
+              {focusTip && !topicEdit && (
+                <div style={{
+                  marginTop: 10,
+                  padding: '10px 14px',
+                  background: 'rgba(167,139,250,.08)',
+                  border: '1px solid var(--accent-border)',
+                  borderLeft: '3px solid var(--accent-strong)',
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: 13, lineHeight: 1.55,
+                  color: 'var(--text-primary)',
+                  position: 'relative',
+                }}>
+                  <div style={{
+                    fontSize: 10, fontWeight: 800, letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    color: 'var(--accent-hover)', marginBottom: 4,
+                  }}>👁 Para focus today</div>
+                  <div style={{ whiteSpace: 'pre-wrap' }}>{focusTip}</div>
+                  <button
+                    onClick={() => setFocusTip(null)}
+                    title="Dismiss"
+                    style={{
+                      position: 'absolute', top: 6, right: 8,
+                      background: 'transparent', border: 'none', cursor: 'pointer',
+                      color: 'var(--text-muted)', fontSize: 14,
+                    }}
+                  >×</button>
+                </div>
+              )}
             </div>
           )}
 
@@ -646,9 +735,26 @@ export function Dashboard({
               </div>
               <div style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.5 }}>
                 The doc must be <b>"Anyone with the link can view"</b>. The app pulls the text, finds
-                the section for this period, and shows a snippet below.
+                the section for this period, and runs it through Gemini for a structured summary.
               </div>
-              {docSnippet && (
+              {planSummary.loading && (
+                <div style={{ fontSize: 12, color: "var(--text-muted)", fontStyle: "italic", marginTop: 4 }}>
+                  ✨ Summarizing with Gemini…
+                </div>
+              )}
+              {planSummary.error && !planSummary.loading && (
+                <div style={{
+                  fontSize: 12, color: "var(--red)",
+                  padding: "8px 12px", borderRadius: 8,
+                  background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.3)",
+                }}>{planSummary.error}</div>
+              )}
+              {planSummary.plan && (
+                <div style={{ marginTop: 6 }}>
+                  <PlanRendered plan={planSummary.plan} source="doc" />
+                </div>
+              )}
+              {!planSummary.plan && docSnippet && (
                 <div style={{
                   padding: "var(--space-3)",
                   background: "var(--bg-dark)",
@@ -670,27 +776,97 @@ export function Dashboard({
             </div>
           )}
 
+          {planMode === "pdf" && (
+            <div style={{
+              padding: "var(--space-3) var(--space-5) var(--space-4)",
+              borderTop: "1px solid var(--border)",
+              display: "flex", flexDirection: "column", gap: "var(--space-3)",
+            }}>
+              {!planSummary.plan && (
+                <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", flexWrap: "wrap" }}>
+                  <label
+                    className="btn btn-primary"
+                    style={{ cursor: pdfLoading ? "wait" : "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}
+                  >
+                    {pdfLoading ? "Parsing…" : "📎 Choose PDF"}
+                    <input
+                      type="file"
+                      accept="application/pdf,.pdf"
+                      disabled={pdfLoading}
+                      style={{ display: "none" }}
+                      onChange={e => {
+                        const f = e.target.files?.[0];
+                        e.target.value = "";
+                        handlePdfFile(f);
+                      }}
+                    />
+                  </label>
+                  <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                    Pick a teacher's lesson PDF — the app reads it and summarizes for you.
+                  </span>
+                </div>
+              )}
+              {planSummary.plan && (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                    📎 <b>{pdfFileName || 'lesson.pdf'}</b>
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <label className="btn btn-secondary btn-sm" style={{ cursor: "pointer" }}>
+                      Replace PDF
+                      <input
+                        type="file"
+                        accept="application/pdf,.pdf"
+                        style={{ display: "none" }}
+                        onChange={e => {
+                          const f = e.target.files?.[0];
+                          e.target.value = "";
+                          handlePdfFile(f);
+                        }}
+                      />
+                    </label>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => { planSummary.clear(); setPdfFileName(''); }}
+                      style={{ color: "var(--red)", borderColor: "rgba(248,113,113,0.3)" }}
+                    >Clear</button>
+                  </div>
+                </div>
+              )}
+              {pdfError && (
+                <div style={{
+                  fontSize: 12, color: "var(--red)",
+                  padding: "8px 12px", borderRadius: 8,
+                  background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.3)",
+                }}>{pdfError}</div>
+              )}
+              {planSummary.loading && (
+                <div style={{ fontSize: 12, color: "var(--text-muted)", fontStyle: "italic" }}>
+                  ✨ Summarizing with Gemini…
+                </div>
+              )}
+              {planSummary.plan && <PlanRendered plan={planSummary.plan} source="pdf" />}
+            </div>
+          )}
+
           {planMode === "none" && (
             <div style={{
               padding: "var(--space-3) var(--space-5) var(--space-4)",
               borderTop: "1px solid var(--border)",
-              fontSize: 12.5, color: "var(--text-muted)", fontStyle: "italic",
+              display: "flex", flexDirection: "column", gap: "var(--space-2)",
             }}>
-              No plan set for today. Your student logs still export normally.
+              <div style={{ fontSize: 12.5, color: "var(--text-muted)", fontStyle: "italic" }}>
+                No plan set for today. Pick how you want to add one:
+              </div>
+              <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+                <button onClick={() => setPlanMode('write')} className="btn btn-primary btn-sm">✏️ Write topic</button>
+                <button onClick={() => setPlanMode('fetch')} className="btn btn-secondary btn-sm">📄 Doc link</button>
+                <button onClick={() => setPlanMode('pdf')}   className="btn btn-secondary btn-sm">📎 Upload PDF</button>
+              </div>
             </div>
           )}
         </div>
         )}
-
-        {/* ── MASS LOG STRIP (subtle, sticky to top of dashboard) ── */}
-        <MassLogStrip
-          actions={DASH_ACTIONS}
-          activeAction={activeAction}
-          setActiveAction={setActiveAction}
-          selectedCount={selectedIds.size}
-          onCommit={commitMassLog}
-          onCancel={cancelMassLog}
-        />
 
         {/* ── SHOWCASE BANNER ────────────────────────────── */}
         {onLoadDemo && (
@@ -1321,6 +1497,7 @@ export function Dashboard({
 // Google Doc (or wherever they're keeping Class Notes).
 // ══════════════════════════════════════════════════════════════
 function ExportTodayModal({ period, activePeriod, currentDate, topic, docSnippet, logs, allStudents, onClose }) {
+  const { showRealNames } = useVault();
   const [copied, setCopied] = React.useState(false);
   const [includeDocSnippet, setIncludeDocSnippet] = React.useState(Boolean(docSnippet));
 
@@ -1368,7 +1545,7 @@ function ExportTodayModal({ period, activePeriod, currentDate, topic, docSnippet
       lines.push('');
       byStudent.forEach((stuLogs, studentId) => {
         const s = allStudents[studentId];
-        const name = s?.realName || s?.pseudonym || studentId;
+        const name = showRealNames ? (s?.realName || s?.pseudonym || studentId) : (s?.pseudonym || studentId);
         lines.push(`• ${name}`);
         stuLogs.forEach(l => {
           const t = l.timestamp
@@ -1384,9 +1561,10 @@ function ExportTodayModal({ period, activePeriod, currentDate, topic, docSnippet
 
     lines.push(`— Exported from SupaPara on ${new Date().toLocaleString()} —`);
     return lines.join('\n');
-  }, [period, currentDate, topic, docSnippet, includeDocSnippet, todaysLogs, byStudent, allStudents]);
+  }, [period, currentDate, topic, docSnippet, includeDocSnippet, todaysLogs, byStudent, allStudents, showRealNames]);
 
   function copy() {
+    if (showRealNames && !window.confirm('Export will contain real student names. Copy to clipboard?')) return;
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
@@ -1394,6 +1572,7 @@ function ExportTodayModal({ period, activePeriod, currentDate, topic, docSnippet
   }
 
   function download() {
+    if (showRealNames && !window.confirm('Export will contain real student names. Download file?')) return;
     const safeDate = currentDate.replace(/[^0-9-]/g, '');
     const safePeriod = (period.label || activePeriod).replace(/[^a-z0-9]+/gi, '_');
     const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
