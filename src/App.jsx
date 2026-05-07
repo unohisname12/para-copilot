@@ -98,6 +98,68 @@ function LogDetailCell({ label, children }) {
   );
 }
 
+// Pure helper — exported for unit tests. Builds the merged Vault log set:
+// local logs first, then cloud rows that aren't already represented locally.
+//
+// Fingerprint priority:
+//   1. paraAppNumber + timestamp  (FERPA-safe stable bridge — survives roster
+//      regeneration; matches across local studentId vs cloud student_id UUID)
+//   2. timestamp + type + note    (fallback when paraAppNumber is null)
+// Tombstones override both: a tombstoned id is dropped even if the local copy
+// is gone (handles delete-then-cloud-echo race).
+export function mergeVaultLogs({ logs, sharedLogs, tombstones, allStudents, currentUserId, resolveStudentByParaAppNumber }) {
+  const local = logs || [];
+  const shared = sharedLogs || [];
+  const tomb = tombstones || new Set();
+
+  const fingerprint = (paraAppNumber, timestamp, type, note) => {
+    if (paraAppNumber && timestamp) return `pan:${String(paraAppNumber).trim()}__${timestamp}`;
+    return `tn:${timestamp || ''}__${type || ''}__${(note || '').slice(0, 40)}`;
+  };
+
+  const localPrints = new Set(
+    local.map(l => fingerprint(l.paraAppNumber, l.timestamp, l.type, l.note))
+  );
+
+  const sharedAdapted = shared
+    .filter(l => l && !tomb.has(l.id))
+    .filter(l => !localPrints.has(fingerprint(l.external_key, l.timestamp, l.type, l.note)))
+    .map(l => {
+      const cloudStudentId = l.student_id;
+      const paraAppNumber = l.external_key || null;
+      const stuByDirectId = cloudStudentId ? allStudents[cloudStudentId] : null;
+      const stuByParaAppNumber = !stuByDirectId
+        ? resolveStudentByParaAppNumber(allStudents, paraAppNumber)
+        : null;
+      const resolvedStudentId =
+        (stuByDirectId && cloudStudentId)
+        || (stuByParaAppNumber && stuByParaAppNumber.id)
+        || cloudStudentId
+        || null;
+      return {
+        id: l.id,
+        studentId: resolvedStudentId,
+        paraAppNumber,
+        type: l.type,
+        category: l.category,
+        note: l.note,
+        date: l.date,
+        period: l.period_id,
+        periodId: l.period_id,
+        timestamp: l.timestamp,
+        tags: l.tags || [],
+        flagged: Boolean(l.flagged),
+        source: l.source || 'cloud_sync',
+        situationId: l.situation_id,
+        strategyUsed: l.strategy_used,
+        goalId: l.goal_id,
+        sharedFromTeammate: l.user_id !== currentUserId,
+      };
+    });
+
+  return sharedAdapted.length ? [...local, ...sharedAdapted] : local;
+}
+
 export default function App() {
   if (!supabaseConfigured) {
     // No cloud env — skip auth, run fully local as before.
@@ -283,45 +345,14 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
   // For each cloud row, resolve studentId via paraAppNumber when the FK
   // doesn't match anything local (rosterReconnect bridge at the log layer).
   const vaultLogs = React.useMemo(() => {
-    const localFingerprints = new Set(
-      (logs || []).map(l => `${l.studentId}__${l.timestamp}`)
-    );
-    const tombstones = logsBag.tombstoneIds || new Set();
-    const sharedAdapted = (teamCtx?.sharedLogs || [])
-      .filter(l => l && !tombstones.has(l.id) && !localFingerprints.has(`${l.student_id}__${l.timestamp}`))
-      .map(l => {
-        const cloudStudentId = l.student_id;
-        const paraAppNumber = l.external_key || null;
-        const stuByDirectId = cloudStudentId ? allStudents[cloudStudentId] : null;
-        const stuByParaAppNumber = !stuByDirectId
-          ? resolveStudentByParaAppNumber(allStudents, paraAppNumber)
-          : null;
-        const resolvedStudentId =
-          (stuByDirectId && cloudStudentId)
-          || (stuByParaAppNumber && stuByParaAppNumber.id)
-          || cloudStudentId
-          || null;
-        return {
-          id: l.id,
-          studentId: resolvedStudentId,
-          paraAppNumber,
-          type: l.type,
-          category: l.category,
-          note: l.note,
-          date: l.date,
-          period: l.period_id,
-          periodId: l.period_id,
-          timestamp: l.timestamp,
-          tags: l.tags || [],
-          flagged: Boolean(l.flagged),
-          source: l.source || 'cloud_sync',
-          situationId: l.situation_id,
-          strategyUsed: l.strategy_used,
-          goalId: l.goal_id,
-          sharedFromTeammate: l.user_id !== teamCtx?.user?.id,
-        };
-      });
-    return sharedAdapted.length ? [...(logs || []), ...sharedAdapted] : (logs || []);
+    return mergeVaultLogs({
+      logs,
+      sharedLogs: teamCtx?.sharedLogs,
+      tombstones: logsBag.tombstoneIds,
+      allStudents,
+      currentUserId: teamCtx?.user?.id,
+      resolveStudentByParaAppNumber,
+    });
   }, [logs, teamCtx?.sharedLogs, teamCtx?.user?.id, allStudents, logsBag.tombstoneIds]);
 
   // Auto-clear sample data when real students come in. demoMode flips to
