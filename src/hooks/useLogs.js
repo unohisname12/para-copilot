@@ -93,8 +93,11 @@ export function useLogs({ currentDate, periodLabel, activePeriod, onLogCreated, 
     // { silent: true } skips the confirm — used by Undo flows where the user
     // has already indicated they want the entry gone.
     if (opts.silent || window.confirm("Delete this log entry?")) {
-      const removed = logs.filter(l => l.id === id);
-      setLogs(prev => prev.filter(l => l.id !== id));
+      const removedLocal = logs.filter(l => l.id === id);
+      if (removedLocal.length > 0) {
+        setLogs(prev => prev.filter(l => l.id !== id));
+      }
+      const removed = removedLocal.length > 0 ? removedLocal : [{ id }];
       fireDeleted(removed);
     }
   };
@@ -104,10 +107,21 @@ export function useLogs({ currentDate, periodLabel, activePeriod, onLogCreated, 
   const bulkDeleteLogs = (ids) => {
     const set = ids instanceof Set ? ids : new Set(ids || []);
     if (set.size === 0) return [];
-    const removed = logs.filter(l => set.has(l.id));
-    setLogs(prev => removeLogsByIds(prev, set));
+    const removedLocal = logs.filter(l => set.has(l.id));
+    if (removedLocal.length > 0) {
+      setLogs(prev => removeLogsByIds(prev, set));
+    }
+    // Synthesize stub entries for ids that exist only in cloud / sharedLogs.
+    // The downstream onLogDeleted handler reads only `id`, so a minimal stub
+    // is enough to fire the cloud delete and seed the tombstone.
+    const removedLocalIds = new Set(removedLocal.map(l => l.id));
+    const cloudOnlyStubs = [];
+    set.forEach(id => {
+      if (!removedLocalIds.has(id)) cloudOnlyStubs.push({ id });
+    });
+    const removed = [...removedLocal, ...cloudOnlyStubs];
     fireDeleted(removed);
-    return removed;
+    return removedLocal;
   };
 
   const restoreLogs = (snapshot) => {
