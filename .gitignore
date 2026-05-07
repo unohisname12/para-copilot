@@ -16,6 +16,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# worktrees for parallel feature work
+.worktrees/
+
 # brainstorm sessions
 .superpowers/brainstorm/
 .vercel
