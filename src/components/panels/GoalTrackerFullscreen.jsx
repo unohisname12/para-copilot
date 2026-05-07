@@ -5,6 +5,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GOAL_PROGRESS_OPTIONS } from '../../data';
 import { resolveLabel } from '../../privacy/nameResolver';
+import PrivacyName from '../PrivacyName';
 import { Donut } from './Donut';
 import { useEscape } from '../../hooks/useEscape';
 import { optionForId } from './goalTrackerHelpers';
@@ -143,7 +144,7 @@ export function GoalTrackerFullscreen({
               fontSize: 22, fontWeight: 800, color: student.color,
               letterSpacing: '-0.01em', lineHeight: 1.1,
             }}>
-              {studentLabel}
+              <PrivacyName>{studentLabel}</PrivacyName>
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 2 }}>
               Goal dashboard · {goals.length} goal{goals.length === 1 ? '' : 's'}
