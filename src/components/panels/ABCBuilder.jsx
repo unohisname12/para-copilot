@@ -1,11 +1,13 @@
 // ── ABC Behavior Builder ─────────────────────────────────────
 import React, { useState } from "react";
 import { resolveLabel } from '../../privacy/nameResolver';
+import { usePrivacyMode } from '../../hooks/usePrivacyMode';
 
 const lbl = { fontSize: "11px", color: "#94a3b8", display: "block", marginBottom: "3px" };
 
 export function ABCBuilder({ students, onSave, periodLabel, currentDate, studentsMap }) {
   const lookup = studentsMap || {};
+  const { on: privacyOn } = usePrivacyMode();
   const [stu, setStu] = useState(students[0] || ""), [ant, setAnt] = useState(""), [beh, setBeh] = useState(""), [con, setCon] = useState(""), [intensity, setIntensity] = useState("low"), [duration, setDuration] = useState(""), [staffResp, setStaffResp] = useState(""), [followUp, setFollowUp] = useState("");
   const save = () => {
     if (!beh.trim()) return;
@@ -15,7 +17,11 @@ export function ABCBuilder({ students, onSave, periodLabel, currentDate, student
   };
   return (
     <div style={{ padding: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
-      <div><label style={lbl}>Student</label><select value={stu} onChange={e => setStu(e.target.value)} className="period-select" style={{ width: "100%" }}>{students.filter(id => lookup[id]).map(id => <option key={id} value={id}>{resolveLabel(lookup[id], "compact")}</option>)}</select></div>
+      <div><label style={lbl}>Student</label><select value={stu} onChange={e => setStu(e.target.value)} className="period-select" style={{ width: "100%" }}>{students.filter(id => lookup[id]).map(id => {
+        const s = lookup[id];
+        const label = privacyOn ? (s.pseudonym || resolveLabel(s, 'compact')) : resolveLabel(s, 'compact');
+        return <option key={id} value={id}>{label}</option>;
+      })}</select></div>
       <div><label style={lbl}>A — Antecedent <span style={{ color: "#64748b" }}>(what happened before)</span></label><input value={ant} onChange={e => setAnt(e.target.value)} className="chat-input" placeholder="e.g. Teacher asked class to open books" /></div>
       <div><label style={{ ...lbl, color: "#f87171" }}>B — Behavior <span style={{ color: "#64748b" }}>(what you observed)*</span></label><input value={beh} onChange={e => setBeh(e.target.value)} className="chat-input" placeholder="e.g. Student put head down and refused" /></div>
       <div><label style={lbl}>C — Consequence <span style={{ color: "#64748b" }}>(what happened after)</span></label><input value={con} onChange={e => setCon(e.target.value)} className="chat-input" placeholder="e.g. Offered break pass, student took 5 min walk" /></div>

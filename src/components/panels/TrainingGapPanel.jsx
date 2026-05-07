@@ -7,6 +7,7 @@ import React, { useState } from "react";
 import { runTrainingGapRules } from "../../engine";
 import { tailorAdvice } from "../../engine/trainingGapTailoring";
 import { resolveLabel } from "../../privacy/nameResolver";
+import PrivacyName from "../PrivacyName";
 
 const lbl = { fontSize: "11px", color: "#94a3b8", display: "block", marginBottom: "3px" };
 
@@ -22,7 +23,7 @@ function AuditPanel({ topic, studentLabel }) {
       </div>
       <div style={{ marginBottom: 8 }}>
         <span style={{ color: "#94a3b8" }}>Window:</span> last {topic.window.days} days &nbsp;·&nbsp;
-        <span style={{ color: "#94a3b8" }}>Student:</span> {studentLabel}
+        <span style={{ color: "#94a3b8" }}>Student:</span> <PrivacyName>{studentLabel}</PrivacyName>
       </div>
       <div style={{ marginBottom: 8 }}>
         <span style={{ color: "#94a3b8" }}>Matching logs ({topic.evidenceLogs.length}):</span>
@@ -56,7 +57,7 @@ function TopicCard({ topic, studentsMap, expanded, onToggle }) {
         <div style={{ fontSize: 16 }} title="Topic for next check-in">🔖</div>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#f1f5f9" }}>{topic.topicTitle}</div>
-          <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>About: {studentLabel}</div>
+          <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>About: <PrivacyName>{studentLabel}</PrivacyName></div>
           <div style={{ fontSize: 13, color: "#cbd5e1", marginTop: 8, lineHeight: 1.5 }}>{topic.topicExplainer}</div>
         </div>
       </div>

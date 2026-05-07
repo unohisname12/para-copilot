@@ -21,6 +21,7 @@ import { usePlanSummary } from '../plan/usePlanSummary';
 import { extractPdfText } from '../plan/extractPdfText';
 import { geminiQuickFocusTips } from '../../engine/cloudAI';
 import { useVault } from '../../context/VaultProvider';
+import { usePrivacyMode } from '../../hooks/usePrivacyMode';
 
 // ── Constants ────────────────────────────────────────────────
 const LAYOUT_KEY  = "dashLayoutV3";
@@ -1498,6 +1499,7 @@ export function Dashboard({
 // ══════════════════════════════════════════════════════════════
 function ExportTodayModal({ period, activePeriod, currentDate, topic, docSnippet, logs, allStudents, onClose }) {
   const { showRealNames } = useVault();
+  const { on: privacyOn } = usePrivacyMode();
   const [copied, setCopied] = React.useState(false);
   const [includeDocSnippet, setIncludeDocSnippet] = React.useState(Boolean(docSnippet));
 
@@ -1545,7 +1547,9 @@ function ExportTodayModal({ period, activePeriod, currentDate, topic, docSnippet
       lines.push('');
       byStudent.forEach((stuLogs, studentId) => {
         const s = allStudents[studentId];
-        const name = showRealNames ? (s?.realName || s?.pseudonym || studentId) : (s?.pseudonym || studentId);
+        const name = privacyOn
+          ? (s?.pseudonym || studentId)
+          : (showRealNames ? (s?.realName || s?.pseudonym || studentId) : (s?.pseudonym || studentId));
         lines.push(`• ${name}`);
         stuLogs.forEach(l => {
           const t = l.timestamp
@@ -1561,10 +1565,10 @@ function ExportTodayModal({ period, activePeriod, currentDate, topic, docSnippet
 
     lines.push(`— Exported from SupaPara on ${new Date().toLocaleString()} —`);
     return lines.join('\n');
-  }, [period, currentDate, topic, docSnippet, includeDocSnippet, todaysLogs, byStudent, allStudents, showRealNames]);
+  }, [period, currentDate, topic, docSnippet, includeDocSnippet, todaysLogs, byStudent, allStudents, showRealNames, privacyOn]);
 
   function copy() {
-    if (showRealNames && !window.confirm('Export will contain real student names. Copy to clipboard?')) return;
+    if (!privacyOn && showRealNames && !window.confirm('Export will contain real student names. Copy to clipboard?')) return;
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
@@ -1572,7 +1576,7 @@ function ExportTodayModal({ period, activePeriod, currentDate, topic, docSnippet
   }
 
   function download() {
-    if (showRealNames && !window.confirm('Export will contain real student names. Download file?')) return;
+    if (!privacyOn && showRealNames && !window.confirm('Export will contain real student names. Download file?')) return;
     const safeDate = currentDate.replace(/[^0-9-]/g, '');
     const safePeriod = (period.label || activePeriod).replace(/[^a-z0-9]+/gi, '_');
     const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });

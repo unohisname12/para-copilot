@@ -12,6 +12,7 @@ import {
 } from './goalTrackerHelpers';
 import { Donut } from './Donut';
 import { GoalTrackerFullscreen } from './GoalTrackerFullscreen';
+import PrivacyName from '../PrivacyName';
 
 function StatusChip({ optionId, glow = false }) {
   const opt = optionForId(optionId);
@@ -221,7 +222,7 @@ function StudentDashboardCard({ student, goals, logs, allLogs, onLog, onExpandFu
               boxShadow: `0 0 8px ${student.color}90`,
               flexShrink: 0,
             }} />
-            {studentLabel}
+            <PrivacyName>{studentLabel}</PrivacyName>
           </div>
 
           <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', flexWrap: 'wrap' }}>

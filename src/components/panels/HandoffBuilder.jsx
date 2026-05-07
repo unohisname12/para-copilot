@@ -5,11 +5,13 @@ import { useTeamOptional } from '../../context/TeamProvider';
 import { pushHandoff } from '../../services/teamSync';
 import { useAutoGrammarFix, useGrammarFixSetting } from '../../hooks/useAutoGrammarFix';
 import { useDraft } from '../../hooks/useDraft';
+import { usePrivacyMode } from '../../hooks/usePrivacyMode';
 
 const lbl = { fontSize: "11px", color: "#94a3b8", display: "block", marginBottom: "3px" };
 
 export function HandoffBuilder({ students, onSave, studentsMap, ollamaOnline, ollamaLoading, onOllamaHandoff }) {
   const lookup = studentsMap || {};
+  const { on: privacyOn } = usePrivacyMode();
   const team = useTeamOptional();
   const canShare = Boolean(team?.activeTeamId && team?.user?.id);
   const [audience, setAudience] = useState("next_para"), [urgency, setUrgency] = useState("normal"), [stuId, setStuId] = useState("all"), [summary, setSummary] = useState(""), [nextStep, setNextStep] = useState("");
@@ -83,7 +85,11 @@ export function HandoffBuilder({ students, onSave, studentsMap, ollamaOnline, ol
         <div><label style={lbl}>Audience</label><select value={audience} onChange={e => setAudience(e.target.value)} className="period-select" style={{ width: "100%" }}><option value="next_para">Next Para</option><option value="teacher">Teacher</option><option value="end_of_day">End of Day</option><option value="urgent">Urgent Follow-up</option></select></div>
         <div><label style={lbl}>Urgency</label><select value={urgency} onChange={e => setUrgency(e.target.value)} className="period-select" style={{ width: "100%" }}><option value="normal">Normal</option><option value="important">Important</option><option value="urgent">Urgent</option></select></div>
       </div>
-      <div><label style={lbl}>Student (or all)</label><select value={stuId} onChange={e => setStuId(e.target.value)} className="period-select" style={{ width: "100%" }}><option value="all">All students this period</option>{students.filter(id => lookup[id]).map(id => <option key={id} value={id}>{resolveLabel(lookup[id], "compact")}</option>)}</select></div>
+      <div><label style={lbl}>Student (or all)</label><select value={stuId} onChange={e => setStuId(e.target.value)} className="period-select" style={{ width: "100%" }}><option value="all">All students this period</option>{students.filter(id => lookup[id]).map(id => {
+        const s = lookup[id];
+        const label = privacyOn ? (s.pseudonym || resolveLabel(s, 'compact')) : resolveLabel(s, 'compact');
+        return <option key={id} value={id}>{label}</option>;
+      })}</select></div>
       <div><label style={lbl}>Summary*</label><textarea ref={summaryRef} spellCheck="true" lang="en" value={summary} onChange={e => setSummary(e.target.value)} className="data-textarea" style={{ height: "70px" }} placeholder="What happened, what to know..." /></div>
       <div><label style={lbl}>Action Needed</label><input ref={nextStepRef} spellCheck="true" lang="en" value={nextStep} onChange={e => setNextStep(e.target.value)} className="chat-input" placeholder="e.g. Check in with student at start of next period" /></div>
       {urgency === "urgent" && <div style={{ fontSize: "11px", color: "#f87171", background: "#7f1d1d30", padding: "6px 10px", borderRadius: "6px" }}>🔴 This will show up as urgent in your records.</div>}
