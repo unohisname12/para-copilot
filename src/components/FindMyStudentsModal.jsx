@@ -48,6 +48,7 @@ export default function FindMyStudentsModal({
   allowedKeys = null,
   onSetAllowlist = null,
   onClearAllowlist = null,
+  allowlistDiagnostic = null,
 }) {
   const fileRef = useRef();
   const vault   = useVault();
@@ -115,8 +116,11 @@ export default function FindMyStudentsModal({
     // the source of truth. Anything not in the upload is hidden until the
     // para clears the lock from this modal.
     const keys = entries
-      .map((e) => e?.paraAppNumber || e?.externalKey || e?.key)
-      .filter(Boolean);
+      .map((e) => ({
+        paraAppNumber: e?.paraAppNumber || e?.externalKey || e?.key || null,
+        pseudonym: e?.pseudonym || e?.displayLabel || null,
+      }))
+      .filter((k) => k.paraAppNumber || k.pseudonym);
     let lockedCount = 0;
     if (onSetAllowlist && keys.length > 0) {
       lockedCount = onSetAllowlist(keys);
@@ -230,6 +234,30 @@ export default function FindMyStudentsModal({
                   Clear lock
                 </button>
               )}
+            </div>
+          )}
+
+          {allowlistDiagnostic && allowlistDiagnostic.totalUploaded > 0 && allowlistDiagnostic.matched < allowlistDiagnostic.totalUploaded && (
+            <div style={{
+              padding: '10px 14px',
+              borderRadius: 'var(--radius-md)',
+              background: 'rgba(248,113,113,0.10)',
+              border: '1px solid rgba(248,113,113,0.40)',
+              color: '#fca5a5',
+              fontSize: 12, lineHeight: 1.55,
+            }}>
+              <div style={{ fontWeight: 700 }}>
+                {allowlistDiagnostic.matched} of {allowlistDiagnostic.totalUploaded} matched on the cloud roster.
+              </div>
+              {allowlistDiagnostic.unmatchedKeys.length > 0 && (
+                <div style={{ marginTop: 4 }}>
+                  Unmatched: {allowlistDiagnostic.unmatchedKeys.join(', ')}
+                  {allowlistDiagnostic.totalUploaded - allowlistDiagnostic.matched > allowlistDiagnostic.unmatchedKeys.length ? ', …' : ''}
+                </div>
+              )}
+              <div style={{ marginTop: 4, fontSize: 11, opacity: 0.85 }}>
+                Ask the admin to check that paraAppNumber is set on the cloud roster, or re-upload with matching keys.
+              </div>
             </div>
           )}
 

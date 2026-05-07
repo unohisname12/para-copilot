@@ -243,7 +243,27 @@ export function useStudents({ activePeriod, cloudStudents = null }) {
   );
   const allowedSet = useMemo(() => {
     const arr = Array.isArray(allowedKeys) ? allowedKeys : [];
-    return new Set(arr.map((k) => String(k).trim()).filter(Boolean));
+    const numbers = new Set();
+    const pseudonyms = new Set();
+    arr.forEach((entry) => {
+      if (entry == null) return;
+      if (typeof entry === 'string') {
+        const t = entry.trim();
+        if (t) numbers.add(t);
+        return;
+      }
+      if (typeof entry === 'object') {
+        if (entry.paraAppNumber != null) {
+          const t = String(entry.paraAppNumber).trim();
+          if (t) numbers.add(t);
+        }
+        if (entry.pseudonym != null) {
+          const t = String(entry.pseudonym).trim();
+          if (t) pseudonyms.add(t);
+        }
+      }
+    });
+    return { numbers, pseudonyms, total: numbers.size + pseudonyms.size };
   }, [allowedKeys]);
   const effectivePeriodStudents = useMemo(() => {
     const importedIds = importedPeriodMap[activePeriod] || [];
@@ -261,9 +281,12 @@ export function useStudents({ activePeriod, cloudStudents = null }) {
       // My Students, only cloud rows whose paraAppNumber appears in the
       // allowlist survive. Empty allowlist = no lock = show all assigned.
       const passesAllowlist = (s) => {
-        if (allowedSet.size === 0) return true;
-        const key = s?.paraAppNumber ? String(s.paraAppNumber).trim() : '';
-        return key && allowedSet.has(key);
+        if (allowedSet.total === 0) return true;
+        const num = s?.paraAppNumber ? String(s.paraAppNumber).trim() : '';
+        if (num && allowedSet.numbers.has(num)) return true;
+        const pseu = s?.pseudonym ? String(s.pseudonym).trim() : '';
+        if (pseu && allowedSet.pseudonyms.has(pseu)) return true;
+        return false;
       };
       // Dedupe cloud rows by paraAppNumber inside this period and drop
       // locally-imported ids that the cloud already covers. Admin
@@ -291,6 +314,28 @@ export function useStudents({ activePeriod, cloudStudents = null }) {
       : [...new Set([...importedIds])];
     return merged.filter((id) => !hiddenSet.has(id));
   }, [cloudStudentList, effectiveDemoMode, period.students, importedPeriodMap, importedStudents, activePeriod, hiddenSet, allowedSet]);
+
+  const allowlistDiagnostic = useMemo(() => {
+    const totalUploaded = allowedSet.total;
+    if (!cloudStudentList || totalUploaded === 0) {
+      return { totalUploaded, matched: 0, unmatchedKeys: [] };
+    }
+    const cloudPan = new Set();
+    const cloudPseu = new Set();
+    cloudStudentList.forEach((s) => {
+      if (s.paraAppNumber) cloudPan.add(String(s.paraAppNumber).trim());
+      if (s.pseudonym) cloudPseu.add(String(s.pseudonym).trim());
+    });
+    let matched = 0;
+    const unmatched = [];
+    allowedSet.numbers.forEach((n) => {
+      if (cloudPan.has(n)) matched++; else unmatched.push(`#${n}`);
+    });
+    allowedSet.pseudonyms.forEach((p) => {
+      if (cloudPseu.has(p)) matched++; else unmatched.push(p);
+    });
+    return { totalUploaded, matched, unmatchedKeys: unmatched.slice(0, 10) };
+  }, [cloudStudentList, allowedSet]);
 
   const handleImport = (studentObj, periodId) => {
     setImportedStudents(prev => ({ ...prev, [studentObj.id]: studentObj }));
@@ -372,12 +417,36 @@ export function useStudents({ activePeriod, cloudStudents = null }) {
   };
 
   const setRosterAllowlist = (keys = []) => {
-    const cleaned = Array.from(new Set(
-      (Array.isArray(keys) ? keys : [])
-        .map((k) => (k == null ? '' : String(k).trim()))
-        .filter(Boolean)
-    ));
+    // Accept either bare strings (legacy paraAppNumber-only) or
+    // objects with { paraAppNumber?, pseudonym? } so callers can supply
+    // both keys when they have them. Dedupe by JSON shape so two entries
+    // with the same paraAppNumber don't survive twice.
+    const seen = new Set();
+    const cleaned = [];
+    (Array.isArray(keys) ? keys : []).forEach((entry) => {
+      if (entry == null) return;
+      let normalized = null;
+      if (typeof entry === 'string') {
+        const t = entry.trim();
+        if (t) normalized = t;  // store as string for backwards-compat
+      } else if (typeof entry === 'object') {
+        const pan = entry.paraAppNumber != null ? String(entry.paraAppNumber).trim() : '';
+        const pseu = entry.pseudonym != null ? String(entry.pseudonym).trim() : '';
+        if (pan || pseu) {
+          normalized = {};
+          if (pan) normalized.paraAppNumber = pan;
+          if (pseu) normalized.pseudonym = pseu;
+        }
+      }
+      if (normalized == null) return;
+      const key = typeof normalized === 'string' ? `s:${normalized}` : `o:${normalized.paraAppNumber || ''}|${normalized.pseudonym || ''}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      cleaned.push(normalized);
+    });
     setAllowedKeys(cleaned);
+    // Count = unique identifiers contributed (a paraAppNumber and a pseudonym
+    // on the same entry count as 1 student, not 2).
     return cleaned.length;
   };
   const clearRosterAllowlist = () => setAllowedKeys([]);
@@ -410,5 +479,6 @@ export function useStudents({ activePeriod, cloudStudents = null }) {
     resetImports,
     hiddenStudentIds, hideStudentIds, unhideStudentIds, clearHiddenStudents,
     allowedKeys, setRosterAllowlist, clearRosterAllowlist,
+    allowlistDiagnostic,
   };
 }

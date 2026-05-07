@@ -1520,6 +1520,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
         onUnhideStudents={students.unhideStudentIds}
         onClearHidden={students.clearHiddenStudents}
         allowedKeys={students.allowedKeys}
+        allowlistDiagnostic={students.allowlistDiagnostic}
         onSetAllowlist={students.setRosterAllowlist}
         onClearAllowlist={students.clearRosterAllowlist}
       />
