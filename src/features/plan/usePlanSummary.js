@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { useLocalStorage } from '../../hooks/useLocalStorage';
+import { useLocalStorageKeyed } from '../../hooks/useLocalStorageKeyed';
 import { geminiSummarizePlan } from '../../engine/cloudAI';
 
 // Small string hash used as cache key. We re-summarize whenever the
@@ -17,7 +17,7 @@ function hashText(text) {
 // Stored object: { hash, source, plan: { topic, objectives, vocab, activities, para_focus } }
 export function usePlanSummary(activePeriod, currentDate) {
   const key = `planSummary_${activePeriod}_${currentDate}`;
-  const [stored, setStored] = useLocalStorage(key, null);
+  const [stored, setStored] = useLocalStorageKeyed(key, null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 

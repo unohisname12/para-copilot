@@ -8,6 +8,7 @@ import { resolveLabel } from '../../privacy/nameResolver';
 import { parseDocForPeriod, matchCaseKeywords } from '../../engine';
 import { useAutoGrammarFix, useGrammarFixSetting } from '../../hooks/useAutoGrammarFix';
 import { useDraft } from '../../hooks/useDraft';
+import { useLocalStorageKeyed } from '../../hooks/useLocalStorageKeyed';
 import { OllamaStatusBadge } from '../../components/OllamaStatusBadge';
 import { HelpButton } from '../help';
 import { ShowcaseBanner } from '../showcase';
@@ -45,21 +46,6 @@ const HEALTH_STYLE = {
   red:    { bg: "#1a0505", color: "#f87171", border: "#7f1d1d" },
 };
 
-// ── Small util: localStorage hook ────────────────────────────
-function useLS(key, def) {
-  const [val, setVal] = useState(() => {
-    try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : def; } catch { return def; }
-  });
-  const set = useCallback((v) => {
-    setVal(prev => {
-      const next = typeof v === "function" ? v(prev) : v;
-      try { localStorage.setItem(key, JSON.stringify(next)); } catch {}
-      return next;
-    });
-  }, [key]);
-  return [val, set];
-}
-
 // ═════════════════════════════════════════════════════════════
 // MAIN DASHBOARD COMPONENT
 // ═════════════════════════════════════════════════════════════
@@ -84,16 +70,16 @@ export function Dashboard({
   onScheduleFollowUp,
 }) {
   // ── Persisted layout ──────────────────────────────────────
-  const [layout, setLayout] = useLS(LAYOUT_KEY, { cols: 2, chatOpen: false, chatH: 320 });
-  const [topic, setTopic]   = useLS(topicKey(activePeriod, currentDate), "");
+  const [layout, setLayout] = useLocalStorageKeyed(LAYOUT_KEY, { cols: 2, chatOpen: false, chatH: 320 });
+  const [topic, setTopic]   = useLocalStorageKeyed(topicKey(activePeriod, currentDate), "");
   // 'write' = type the topic in the app; 'fetch' = pull from Google Doc URL;
   // 'pdf'   = upload a PDF lesson plan from the teacher;
   // 'none'  = skip (no plan today). Persisted per-period-per-day.
-  const [planMode, setPlanMode] = useLS(`planMode_${activePeriod}_${currentDate}`, 'write');
+  const [planMode, setPlanMode] = useLocalStorageKeyed(`planMode_${activePeriod}_${currentDate}`, 'write');
   // AI-summarized plan (from doc fetch or PDF upload). Per-period-per-day,
   // cached by content hash so re-renders don't re-spend Gemini quota.
   const planSummary = usePlanSummary(activePeriod, currentDate);
-  const [pdfFileName, setPdfFileName] = useLS(`planPdfName_${activePeriod}_${currentDate}`, '');
+  const [pdfFileName, setPdfFileName] = useLocalStorageKeyed(`planPdfName_${activePeriod}_${currentDate}`, '');
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfError, setPdfError] = useState(null);
   const [focusTip, setFocusTip] = useState(null);
@@ -133,8 +119,9 @@ export function Dashboard({
     document.addEventListener("mouseup", up);
   }, [layout.chatH, setLayout]);
 
-  // Sync topic draft when switching periods / dates
-  useEffect(() => { setTopicDraft(topic); }, [activePeriod, currentDate]);
+  // Sync topic draft when the persisted topic changes (e.g. period/date switch
+  // re-keys the underlying useLocalStorageKeyed and yields a new value).
+  useEffect(() => { setTopicDraft(topic); }, [topic]);
 
   // Auto-grammar-fix: shared hook handles debounce + cursor restoration.
   useAutoGrammarFix({ value: topicDraft, setValue: setTopicDraft, ref: topicTextareaRef, enabled: autoFix && topicEdit });
