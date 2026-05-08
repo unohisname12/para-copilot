@@ -7,14 +7,14 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 // Existing useLocalStorage() in this repo is for STATIC keys; do not use it
 // when the key is derived from props (e.g. activePeriod).
 export function useLocalStorageKeyed(key, def) {
+  // def intentionally captured at mount — change-of-default after mount
+  // shouldn't retroactively re-init storage. Empty deps are correct here.
+  const defRef = useRef(def);
   const read = useCallback((k) => {
     try {
       const s = localStorage.getItem(k);
-      return s != null ? JSON.parse(s) : def;
-    } catch { return def; }
-    // def intentionally not in deps — change-of-default after mount shouldn't
-    // retroactively re-init storage.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      return s != null ? JSON.parse(s) : defRef.current;
+    } catch { return defRef.current; }
   }, []);
 
   const [val, setVal] = useState(() => read(key));
