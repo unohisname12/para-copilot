@@ -483,3 +483,31 @@ watch for or pre-teach today. Plain language. No filler. No bullets in output.`,
   });
   return out;
 }
+
+// Cheap connectivity test. Sends a 1-token prompt to Flash-Lite, returns
+// { ok: true } on success or { ok: false, reason } on any failure.
+// Used by Settings → "Test Gemini key" so the user gets a yes/no answer
+// without burning quota on a real summarization.
+export async function geminiTestKey() {
+  const key = getCloudApiKey();
+  if (!key) return { ok: false, reason: 'No API key set.' };
+  try {
+    const res = await fetch(GEMINI_ENDPOINT(GEMINI_FLASH_LITE_MODEL, key), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: 'ping' }] }],
+        generationConfig: { maxOutputTokens: 1, temperature: 0 },
+      }),
+    });
+    if (res.status === 401 || res.status === 403) return { ok: false, reason: 'Key rejected (401/403). Re-paste from AI Studio and confirm billing is enabled.' };
+    if (res.status === 429) return { ok: false, reason: 'Quota exceeded (429). Wait or upgrade your Google AI Studio plan.' };
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      return { ok: false, reason: `HTTP ${res.status}: ${body.slice(0, 200)}` };
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, reason: `Network error: ${e?.message || e}` };
+  }
+}

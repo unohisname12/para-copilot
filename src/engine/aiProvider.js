@@ -24,6 +24,7 @@ import {
   getDailyCapDollars,
   setDailyCapDollars,
   getDailyUsage,
+  geminiTestKey,
 } from './cloudAI';
 
 const PROVIDER_STORAGE_KEY = 'supapara_ai_provider_v1';
@@ -122,4 +123,5 @@ export {
   DEFAULT_GEMINI_MODEL,
   GEMINI_FLASH_LITE_MODEL,
   getDailyCapDollars, setDailyCapDollars, getDailyUsage,
+  geminiTestKey,
 };

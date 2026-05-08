@@ -82,6 +82,7 @@ export function Dashboard({
   const [pdfFileName, setPdfFileName] = useLocalStorageKeyed(`planPdfName_${activePeriod}_${currentDate}`, '');
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfError, setPdfError] = useState(null);
+  const [docError, setDocError] = useState(null);
   const [focusTip, setFocusTip] = useState(null);
   const [focusTipLoading, setFocusTipLoading] = useState(false);
   // Auto-Grammar-Fix toggle — toggle now lives in Settings; this hook just
@@ -216,7 +217,10 @@ export function Dashboard({
     if (planMode !== 'fetch') return;
     const text = docSnippet || docContent;
     if (!text || !String(text).trim()) return;
-    planSummary.summarize(text, 'doc').catch(() => {});
+    setDocError(null);
+    planSummary.summarize(text, 'doc').catch((e) => {
+      setDocError(e?.message || String(e));
+    });
   }, [docContent, docSnippet, planMode]);
 
   const handlePdfFile = useCallback(async (file) => {
@@ -248,9 +252,16 @@ export function Dashboard({
     try {
       const tip = await geminiQuickFocusTips(topic);
       if (tip) setFocusTip(tip);
-      else setFocusTip('No tips returned. Check your API key in Settings.');
+      else setFocusTip('No tips returned. Try Settings → Test Gemini key.');
     } catch (e) {
-      setFocusTip(`Error: ${e?.message || e}`);
+      const msg = e?.name === 'CloudAIKeyMissingError'
+        ? 'Gemini key not set. Open Settings → Gemini and paste a key from Google AI Studio.'
+        : e?.name === 'CloudAIKeyInvalidError'
+        ? 'Gemini key was rejected (401/403). Re-paste from AI Studio.'
+        : e?.name === 'CloudAIQuotaError'
+        ? 'Gemini quota exhausted. Try later or upgrade your AI Studio plan.'
+        : `Gemini error: ${e?.message || e}`;
+      setFocusTip(msg);
     } finally {
       setFocusTipLoading(false);
     }
@@ -736,6 +747,21 @@ export function Dashboard({
                   padding: "8px 12px", borderRadius: 8,
                   background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.3)",
                 }}>{planSummary.error}</div>
+              )}
+              {docError && (
+                <div style={{
+                  padding: 'var(--space-3)',
+                  background: 'rgba(248,113,113,0.08)',
+                  border: '1px solid rgba(248,113,113,0.4)',
+                  borderRadius: 'var(--radius-md)',
+                  color: '#fca5a5',
+                  fontSize: 12,
+                }}>
+                  Plan summarize failed: {docError}
+                  <div style={{ marginTop: 4, opacity: 0.85 }}>
+                    Open Settings → Gemini → Test key. If the key isn't set, paste one from Google AI Studio.
+                  </div>
+                </div>
               )}
               {planSummary.plan && (
                 <div style={{ marginTop: 6 }}>

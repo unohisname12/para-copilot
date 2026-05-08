@@ -12,6 +12,7 @@ import {
   getDailyUsage,
   DEFAULT_GEMINI_MODEL,
   GEMINI_FLASH_LITE_MODEL,
+  geminiTestKey,
 } from '../engine/aiProvider';
 import { ONBOARDING_KEY } from './OnboardingModal';
 import { hasPin, clearPin } from '../features/stealth/pinStorage';
@@ -48,6 +49,8 @@ export default function SettingsModal({ open, onClose, onReplayOnboarding, onOpe
   const [pinExists, setPinExists] = React.useState(() => hasPin());
   const [pinModal, setPinModal] = React.useState(false);
   const [geminiKey, setGeminiKey] = React.useState(() => getCloudApiKey());
+  const [testStatus, setTestStatus] = React.useState(null); // { kind: 'ok' | 'err', message }
+  const [testing, setTesting] = React.useState(false);
   const [dailyCap, setDailyCap] = React.useState(() => getDailyCapDollars());
   const [aiSaved, setAiSaved] = React.useState(false);
   const aiUsage = getDailyUsage();
@@ -73,6 +76,17 @@ export default function SettingsModal({ open, onClose, onReplayOnboarding, onOpe
     setDailyCapDollars(dailyCap);
     setAiSaved(true);
     setTimeout(() => setAiSaved(false), 1800);
+  }
+
+  async function runGeminiTest() {
+    setTesting(true);
+    setTestStatus(null);
+    try {
+      const r = await geminiTestKey();
+      setTestStatus(r.ok ? { kind: 'ok', message: 'Key works.' } : { kind: 'err', message: r.reason });
+    } finally {
+      setTesting(false);
+    }
   }
 
   async function handleSignOut() {
@@ -143,6 +157,38 @@ export default function SettingsModal({ open, onClose, onReplayOnboarding, onOpe
                 Today: ~${Number(aiUsage.estimatedCost || 0).toFixed(4)} across {aiUsage.calls || 0} calls.
                 {' '}Cheap model: {GEMINI_FLASH_LITE_MODEL}. Harder model: {DEFAULT_GEMINI_MODEL}.
                 {aiSaved && <span style={{ color: 'var(--green)', fontWeight: 700 }}> Saved.</span>}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                {(() => {
+                  const keyPresent = Boolean(getCloudApiKey());
+                  return (
+                    <span style={{
+                      fontSize: 11, padding: '2px 8px', borderRadius: 999,
+                      background: keyPresent ? 'rgba(34,197,94,0.15)' : 'rgba(148,163,184,0.15)',
+                      color: keyPresent ? '#86efac' : '#94a3b8',
+                      border: `1px solid ${keyPresent ? 'rgba(34,197,94,0.4)' : 'rgba(148,163,184,0.3)'}`,
+                    }}>
+                      {keyPresent ? 'Key set' : 'No key set'}
+                    </span>
+                  );
+                })()}
+                <button
+                  type="button"
+                  onClick={runGeminiTest}
+                  disabled={!getCloudApiKey() || testing}
+                  className="btn btn-secondary"
+                  style={{ fontSize: 11, padding: '4px 10px' }}
+                >
+                  {testing ? 'Testing…' : 'Test key'}
+                </button>
+                {testStatus && (
+                  <span style={{
+                    fontSize: 11,
+                    color: testStatus.kind === 'ok' ? '#86efac' : '#fca5a5',
+                  }}>
+                    {testStatus.message}
+                  </span>
+                )}
               </div>
             </div>
           </Section>
