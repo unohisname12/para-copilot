@@ -804,7 +804,10 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
           </button>
         ))}
       </div>
-      {(vaultTab === "byStudent" || vaultTab === "byPeriod") && (<div style={{ marginBottom: "14px", display: "flex", gap: "8px", alignItems: "center" }}><span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Filter:</span><select value={vaultFilter} onChange={e => setVaultFilter(e.target.value)} className="period-select" style={{ maxWidth: "280px" }}><option value="all">All</option>{vaultTab === "byStudent" && Object.entries(allStudents).map(([id, s]) => (<option key={id} value={id}>{needsAttention.has(id) ? "⚠ " : ""}{resolveLabel(s, "compact")} ({logs.filter(l => l.studentId === id).length})</option>))}{vaultTab === "byPeriod" && Object.entries(DB.periods).map(([id, p]) => (<option key={id} value={id}>{p.label}</option>))}</select></div>)}
+      {(vaultTab === "byStudent" || vaultTab === "byPeriod") && (<div style={{ marginBottom: "14px", display: "flex", gap: "8px", alignItems: "center" }}><span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Filter:</span><select value={vaultFilter} onChange={e => setVaultFilter(e.target.value)} className="period-select" style={{ maxWidth: "280px" }}><option value="all">All</option>{vaultTab === "byStudent" && Object.entries(allStudents).map(([id, s]) => {
+              const optLabel = privacyOn ? (s.pseudonym || resolveLabel(s, "compact")) : resolveLabel(s, "compact");
+              return <option key={id} value={id}>{needsAttention.has(id) ? "⚠ " : ""}{optLabel} ({logs.filter(l => l.studentId === id).length})</option>;
+            })}{vaultTab === "byPeriod" && Object.entries(DB.periods).map(([id, p]) => (<option key={id} value={id}>{p.label}</option>))}</select></div>)}
 
       {/* Interactive filter + search bar (hidden on KB tab) */}
       {vaultTab !== "knowledge" && (
@@ -951,7 +954,7 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
         const s = rawStudent || { pseudonym: l.studentId, color: "var(--text-muted)" };
         const label = isOrphan
           ? `↯ ${(l.studentId || '').slice(0, 24)}${(l.studentId || '').length > 24 ? '…' : ''}`
-          : (s.realName || resolveLabel(s, "compact"));
+          : (privacyOn ? (s.pseudonym || resolveLabel(s, "compact")) : (s.realName || resolveLabel(s, "compact")));
         const isExpanded = vaultExpandedId === l.id;
         const rowNeedsAttn = needsAttention.has(l.studentId);
         const rowBg = isExpanded
@@ -986,6 +989,8 @@ function AppShell({ currentDate, setCurrentDate, activePeriod, setActivePeriod, 
               <td style={{ whiteSpace: "nowrap", color: "var(--text-muted)" }}>{l.date}</td>
               <td style={{ fontSize: "12px", color: "var(--text-muted)", whiteSpace: "nowrap" }}>{l.period}</td>
               <td
+                className="privacy-blur"
+                tabIndex={0}
                 onClick={() => setProfileStu(l.studentId)}
                 title={isOrphan ? "Student not in current roster — click for details" : "Open profile"}
                 style={{

@@ -9,6 +9,7 @@
 // ══════════════════════════════════════════════════════════════
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useLocalStorage } from '../../hooks/useLocalStorage';
+import { usePrivacyMode } from '../../hooks/usePrivacyMode';
 import { useAutoGrammarFix, useGrammarFixSetting } from '../../hooks/useAutoGrammarFix';
 import { useDraft } from '../../hooks/useDraft';
 import { useCompactView } from '../../hooks/useCompactView';
@@ -122,6 +123,7 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
   // Real-names visibility — used to surface a warning chip when a student is
   // missing a real-name match while real-names mode is active.
   const { showRealNames } = useVault();
+  const { on: privacyOn } = usePrivacyMode();
 
   // Density layer — Chromebook-friendly compact mode. Auto-on under 1366px,
   // settings override available. Metrics flow into inline styles below so the
@@ -1214,7 +1216,7 @@ export function SimpleMode({ activePeriod, setActivePeriod, logs, addLog, delete
                 Write a short note: <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(or just hit Save)</span>
               </div>
               <textarea ref={noteTextRef} spellCheck="true" lang="en" value={noteText} onChange={e => setNoteText(e.target.value)}
-                placeholder={`What happened with ${resolveLabel(s, "compact")}?\n\nJust describe what you saw — keep it simple.`}
+                placeholder={`What happened with ${privacyOn ? (s.pseudonym || resolveLabel(s, "compact")) : resolveLabel(s, "compact")}?\n\nJust describe what you saw — keep it simple.`}
                 className="data-textarea"
                 style={{ minHeight: 130, fontSize: 16, lineHeight: 1.6 }} />
             </div>

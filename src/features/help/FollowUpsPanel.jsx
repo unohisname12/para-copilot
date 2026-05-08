@@ -61,7 +61,7 @@ export function FollowUpsPanel({
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 5 }}>
-              <strong style={{ fontSize: 13, color: 'var(--text-primary)' }}>
+              <strong className="privacy-blur" tabIndex={0} style={{ fontSize: 13, color: 'var(--text-primary)' }}>
                 {student ? resolveLabel(student, 'compact') : 'Student'}
               </strong>
               <span style={{ fontSize: 11, color: due ? 'var(--accent-hover)' : 'var(--text-muted)', fontWeight: 700 }}>

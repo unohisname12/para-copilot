@@ -77,7 +77,7 @@ export function FollowUpPrompt({ followUp, student, incident, intervention, onAn
         </div>
 
         <div style={{ color: 'var(--text-secondary)', fontSize: 13, lineHeight: 1.5, marginBottom: 14 }}>
-          <strong style={{ color: 'var(--text-primary)' }}>{studentLabel}</strong>
+          <strong className="privacy-blur" tabIndex={0} style={{ color: 'var(--text-primary)' }}>{studentLabel}</strong>
           {' '}had this note: {incident?.description || 'a saved note'}.
           <br />
           {needsIntervention ? (

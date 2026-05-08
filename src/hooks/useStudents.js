@@ -245,25 +245,33 @@ export function useStudents({ activePeriod, cloudStudents = null }) {
     const arr = Array.isArray(allowedKeys) ? allowedKeys : [];
     const numbers = new Set();
     const pseudonyms = new Set();
+    let entryCount = 0;
     arr.forEach((entry) => {
       if (entry == null) return;
       if (typeof entry === 'string') {
         const t = entry.trim();
-        if (t) numbers.add(t);
+        if (t) { numbers.add(t); entryCount++; }
         return;
       }
       if (typeof entry === 'object') {
+        let added = false;
         if (entry.paraAppNumber != null) {
           const t = String(entry.paraAppNumber).trim();
-          if (t) numbers.add(t);
+          if (t) { numbers.add(t); added = true; }
         }
         if (entry.pseudonym != null) {
           const t = String(entry.pseudonym).trim();
-          if (t) pseudonyms.add(t);
+          if (t) { pseudonyms.add(t); added = true; }
         }
+        if (added) entryCount++;
       }
     });
-    return { numbers, pseudonyms, total: numbers.size + pseudonyms.size };
+    return {
+      numbers,
+      pseudonyms,
+      total: entryCount,            // entry-based count for diagnostic display
+      keyTotal: numbers.size + pseudonyms.size,  // raw key count (kept for any callsite that needs it)
+    };
   }, [allowedKeys]);
   const effectivePeriodStudents = useMemo(() => {
     const importedIds = importedPeriodMap[activePeriod] || [];
@@ -328,14 +336,27 @@ export function useStudents({ activePeriod, cloudStudents = null }) {
     });
     let matched = 0;
     const unmatched = [];
-    allowedSet.numbers.forEach((n) => {
-      if (cloudPan.has(n)) matched++; else unmatched.push(`#${n}`);
-    });
-    allowedSet.pseudonyms.forEach((p) => {
-      if (cloudPseu.has(p)) matched++; else unmatched.push(p);
+    const arr = Array.isArray(allowedKeys) ? allowedKeys : [];
+    arr.forEach((entry) => {
+      if (entry == null) return;
+      let pan = '';
+      let pseu = '';
+      let label = '';
+      if (typeof entry === 'string') {
+        pan = entry.trim();
+        label = pan ? `#${pan}` : '';
+      } else if (typeof entry === 'object') {
+        pan = entry.paraAppNumber != null ? String(entry.paraAppNumber).trim() : '';
+        pseu = entry.pseudonym != null ? String(entry.pseudonym).trim() : '';
+        label = pseu || (pan ? `#${pan}` : '');
+      }
+      if (!pan && !pseu) return;
+      const hit = (pan && cloudPan.has(pan)) || (pseu && cloudPseu.has(pseu));
+      if (hit) matched++;
+      else if (label) unmatched.push(label);
     });
     return { totalUploaded, matched, unmatchedKeys: unmatched.slice(0, 10) };
-  }, [cloudStudentList, allowedSet]);
+  }, [cloudStudentList, allowedSet, allowedKeys]);
 
   const handleImport = (studentObj, periodId) => {
     setImportedStudents(prev => ({ ...prev, [studentObj.id]: studentObj }));
